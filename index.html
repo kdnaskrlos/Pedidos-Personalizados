@@ -453,6 +453,21 @@ table.mx{border-collapse:collapse;width:100%;font-size:13px}
 .pkotro{display:flex;gap:8px}
 .pkotro[hidden]{display:none}
 
+/* fila de prenda (v2.12) */
+.pbtn{justify-content:center;text-align:center}
+.pbtn span{flex:0 1 auto}
+.irow3 .r1{display:grid;grid-template-columns:repeat(3,minmax(0,1fr));gap:6px}
+.irow3 .r1 .qty{width:100%}
+.irow3 .r1 .qty span{flex:1}
+.irow3 .r3{display:flex;gap:6px}
+.irow3 .r3 .nm{flex:1;min-width:0;height:42px}
+.irow3 .r3 .nu{width:calc((100% - 12px) / 3);flex:none;height:42px;text-align:left}
+.irow3 .inp::placeholder{color:var(--muted);opacity:.45}
+.iempty{min-height:52vh;display:grid;place-items:center}
+.addfirst{display:inline-flex;align-items:center;gap:8px;border:0;border-radius:14px;padding:16px 28px;font-weight:800;font-size:16px;background:var(--accent);color:var(--accent-ink);box-shadow:0 10px 26px color-mix(in srgb,var(--accent) 30%,transparent)}
+.addfirst svg.i{width:20px;height:20px}
+.addfirst:active{filter:brightness(.94)}
+
 @media (max-width:1000px){
   .cols{grid-template-columns:minmax(0,1fr)}
   .tipotabs{display:flex}
@@ -532,7 +547,7 @@ import { initializeApp, deleteApp } from "https://www.gstatic.com/firebasejs/10.
 import { getAuth, onAuthStateChanged, signInWithEmailAndPassword, createUserWithEmailAndPassword, signOut, updatePassword, reauthenticateWithCredential, EmailAuthProvider } from "https://www.gstatic.com/firebasejs/10.12.2/firebase-auth.js";
 import { initializeFirestore, getFirestore, persistentLocalCache, persistentMultipleTabManager, doc, collection, query, where, onSnapshot, getDoc, setDoc, updateDoc, deleteDoc, writeBatch } from "https://www.gstatic.com/firebasejs/10.12.2/firebase-firestore.js";
 
-const VERSION = "v2.11";
+const VERSION = "v2.12";
 /* ================= Utilidades ================= */
 const $ = (s, r = document) => r.querySelector(s);
 const esc = s => String(s ?? "").replace(/[&<>"']/g, c => ({"&":"&amp;","<":"&lt;",">":"&gt;",'"':"&quot;","'":"&#39;"}[c]));
@@ -1027,7 +1042,7 @@ function viewAjustes(){
     </div>
     <div class="card">
       <div class="sec">${I("list")}Listas de opciones <small>una por línea</small></div>
-      <div class="g3">${ta("servicios","Tipos de estampado")}${ta("prendasPers","Prendas · Personalizado")}${ta("prendasSub","Productos · Sublimación")}${ta("hormas","Hormas")}${ta("marcas","Marcas")}${ta("tallasAdulto","Tallas adulto")}${ta("tallasNino","Tallas niño")}</div>
+      <div class="g3">${ta("servicios","Tipos de estampado")}${ta("prendasPers","Prendas · Personalizado")}${ta("prendasSub","Productos · Sublimación")}${ta("hormas","Hormas")}${ta("marcas","Etiquetas")}${ta("tallasAdulto","Tallas adulto")}${ta("tallasNino","Tallas niño")}</div>
       <div class="f"><label>Colores (Nombre | #código; usa "full" para fullprint)</label><textarea class="inp" id="cCol" style="min-height:170px">${esc(k.colores.map(x => x[0] + " | " + x[1]).join("\n"))}</textarea></div>
       <div style="display:flex;gap:8px;flex-wrap:wrap"><button class="btn primary" id="cSave">${I("check")}Guardar ajustes</button><button class="btn" id="cReset">${I("undo")}Restaurar listas originales</button></div>
     </div>`;
@@ -1310,8 +1325,8 @@ function openForm(id, tipo, cliente){
   const orig = id ? S.pedidos[id] : null;
   if (orig) tipo = orig.tipo;
   const c = cfg(), pr = perm(), T = TIPOS[tipo], isP = tipo === "personalizado";
-  F = orig ? JSON.parse(JSON.stringify(orig)) : {tipo, cliente:{nombre:(cliente && cliente.nombre) || "", telefono:(cliente && cliente.telefono) || ""}, tema:"", servicio:"", prendaDe:"", etiqueta:"", items:[blankItem()], fechaEntrega:"", precio:"", moneda:"COP", abono:"", motivoSinAbono:"", urgente:false, imagenes:[], nota:"", asignados:[]};
-  if (!F.items || !F.items.length) F.items = [blankItem()];
+  F = orig ? JSON.parse(JSON.stringify(orig)) : {tipo, cliente:{nombre:(cliente && cliente.nombre) || "", telefono:(cliente && cliente.telefono) || ""}, tema:"", servicio:"", prendaDe:"", etiqueta:"", items:[], fechaEntrega:"", precio:"", moneda:"COP", abono:"", motivoSinAbono:"", urgente:false, imagenes:[], nota:"", asignados:[]};
+  F.items = (F.items || []).map(i => Object.assign({etiqueta: F.etiqueta || ""}, i));
   F.imagenes = (F.imagenes || []).map(id => ({id}));
   F.step = 0; F.visto = [true, false, false, false];
   const marcas = c.cat.marcas.includes(F.etiqueta) || !F.etiqueta ? c.cat.marcas : [...c.cat.marcas, F.etiqueta];
@@ -1342,7 +1357,6 @@ function openForm(id, tipo, cliente){
       </section>
 
       <section class="step" data-step="1" hidden>
-        <div class="fsec"><div class="f" id="f-marca"><button type="button" class="pbtn big ${F.etiqueta ? "on" : ""}" id="in-etiq"><span>${esc(F.etiqueta || "Elegir marca")}</span>${I("chev")}</button><span class="msg"></span></div></div>
         <div class="fsec"><div class="f" id="f-items"><span id="itcount" hidden></span><div class="itemsbox" id="items"></div><span class="msg"></span></div></div>
       </section>
 
@@ -1431,7 +1445,6 @@ function openForm(id, tipo, cliente){
   F._checkTel = () => parsePhone(inTel.value, inPais.value);
 
   $("#in-tema", ov).oninput = e => { F.tema = e.target.value; clearErr("f-tema"); };
-  $("#in-etiq", ov).onclick = elegirMarca;
   $("#in-nota", ov).oninput = e => F.nota = e.target.value;
   $("#in-mon", ov).onchange = e => { F.moneda = e.target.value; renderTotals(); };
   $("#in-precio", ov).oninput = e => { F.precio = e.target.value; clearErr("f-precio"); renderTotals(); };
@@ -1480,11 +1493,10 @@ function erroresPaso(i){
     if (isP && !F.prendaDe) e.push(["f-prendade", "Indica quién pone la prenda"]);
   }
   if (i === 1) {
-    if (!F.etiqueta) e.push(["f-marca", "Elige la marca"]);
     const llenas = F.items.filter(x => !itemVacio(x));
-    const incompl = F.items.findIndex(x => !itemVacio(x) && (!x.prenda || !x.color || !x.talla));
-    if (!llenas.length) e.push(["f-items", "Agrega al menos una prenda con su color y talla"]);
-    else if (incompl >= 0) e.push(["f-items", "Completa la prenda, el color y la talla marcados en rojo"]);
+    const incompl = F.items.findIndex(x => !itemVacio(x) && (!x.etiqueta || !x.prenda || !x.color || !x.talla));
+    if (!llenas.length) e.push(["f-items", "Agrega al menos una prenda"]);
+    else if (incompl >= 0) e.push(["f-items", "Completa los datos marcados en rojo"]);
   }
   if (i === 2) {
     if (!F.fechaEntrega) e.push(["f-fecha", "Elige la fecha de entrega"]);
@@ -1537,24 +1549,30 @@ function pickPopup({title, kind, options, sections, current, otro, onPick}){
 }
 
 /* ---- Lista del pedido: cada fila con botones que abren la ventana de opciones ---- */
-const blankItem = prev => ({prenda: prev ? prev.prenda : "", color: prev ? prev.color : "", horma: prev ? prev.horma : "", talla:"", cant:1, nombre:"", numero:""});
-const itemVacio = i => !i.prenda && !i.color && !i.talla;
+const blankItem = prev => ({etiqueta: prev ? prev.etiqueta : "", prenda: prev ? prev.prenda : "", color: prev ? prev.color : "", horma: prev ? prev.horma : "", talla:"", cant:1, nombre:"", numero:""});
+const itemVacio = i => !i.etiqueta && !i.prenda && !i.color && !i.talla && !i.nombre;
 function renderItems(){
   const ov = F._ov, c = cfg().cat;
   const box = $("#items", ov), n = F.items.filter(i => !itemVacio(i)).reduce((s, i) => s + (Number(i.cant) || 1), 0);
   $("#itcount", ov).textContent = n ? `${n} pieza${n > 1 ? "s" : ""}` : "";
   const hexOf = name => (c.colores.find(x => x[0] === name) || [])[1] || "";
-  const pb = (f, val, ph, extra = "") => `<button type="button" class="pbtn ${val ? "on" : ""}" data-pick="${f}" data-err="${f}">${extra}<span>${esc(val || ph)}</span>${I("chev")}</button>`;
-  box.innerHTML = F.items.map((it, i) => `<div class="irow3" data-i="${i}">
+  const pb = (f, val, ph, extra = "") => `<button type="button" class="pbtn ${val ? "on" : ""}" data-pick="${f}" data-err="${f}">${extra}<span>${esc(val || ph)}</span></button>`;
+  if (!F.items.length) {
+    box.innerHTML = `<div class="iempty"><button type="button" class="addfirst" id="addItem">${I("plus")}Agregar prenda</button></div>`;
+  } else box.innerHTML = F.items.map((it, i) => `<div class="irow3" data-i="${i}">
+      <div class="r1">
+        ${pb("etiqueta", it.etiqueta, "Etiqueta")}
+        ${pb("talla", it.talla, "Talla")}
+        <div class="qty">${it.cant === 1 ? `<button type="button" class="del" data-del title="Quitar">${I("trash")}</button>` : `<button type="button" data-q="-1">−</button>`}<span>${it.cant}</span><button type="button" data-q="1">+</button></div>
+      </div>
       <div class="r1">
         ${pb("prenda", it.prenda, F.tipo === "personalizado" ? "Prenda" : "Producto")}
         ${pb("color", it.color, "Color", `<i class="sw0" style="${swatchStyle(hexOf(it.color))}"></i>`)}
         ${pb("horma", it.horma, "Horma")}
       </div>
-      <div class="r2">
-        ${it.cant === 1 ? `<input class="inp nm" data-fld="nombre" placeholder="Nombre" value="${esc(it.nombre || "")}">` : `<button type="button" class="lk nmlink" data-split="${i}">Nombre a cada una</button>`}
-        ${pb("talla", it.talla, "Talla")}
-        <div class="qty">${it.cant === 1 ? `<button type="button" class="del" data-del title="Quitar">${I("trash")}</button>` : `<button type="button" data-q="-1">−</button>`}<span>${it.cant}</span><button type="button" data-q="1">+</button></div>
+      <div class="r3">
+        <input class="inp nm" data-fld="nombre" placeholder="Nombre" value="${esc(it.nombre || "")}">
+        <input class="inp nu" data-fld="numero" placeholder="N°" value="${esc(it.numero || "")}">
       </div>
     </div>`).join("") + `<button type="button" class="addrow" id="addItem">${I("plus")}Agregar otra prenda</button>`;
   box.onclick = e => {
@@ -1562,11 +1580,10 @@ function renderItems(){
     const row = e.target.closest("[data-i]"); if (!row) return;
     const n = Number(row.dataset.i), it = F.items[n], t = e.target.closest("button"); if (!t) return;
     if (t.dataset.pick) return elegir(it, t.dataset.pick);
-    if (t.dataset.q) { it.cant = Math.max(1, it.cant + Number(t.dataset.q)); if (it.cant > 1) { it.nombre = ""; it.numero = ""; } renderItems(); renderTotals(); }
-    if (t.hasAttribute("data-del")) { F.items.splice(n, 1); if (!F.items.length) F.items.push(blankItem()); renderItems(); renderTotals(); }
-    if (t.dataset.split !== undefined) { const cp = Array.from({length:it.cant}, () => Object.assign({}, it, {cant:1, nombre:"", numero:""})); F.items.splice(n, 1, ...cp); renderItems(); renderTotals(); }
+    if (t.dataset.q) { it.cant = Math.max(1, it.cant + Number(t.dataset.q)); renderItems(); renderTotals(); }
+    if (t.hasAttribute("data-del")) { F.items.splice(n, 1); renderItems(); renderTotals(); }
   };
-  box.oninput = e => { const row = e.target.closest("[data-i]"); if (row && e.target.dataset.fld === "nombre") F.items[Number(row.dataset.i)].nombre = e.target.value; };
+  box.oninput = e => { const row = e.target.closest("[data-i]"), f = e.target.dataset.fld; if (row && (f === "nombre" || f === "numero")) F.items[Number(row.dataset.i)][f] = e.target.value; };
 }
 function elegir(it, f){
   const c = cfg().cat, isP = F.tipo === "personalizado";
@@ -1577,6 +1594,7 @@ function elegir(it, f){
     options:c.colores.filter(x => isP ? x[1] !== "full" : true).map(([v, h]) => ({v, h}))});
   if (f === "horma") pickPopup({title:"Horma", kind:"text", current:it.horma, onPick:v => set(v === "__none" ? "" : v),
     options:[...c.hormas.map(v => ({v})), {v:"__none", label:"Sin horma"}]});
+  if (f === "etiqueta") pickPopup({title:"Etiqueta", kind:"text", current:it.etiqueta, onPick:set, options:c.marcas.map(v => ({v}))});
   if (f === "talla") pickPopup({title:"Talla", kind:"talla", current:it.talla, onPick:set,
     sections:[{title:"Niño", options:c.tallasNino.map(v => ({v}))}, {title:"Adulto", options:c.tallasAdulto.map(v => ({v}))}]});
 }
@@ -1591,7 +1609,7 @@ function marcarFilas(){
   const box = $("#items", F._ov);
   F.items.forEach((it, i) => {
     if (itemVacio(it) && F.items.length > 1) return;
-    ["prenda", "color", "talla"].forEach(f => { if (!it[f]) box.querySelector(`[data-i="${i}"] [data-err="${f}"]`)?.classList.add("bad"); });
+    ["etiqueta", "prenda", "color", "talla"].forEach(f => { if (!it[f]) box.querySelector(`[data-i="${i}"] [data-err="${f}"]`)?.classList.add("bad"); });
   });
 }
 function renderTotals(){
@@ -1637,8 +1655,8 @@ async function saveForm(ov, orig){
   const now = new Date().toISOString(), nombre = F.cliente.nombre.trim().replace(/\s+/g, " "), pr = perm();
   const data = {
     cliente:{nombre, telefono:tel.e164}, tema:(F.tema || "").trim(), servicio:isP ? F.servicio : "", prendaDe:isP ? F.prendaDe : "tienda",
-    etiqueta:F.etiqueta || "",
-    items:F.items.filter(i => !itemVacio(i)).map(i => ({prenda:i.prenda, color:i.color, horma:i.horma || "", talla:i.talla, cant:Number(i.cant) || 1, nombre:(i.nombre || "").trim(), numero:(i.numero || "").trim()})),
+    etiqueta:[...new Set(F.items.filter(i => !itemVacio(i)).map(i => i.etiqueta).filter(Boolean))].join(", "),
+    items:F.items.filter(i => !itemVacio(i)).map(i => ({etiqueta:i.etiqueta || "", prenda:i.prenda, color:i.color, horma:i.horma || "", talla:i.talla, cant:Number(i.cant) || 1, nombre:(i.nombre || "").trim(), numero:(i.numero || "").trim()})),
     fechaEntrega:F.fechaEntrega, precio:num(F.precio), moneda:F.moneda, abono:num(F.abono), motivoSinAbono:num(F.abono) > 0 ? "" : (F.motivoSinAbono || "").trim(), urgente:!!F.urgente,
     imagenes:F.imagenes.filter(i => i.id && !i.error).map(i => i.id), nota:(F.nota || "").trim(),
     editadoEn:now, editadoPor:S.me.usuario
@@ -1674,7 +1692,7 @@ function waLink(p){
 function resumenTexto(p){
   const t = totales(p);
   return [`*${TIPOS[p.tipo].label.toUpperCase()}* · ${p.codigo}${p.urgente ? " · 🔥 URGENTE" : ""}`, p.tema && `Tema: ${p.tema}`, p.servicio && `Tipo estampado: ${p.servicio}`, p.prendaDe === "cliente" && "Prenda: la trae el cliente",
-    p.etiqueta && `Marca: ${p.etiqueta}`, " ",
+    p.etiqueta && `Etiqueta: ${p.etiqueta}`, " ",
     ...(p.items || []).map(i => `• ${i.cant > 1 ? i.cant + "× " : ""}${itemLine(i)}${i.horma ? " (" + i.horma + ")" : ""}`), " ", p.nota && `Nota: ${p.nota}`,
     `Cliente: ${p.cliente.nombre}`, `WhatsApp: ${prettyPhone(p.cliente.telefono)}`, `Entrega: ${fmtDate(p.fechaEntrega)}`,
     `Precio unidad: ${money(p.precio, p.moneda)} · Total: ${money(t.total, p.moneda)}`, `Abono: ${money(t.abono, p.moneda)} · Saldo: ${money(t.saldo, p.moneda)}`, p.motivoSinAbono && `Sin abono: ${p.motivoSinAbono}`].filter(Boolean).join("\n").replace(/\n \n/g, "\n\n");
@@ -1697,9 +1715,9 @@ function openDetail(id){
       <div class="fsec"><div class="sec">${I(T.icon)}Detalles</div><dl class="kv">
         ${p.tema ? `<dt>Tema</dt><dd>${esc(p.tema)}</dd>` : ""}${p.servicio ? `<dt>Tipo de estampado</dt><dd>${esc(p.servicio)}</dd>` : ""}
         ${p.tipo === "personalizado" ? `<dt>Prenda</dt><dd>${p.prendaDe === "cliente" ? "La trae el cliente" : "La pone la tienda"}</dd>` : ""}
-        <dt>Marca</dt><dd>${esc(p.etiqueta || "—")}</dd></dl></div>
+        <dt>Etiqueta</dt><dd>${esc(p.etiqueta || "—")}</dd></dl></div>
       <div class="fsec"><div class="sec">${I("shirt")}Prendas <small>${t.piezas} piezas</small></div>
-        <ul class="il">${(p.items || []).map(i => `<li><span class="q">${i.cant}×</span><span><b>${esc(i.prenda)} ${esc(i.color)} ${esc(i.talla)}</b>${i.nombre ? ` — ${esc(i.nombre)}` : ""}${i.numero ? ` <b>#${esc(i.numero)}</b>` : ""}${i.horma ? ` <span class="note" style="display:inline">· ${esc(i.horma)}</span>` : ""}</span></li>`).join("")}</ul></div>
+        <ul class="il">${(p.items || []).map(i => `<li><span class="q">${i.cant}×</span><span><b>${esc(i.prenda)} ${esc(i.color)} ${esc(i.talla)}</b>${i.nombre ? ` — ${esc(i.nombre)}` : ""}${i.numero ? ` <b>#${esc(i.numero)}</b>` : ""}${[i.horma, i.etiqueta].filter(Boolean).length ? ` <span class="note" style="display:inline">· ${esc([i.horma, i.etiqueta].filter(Boolean).join(" · "))}</span>` : ""}</span></li>`).join("")}</ul></div>
       <div class="fsec"><div class="sec">${I("cash")}Pago</div><div class="totals"><div class="tot"><small>Precio unidad</small><b class="num">${esc(money(p.precio, p.moneda))}</b></div><div class="tot"><small>Total</small><b class="num">${esc(money(t.total, p.moneda))}</b></div><div class="tot"><small>Abono</small><b class="num">${esc(money(t.abono, p.moneda))}</b></div><div class="tot"><small>Saldo</small><b class="num" style="color:${t.saldo > 0 ? "var(--err)" : "var(--ok)"}">${esc(money(t.saldo, p.moneda))}</b></div></div>${p.motivoSinAbono ? `<p class="note"><b>Sin abono:</b> ${esc(p.motivoSinAbono)}</p>` : ""}</div>
       ${(p.imagenes || []).length ? `<div class="fsec"><div class="sec">${I("camera")}Referencias</div><div class="imgs">${p.imagenes.map(im => `<div class="imgbox"><img data-foto="${esc(im)}" alt=""></div>`).join("")}</div></div>` : ""}
       ${p.nota ? `<div class="fsec"><div class="sec">${I("note")}Nota</div><div class="notebox">${esc(p.nota)}</div></div>` : ""}
