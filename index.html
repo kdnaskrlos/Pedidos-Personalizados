@@ -340,7 +340,9 @@ table.mx{border-collapse:collapse;width:100%;font-size:13px}
 .ti.ok{color:var(--ok);background:color-mix(in srgb,var(--ok) 10%,var(--surface))}
 .ti.bad{color:var(--err);background:color-mix(in srgb,var(--err) 9%,var(--surface))}
 .ti.warn{color:var(--warn);background:color-mix(in srgb,var(--warn) 10%,var(--surface))}
-.ti.wa{color:#fff;background:#1fae55;padding:5px 12px;font-size:12px}
+.ti.wa{color:#15803d;background:#dcfce7;border:1px solid #bbf7d0;padding:7px 12px;font-size:12.5px}
+:root[data-theme="dark"] .ti.wa{color:#86efac;background:#12311f;border-color:#1f4d31}
+#tel-msg .ti{flex-basis:100%;justify-content:center;border-radius:9px;padding:7px 12px}
 .ti.wa:hover{filter:brightness(1.06)}
 .ti.wa:active{filter:brightness(.92)}
 .tiw{flex-basis:100%;display:flex;align-items:center;gap:6px;flex-wrap:wrap;font-size:12px;color:var(--warn);background:color-mix(in srgb,var(--warn) 8%,var(--surface));border:1px solid color-mix(in srgb,var(--warn) 25%,var(--line));border-radius:9px;padding:6px 9px}
@@ -468,6 +470,24 @@ table.mx{border-collapse:collapse;width:100%;font-size:13px}
 .addfirst svg.i{width:20px;height:20px}
 .addfirst:active{filter:brightness(.94)}
 
+/* v2.13 */
+.nav.new .ring{width:44px;height:44px;border-radius:14px}
+.nav.new .ring svg.i{width:24px;height:24px}
+.qty .qin{width:100%;min-width:30px;flex:1;border:0;background:none;text-align:center;font-weight:800;font-size:15px;color:var(--ink);padding:0;outline:none;height:100%}
+.qty .qin:focus{background:var(--accent-soft)}
+.irow3 .r3 .nu{width:calc((100% - 12px) / 3);flex:none;height:42px}
+.addbar{display:grid;grid-template-columns:1.4fr 1fr;gap:8px;margin-top:2px}
+.addbar .addrow{margin-top:0}
+.addrow.dup{color:var(--t-info)}
+.addrow.dup:hover{border-color:var(--t-info);background:color-mix(in srgb,var(--t-info) 8%,var(--surface))}
+.ov.pick .md.np-pop{max-width:340px}
+.npd{height:64px;border:1px solid var(--line);border-radius:12px;background:var(--surface-2);display:grid;place-items:center;font-size:32px;font-weight:800;letter-spacing:.06em}
+.npd span{color:var(--muted);opacity:.5}
+.npg{display:grid;grid-template-columns:repeat(3,1fr);gap:8px}
+.pk.np{min-height:58px;font-size:22px}
+.pk.np.ok{background:var(--accent);border-color:var(--accent);color:var(--accent-ink)}
+.pk.np.ok svg.i{width:24px;height:24px}
+
 @media (max-width:1000px){
   .cols{grid-template-columns:minmax(0,1fr)}
   .tipotabs{display:flex}
@@ -547,7 +567,7 @@ import { initializeApp, deleteApp } from "https://www.gstatic.com/firebasejs/10.
 import { getAuth, onAuthStateChanged, signInWithEmailAndPassword, createUserWithEmailAndPassword, signOut, updatePassword, reauthenticateWithCredential, EmailAuthProvider } from "https://www.gstatic.com/firebasejs/10.12.2/firebase-auth.js";
 import { initializeFirestore, getFirestore, persistentLocalCache, persistentMultipleTabManager, doc, collection, query, where, onSnapshot, getDoc, setDoc, updateDoc, deleteDoc, writeBatch } from "https://www.gstatic.com/firebasejs/10.12.2/firebase-firestore.js";
 
-const VERSION = "v2.12";
+const VERSION = "v2.13";
 /* ================= Utilidades ================= */
 const $ = (s, r = document) => r.querySelector(s);
 const esc = s => String(s ?? "").replace(/[&<>"']/g, c => ({"&":"&amp;","<":"&lt;",">":"&gt;",'"':"&quot;","'":"&#39;"}[c]));
@@ -690,7 +710,7 @@ const cleanUser = s => norm(s).replace(/\s+/g, ".").replace(/[^a-z0-9._-]/g, "")
 function perm(){
   const m = S.me || {};
   const admin = m.rol === "admin";
-  return {admin, ver:{personalizado: admin || m.verPersonalizado === true, sublimacion: admin || m.verSublimacion === true}, soloAsignados: !admin && !!m.soloAsignados, eliminar: admin || !!m.eliminar};
+  return {admin, ajustes: admin || m.ajustes === true, ver:{personalizado: admin || m.verPersonalizado === true, sublimacion: admin || m.verSublimacion === true}, soloAsignados: !admin && !!m.soloAsignados, eliminar: admin || !!m.eliminar};
 }
 function nameOf(usuario){
   if (!usuario) return "—";
@@ -858,9 +878,10 @@ function doRender(){
     <div class="logo">${I("shirt")}</div>
     ${nav("resumen","home","Resumen")}
     ${nav("pedidos","list","Pedidos")}
-    <button class="nav new" data-act="nuevo"><span class="ring">${I("plus")}</span>Nuevo</button>
+    <button class="nav new" data-act="nuevo" aria-label="Nuevo pedido" title="Nuevo pedido"><span class="ring">${I("plus")}</span></button>
     ${nav("avisos","bell","Avisos", nAv)}
     ${pr.admin ? `<span class="d-only">${nav("equipo","shield","Equipo")}${nav("ajustes","sliders","Ajustes")}</span><button class="nav m-only" data-view="equipo" aria-current="${S.view === "equipo" || S.view === "ajustes"}">${I("shield")}Admin</button>`
+      : pr.ajustes ? `<span class="d-only">${nav("ajustes","sliders","Ajustes")}</span><button class="nav m-only" data-view="ajustes" aria-current="${S.view === "ajustes"}">${I("sliders")}Ajustes</button>`
       : `<button class="nav m-only" data-act="cuenta">${I("user")}Cuenta</button>`}
     <div class="grow"></div>
     <button class="theme" id="themeBtn" title="Cambiar tema">${I("sun","sun")}${I("moon","moon")}</button>
@@ -875,7 +896,7 @@ function doRender(){
       <button class="pill" id="meBtn">${I("user")}${esc(S.me.nombre || S.me.usuario)}${pr.admin ? " · Admin" : ""}</button>
     </div>
     <main class="main">
-      ${S.view === "avisos" ? viewAvisos(a) : S.view === "pedidos" ? viewPedidos(a, pr) : S.view === "equipo" && pr.admin ? viewEquipo() : S.view === "ajustes" && pr.admin ? viewAjustes() : viewResumen(a, pr)}
+      ${S.view === "avisos" ? viewAvisos(a) : S.view === "pedidos" ? viewPedidos(a, pr) : S.view === "equipo" && pr.admin ? viewEquipo() : S.view === "ajustes" && pr.ajustes ? viewAjustes() : viewResumen(a, pr)}
     </main>
   </div>`;
   scrollTo(0, sc);
@@ -1019,14 +1040,14 @@ function viewEquipo(){
       <div>${us.map(([uid, u]) => `<div class="urow"><span class="av" style="--c:${u.rol === "admin" ? "var(--accent)" : "var(--t-info)"}">${esc((u.nombre || u.usuario).slice(0,1).toUpperCase())}</span>
         <div class="nm">${esc(u.nombre)}<small>@${esc(u.usuario)} · ${u.rol === "admin" ? "Administrador" : u.activo ? "Activo" : "Desactivado"}</small></div>
         ${u.rol === "admin" ? (uid === S.uid ? `<button class="btn sm" data-act="mipin">${I("key")}Cambiar mi PIN</button>` : "") : `
-        ${tg(uid,"verPersonalizado","Personalizado",u.verPersonalizado)}${tg(uid,"verSublimacion","Sublimación",u.verSublimacion)}${tg(uid,"soloAsignados","Solo sus asignados",u.soloAsignados)}${tg(uid,"eliminar","Puede eliminar",u.eliminar)}${tg(uid,"activo","Acceso",u.activo)}
+        ${tg(uid,"verPersonalizado","Personalizado",u.verPersonalizado)}${tg(uid,"verSublimacion","Sublimación",u.verSublimacion)}${tg(uid,"soloAsignados","Solo sus asignados",u.soloAsignados)}${tg(uid,"eliminar","Puede eliminar",u.eliminar)}${tg(uid,"ajustes","Ajustes",u.ajustes)}${tg(uid,"activo","Acceso",u.activo)}
         <button class="btn sm" data-reset="${esc(uid)}">${I("key")}Nuevo PIN</button><button class="btn sm danger" data-deluser="${esc(uid)}">${I("trash")}</button>`}
       </div>`).join("")}</div>
     </div>`;
 }
 
 /* ---------- Ajustes (admin) ---------- */
-const adminTabs = () => `<div class="seg m-tabs"><button data-view="equipo" aria-pressed="${S.view === "equipo"}">Equipo</button><button data-view="ajustes" aria-pressed="${S.view === "ajustes"}">Ajustes</button></div>`;
+const adminTabs = () => !perm().admin ? "" : `<div class="seg m-tabs"><button data-view="equipo" aria-pressed="${S.view === "equipo"}">Equipo</button><button data-view="ajustes" aria-pressed="${S.view === "ajustes"}">Ajustes</button></div>`;
 function viewAjustes(){
   const c = cfg(), k = c.cat;
   const ta = (key, label) => `<div class="f"><label>${label}</label><textarea class="inp" data-cat="${key}" style="min-height:120px">${esc(k[key].join("\n"))}</textarea></div>`;
@@ -1388,7 +1409,6 @@ function openForm(id, tipo, cliente){
           <textarea class="inp" id="in-nota" rows="3">${esc(F.nota)}</textarea>
         </div>
         ${pr.admin ? `<div class="fsec"><div class="sec">${I("lock")}¿Quién puede verlo?</div>
-          <p class="note">Sin marcar a nadie, lo ve todo el equipo con permiso para ${T.label.toLowerCase()}. Si marcas personas, solo ellas (y tú).</p>
           <div class="opts">${empleados.map(u => `<button type="button" class="opt" data-asig="${esc(u.usuario)}" aria-pressed="${(F.asignados || []).includes(u.usuario)}">${esc(u.nombre)}</button>`).join("") || `<span class="note">Aún no hay personas en el equipo.</span>`}</div></div>` : ""}
         <p class="hist">${orig ? `Registrado el ${fmtDT(orig.creadoEn)} por ${esc(nameOf(orig.creadoPor))}${orig.editadoEn ? ` · Última edición ${fmtDT(orig.editadoEn)} por ${esc(nameOf(orig.editadoPor))}` : ""}` : `Fecha de registro: ${fmtDate(ymd(new Date()))} (se guarda sola y no cambia al editar)`}</p>
       </section>
@@ -1563,7 +1583,7 @@ function renderItems(){
       <div class="r1">
         ${pb("etiqueta", it.etiqueta, "Etiqueta")}
         ${pb("talla", it.talla, "Talla")}
-        <div class="qty">${it.cant === 1 ? `<button type="button" class="del" data-del title="Quitar">${I("trash")}</button>` : `<button type="button" data-q="-1">−</button>`}<span>${it.cant}</span><button type="button" data-q="1">+</button></div>
+        <div class="qty">${it.cant === 1 ? `<button type="button" class="del" data-del title="Quitar">${I("trash")}</button>` : `<button type="button" data-q="-1">−</button>`}<input class="qin" type="text" inputmode="numeric" pattern="[0-9]*" data-cant value="${it.cant}" aria-label="Unidades"><button type="button" data-q="1">+</button></div>
       </div>
       <div class="r1">
         ${pb("prenda", it.prenda, F.tipo === "personalizado" ? "Prenda" : "Producto")}
@@ -1572,18 +1592,31 @@ function renderItems(){
       </div>
       <div class="r3">
         <input class="inp nm" data-fld="nombre" placeholder="Nombre" value="${esc(it.nombre || "")}">
-        <input class="inp nu" data-fld="numero" placeholder="N°" value="${esc(it.numero || "")}">
+        <button type="button" class="pbtn nu ${it.numero ? "on" : ""}" data-pick="numero"><span>${esc(it.numero ? "N° " + it.numero : "N°")}</span></button>
       </div>
-    </div>`).join("") + `<button type="button" class="addrow" id="addItem">${I("plus")}Agregar otra prenda</button>`;
+    </div>`).join("") + `<div class="addbar"><button type="button" class="addrow" id="addItem">${I("plus")}Agregar otra prenda</button><button type="button" class="addrow dup" id="dupItem">${I("copy")}Duplicar</button></div>`;
   box.onclick = e => {
-    if (e.target.closest("#addItem")) { const prev = [...F.items].reverse().find(x => !itemVacio(x)); F.items.push(blankItem(prev)); renderItems(); const rows = box.querySelectorAll(".irow3"); rows[rows.length - 1].scrollIntoView({behavior:"smooth", block:"center"}); return; }
+    const nueva = it => { F.items.push(it); renderItems(); renderTotals(); const rows = box.querySelectorAll(".irow3"); rows[rows.length - 1].scrollIntoView({behavior:"smooth", block:"center"}); };
+    if (e.target.closest("#addItem")) return nueva(blankItem());
+    if (e.target.closest("#dupItem")) { const last = F.items[F.items.length - 1]; return nueva(last ? JSON.parse(JSON.stringify(last)) : blankItem()); }
     const row = e.target.closest("[data-i]"); if (!row) return;
     const n = Number(row.dataset.i), it = F.items[n], t = e.target.closest("button"); if (!t) return;
     if (t.dataset.pick) return elegir(it, t.dataset.pick);
     if (t.dataset.q) { it.cant = Math.max(1, it.cant + Number(t.dataset.q)); renderItems(); renderTotals(); }
     if (t.hasAttribute("data-del")) { F.items.splice(n, 1); renderItems(); renderTotals(); }
   };
-  box.oninput = e => { const row = e.target.closest("[data-i]"), f = e.target.dataset.fld; if (row && (f === "nombre" || f === "numero")) F.items[Number(row.dataset.i)][f] = e.target.value; };
+  box.oninput = e => {
+    const row = e.target.closest("[data-i]"); if (!row) return;
+    const it = F.items[Number(row.dataset.i)], f = e.target.dataset.fld;
+    if (f === "nombre") it.nombre = e.target.value;
+    if (e.target.hasAttribute("data-cant")) { e.target.value = e.target.value.replace(/\D/g, "").slice(0, 4); const n = parseInt(e.target.value) || 0; if (n > 0) { it.cant = n; renderTotals(); } }
+  };
+  box.onfocusin = e => { if (e.target.hasAttribute("data-cant")) setTimeout(() => e.target.select(), 0); };
+  box.onfocusout = e => {
+    if (!e.target.hasAttribute("data-cant")) return;
+    const row = e.target.closest("[data-i]"), it = F.items[Number(row.dataset.i)];
+    it.cant = Math.max(1, parseInt(e.target.value) || 1); renderItems(); renderTotals();
+  };
 }
 function elegir(it, f){
   const c = cfg().cat, isP = F.tipo === "personalizado";
@@ -1594,9 +1627,27 @@ function elegir(it, f){
     options:c.colores.filter(x => isP ? x[1] !== "full" : true).map(([v, h]) => ({v, h}))});
   if (f === "horma") pickPopup({title:"Horma", kind:"text", current:it.horma, onPick:v => set(v === "__none" ? "" : v),
     options:[...c.hormas.map(v => ({v})), {v:"__none", label:"Sin horma"}]});
+  if (f === "numero") return numPad(it.numero, v => { it.numero = v; renderItems(); });
   if (f === "etiqueta") pickPopup({title:"Etiqueta", kind:"text", current:it.etiqueta, onPick:set, options:c.marcas.map(v => ({v}))});
   if (f === "talla") pickPopup({title:"Talla", kind:"talla", current:it.talla, onPick:set,
     sections:[{title:"Niño", options:c.tallasNino.map(v => ({v}))}, {title:"Adulto", options:c.tallasAdulto.map(v => ({v}))}]});
+}
+function numPad(actual, onOk){
+  let v = String(actual || "");
+  const pop = modal(`<div class="mh"><h2>Número</h2><button class="ib" data-close>${I("x")}</button></div>
+    <div class="mb"><div class="npd" id="npd"></div>
+      <div class="npg">${[1,2,3,4,5,6,7,8,9].map(n => `<button type="button" class="pk np" data-n="${n}">${n}</button>`).join("")}<button type="button" class="pk np" data-n="del" aria-label="Borrar">⌫</button><button type="button" class="pk np" data-n="0">0</button><button type="button" class="pk np ok" data-n="ok">${I("check")}</button></div>
+      <button type="button" class="btn" data-n="none">Sin número</button></div>`, "sm pop pick np-pop");
+  const draw = () => { $("#npd", pop).innerHTML = v ? esc(v) : `<span>—</span>`; };
+  pop.querySelector(".mb").onclick = e => {
+    const b = e.target.closest("[data-n]"); if (!b) return;
+    const n = b.dataset.n;
+    if (n === "ok") { pop.close(); return onOk(v); }
+    if (n === "none") { pop.close(); return onOk(""); }
+    if (n === "del") v = v.slice(0, -1); else if (v.length < 3) v = (v === "0" ? "" : v) + n;
+    draw();
+  };
+  draw();
 }
 function elegirMarca(){
   const c = cfg().cat;

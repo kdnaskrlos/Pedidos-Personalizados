@@ -47,7 +47,8 @@ service cloud.firestore {
 
     match /config/{doc} {
       allow read: if activo();
-      allow write: if admin();
+      // Ajustes: el administrador, o quien tenga el permiso "Ajustes" en Equipo
+      allow write: if admin() || (activo() && me().ajustes == true);
     }
 
     match /clientes/{tel} {
