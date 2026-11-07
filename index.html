@@ -318,7 +318,7 @@ import { initializeApp, deleteApp } from "https://www.gstatic.com/firebasejs/10.
 import { getAuth, onAuthStateChanged, signInWithEmailAndPassword, createUserWithEmailAndPassword, signOut, updatePassword, reauthenticateWithCredential, EmailAuthProvider } from "https://www.gstatic.com/firebasejs/10.12.2/firebase-auth.js";
 import { initializeFirestore, getFirestore, persistentLocalCache, persistentMultipleTabManager, doc, collection, query, where, onSnapshot, getDoc, setDoc, updateDoc, deleteDoc, writeBatch } from "https://www.gstatic.com/firebasejs/10.12.2/firebase-firestore.js";
 
-const VERSION = "v2.1";
+const VERSION = "v2.2";
 /* ================= Utilidades ================= */
 const $ = (s, r = document) => r.querySelector(s);
 const esc = s => String(s ?? "").replace(/[&<>"']/g, c => ({"&":"&amp;","<":"&lt;",">":"&gt;",'"':"&quot;","'":"&#39;"}[c]));
@@ -488,7 +488,9 @@ function route(){
 }
 function stopSubs(){ S.unsubs.forEach(u => { try { u(); } catch(e) {} }); S.unsubs = []; S.pedidos = {}; S.clientes = {}; S.usuarios = {}; S.cfgRaw = null; S._subsOn = false; }
 function startMe(){
-  const un = onSnapshot(doc(S.db, "usuarios/" + S.uid), s => {
+  const un = onSnapshot(doc(S.db, "usuarios/" + S.uid), { includeMetadataChanges: true }, s => {
+    // Esperar a que el servidor confirme el perfil antes de pedir datos (si no, las reglas aún no lo ven)
+    if (s.metadata.hasPendingWrites) return;
     const was = S.me;
     S.me = s.exists() ? s.data() : false;
     if (S.me && S.me.activo && (!was || was.rol !== S.me.rol || was.soloAsignados !== S.me.soloAsignados || was.verPersonalizado !== S.me.verPersonalizado || was.verSublimacion !== S.me.verSublimacion)) startData();
@@ -502,7 +504,14 @@ function startData(){
   S.dataUnsubs = []; S.pedidos = {};
   const add = u => { S.dataUnsubs.push(u); S.unsubs.push(u); };
   S.errores = [];
-  const err = nombre => e => { console.warn(nombre, e); S.errores.push(nombre + ": " + (e.code || e.message)); toast("No se pudo leer: " + S.errores.join(" · "), true); };
+  const gen = (S.gen = (S.gen || 0) + 1);
+  const err = nombre => e => {
+    console.warn(nombre, e);
+    // Reintentar una vez: puede ser un permiso que el servidor todavía no había registrado
+    if (!S.reintento && gen === S.gen) { S.reintento = true; setTimeout(() => { if (S.me && S.me.activo && gen === S.gen) startData(); }, 2500); return; }
+    if (S.errores.includes(nombre)) return;
+    S.errores.push(nombre); toast("No se pudo leer: " + S.errores.join(", ") + " (" + (e.code || e.message) + ")", true);
+  };
   add(onSnapshot(doc(S.db, "config/ajustes"), s => { S.cfgRaw = s.exists() ? s.data() : null; render(); }, err("ajustes")));
   add(onSnapshot(collection(S.db, "usuarios"), s => { const o = {}; s.forEach(d => o[d.id] = d.data()); S.usuarios = o; render(); }, err("usuarios")));
   add(onSnapshot(collection(S.db, "clientes"), s => { const o = {}; s.forEach(d => o[d.id] = d.data()); S.clientes = o; }, err("clientes")));
@@ -511,7 +520,7 @@ function startData(){
   const merge = () => { const all = {}; Object.values(parts).forEach(m => Object.assign(all, m)); S.pedidos = all; render(); };
   const sub = (key, q) => add(onSnapshot(q, { includeMetadataChanges: true }, s => {
     const m = {}; s.forEach(d => m[d.id] = Object.assign({_id: d.id}, d.data())); parts[key] = m;
-    S.cache = s.metadata.fromCache; merge();
+    S.cache = s.metadata.fromCache; if (!S.cache) S.reintento = false; merge();
   }, err("pedidos-" + key)));
   const col = collection(S.db, "pedidos");
   if (pr.admin) sub("todo", col);
