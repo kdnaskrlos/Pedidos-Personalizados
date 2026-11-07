@@ -490,7 +490,7 @@ function stopSubs(){ S.unsubs.forEach(u => { try { u(); } catch(e) {} }); S.unsu
 function startMe(){
   const un = onSnapshot(doc(S.db, "usuarios/" + S.uid), { includeMetadataChanges: true }, s => {
     // Esperar a que el servidor confirme el perfil antes de pedir datos (si no, las reglas aún no lo ven)
-    if (s.metadata.hasPendingWrites) return;
+    if (s.metadata && s.metadata.hasPendingWrites) return;
     const was = S.me;
     S.me = s.exists() ? s.data() : false;
     if (S.me && S.me.activo && (!was || was.rol !== S.me.rol || was.soloAsignados !== S.me.soloAsignados || was.verPersonalizado !== S.me.verPersonalizado || was.verSublimacion !== S.me.verSublimacion)) startData();
@@ -520,7 +520,7 @@ function startData(){
   const merge = () => { const all = {}; Object.values(parts).forEach(m => Object.assign(all, m)); S.pedidos = all; render(); };
   const sub = (key, q) => add(onSnapshot(q, { includeMetadataChanges: true }, s => {
     const m = {}; s.forEach(d => m[d.id] = Object.assign({_id: d.id}, d.data())); parts[key] = m;
-    S.cache = s.metadata.fromCache; if (!S.cache) S.reintento = false; merge();
+    S.cache = !!(s.metadata && s.metadata.fromCache); if (!S.cache) S.reintento = false; merge();
   }, err("pedidos-" + key)));
   const col = collection(S.db, "pedidos");
   if (pr.admin) sub("todo", col);
