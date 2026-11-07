@@ -318,7 +318,7 @@ import { initializeApp, deleteApp } from "https://www.gstatic.com/firebasejs/10.
 import { getAuth, onAuthStateChanged, signInWithEmailAndPassword, createUserWithEmailAndPassword, signOut, updatePassword, reauthenticateWithCredential, EmailAuthProvider } from "https://www.gstatic.com/firebasejs/10.12.2/firebase-auth.js";
 import { initializeFirestore, getFirestore, persistentLocalCache, persistentMultipleTabManager, doc, collection, query, where, onSnapshot, getDoc, setDoc, updateDoc, deleteDoc, writeBatch } from "https://www.gstatic.com/firebasejs/10.12.2/firebase-firestore.js";
 
-const VERSION = "v2.0";
+const VERSION = "v2.1";
 /* ================= Utilidades ================= */
 const $ = (s, r = document) => r.querySelector(s);
 const esc = s => String(s ?? "").replace(/[&<>"']/g, c => ({"&":"&amp;","<":"&lt;",">":"&gt;",'"':"&quot;","'":"&#39;"}[c]));
@@ -501,17 +501,18 @@ function startData(){
   (S.dataUnsubs || []).forEach(u => { try { u(); } catch(e) {} });
   S.dataUnsubs = []; S.pedidos = {};
   const add = u => { S.dataUnsubs.push(u); S.unsubs.push(u); };
-  const err = e => { console.warn(e); toast("Error de permisos al leer datos: revisa las reglas de Firestore", true); };
-  add(onSnapshot(doc(S.db, "config/ajustes"), s => { S.cfgRaw = s.exists() ? s.data() : null; render(); }, err));
-  add(onSnapshot(collection(S.db, "usuarios"), s => { const o = {}; s.forEach(d => o[d.id] = d.data()); S.usuarios = o; render(); }, err));
-  add(onSnapshot(collection(S.db, "clientes"), s => { const o = {}; s.forEach(d => o[d.id] = d.data()); S.clientes = o; }, err));
+  S.errores = [];
+  const err = nombre => e => { console.warn(nombre, e); S.errores.push(nombre + ": " + (e.code || e.message)); toast("No se pudo leer: " + S.errores.join(" · "), true); };
+  add(onSnapshot(doc(S.db, "config/ajustes"), s => { S.cfgRaw = s.exists() ? s.data() : null; render(); }, err("ajustes")));
+  add(onSnapshot(collection(S.db, "usuarios"), s => { const o = {}; s.forEach(d => o[d.id] = d.data()); S.usuarios = o; render(); }, err("usuarios")));
+  add(onSnapshot(collection(S.db, "clientes"), s => { const o = {}; s.forEach(d => o[d.id] = d.data()); S.clientes = o; }, err("clientes")));
   const pr = perm();
   const parts = {};
   const merge = () => { const all = {}; Object.values(parts).forEach(m => Object.assign(all, m)); S.pedidos = all; render(); };
   const sub = (key, q) => add(onSnapshot(q, { includeMetadataChanges: true }, s => {
     const m = {}; s.forEach(d => m[d.id] = Object.assign({_id: d.id}, d.data())); parts[key] = m;
     S.cache = s.metadata.fromCache; merge();
-  }, err));
+  }, err("pedidos-" + key)));
   const col = collection(S.db, "pedidos");
   if (pr.admin) sub("todo", col);
   else {
