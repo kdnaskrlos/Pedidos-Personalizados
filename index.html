@@ -428,7 +428,7 @@ import { initializeApp, deleteApp } from "https://www.gstatic.com/firebasejs/10.
 import { getAuth, onAuthStateChanged, signInWithEmailAndPassword, createUserWithEmailAndPassword, signOut, updatePassword, reauthenticateWithCredential, EmailAuthProvider } from "https://www.gstatic.com/firebasejs/10.12.2/firebase-auth.js";
 import { initializeFirestore, getFirestore, persistentLocalCache, persistentMultipleTabManager, doc, collection, query, where, onSnapshot, getDoc, setDoc, updateDoc, deleteDoc, writeBatch } from "https://www.gstatic.com/firebasejs/10.12.2/firebase-firestore.js";
 
-const VERSION = "v2.4";
+const VERSION = "v2.5";
 /* ================= Utilidades ================= */
 const $ = (s, r = document) => r.querySelector(s);
 const esc = s => String(s ?? "").replace(/[&<>"']/g, c => ({"&":"&amp;","<":"&lt;",">":"&gt;",'"':"&quot;","'":"&#39;"}[c]));
@@ -657,6 +657,7 @@ function renderLogin(){
     <div class="f"><label>PIN</label><input class="inp pinin" id="lp" type="password" inputmode="numeric" autocomplete="current-password" maxlength="8"></div>
     <span class="msg bad" id="lmsg"></span>
     <button class="btn primary" style="min-height:46px">${I("key")}Entrar</button>
+    <p class="hist" style="text-align:center">Versión ${VERSION}</p>
   </form></div>`;
   $("#loginForm").onsubmit = async e => {
     e.preventDefault();
@@ -1057,7 +1058,7 @@ function cambiarMiPin(){
 function openCuenta(){
   const pr = perm();
   const ov = modal(`<div class="mh"><h2>${esc(S.me.nombre)}</h2><button class="ib" data-close>${I("x")}</button></div>
-    <div class="mb"><dl class="kv"><dt>Usuario</dt><dd>@${esc(S.me.usuario)}</dd><dt>Rol</dt><dd>${pr.admin ? "Administrador" : "Equipo"}</dd><dt>Puede ver</dt><dd>${[pr.ver.personalizado && "Personalizado", pr.ver.sublimacion && "Sublimación completa"].filter(Boolean).join(" y ") || "—"}${pr.soloAsignados ? " (solo asignados)" : ""}</dd></dl>
+    <div class="mb"><dl class="kv"><dt>Usuario</dt><dd>@${esc(S.me.usuario)}</dd><dt>Rol</dt><dd>${pr.admin ? "Administrador" : "Equipo"}</dd><dt>Versión</dt><dd>${VERSION}</dd><dt>Puede ver</dt><dd>${[pr.ver.personalizado && "Personalizado", pr.ver.sublimacion && "Sublimación completa"].filter(Boolean).join(" y ") || "—"}${pr.soloAsignados ? " (solo asignados)" : ""}</dd></dl>
     <div style="display:flex;gap:8px;flex-wrap:wrap"><button class="btn" id="tm">${I("moon")}Cambiar tema</button><button class="btn" id="cp">${I("key")}Cambiar mi PIN</button></div></div>
     <div class="mf"><button class="btn danger" id="lo">${I("logout")}Cerrar sesión</button></div>`, "sm");
   $("#tm", ov).onclick = () => $("#themeBtn").click();
