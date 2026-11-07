@@ -408,6 +408,17 @@ table.mx{border-collapse:collapse;width:100%;font-size:13px}
 .d-only{display:contents}
 .m-tabs{display:none}
 
+/* ventana de pedido listo */
+.okpop{display:flex;flex-direction:column;align-items:center;text-align:center;gap:10px;padding:26px 22px 20px}
+.okpop .okic{width:76px;height:76px;border-radius:50%;display:grid;place-items:center;background:color-mix(in srgb,var(--accent) 16%,var(--surface));color:var(--accent);box-shadow:0 0 0 10px color-mix(in srgb,var(--accent) 7%,transparent);animation:okin .35s cubic-bezier(.2,1.4,.4,1)}
+.okpop .okic svg.i{width:40px;height:40px;stroke-width:2.6}
+.okpop h2{font-size:22px;font-weight:800;margin-top:6px}
+.okpop p{margin:0;font-weight:700}
+.okpop .note{font-weight:500}
+.okpop .btn{width:100%}
+@keyframes okin{from{transform:scale(.4);opacity:0}to{transform:scale(1);opacity:1}}
+
+.appver{margin:8px 0 0;text-align:center;font-size:11px;font-weight:600;color:var(--muted);opacity:.8}
 @media (max-width:1000px){
   .cols{grid-template-columns:minmax(0,1fr)}
   .tipotabs{display:flex}
@@ -486,7 +497,7 @@ import { initializeApp, deleteApp } from "https://www.gstatic.com/firebasejs/10.
 import { getAuth, onAuthStateChanged, signInWithEmailAndPassword, createUserWithEmailAndPassword, signOut, updatePassword, reauthenticateWithCredential, EmailAuthProvider } from "https://www.gstatic.com/firebasejs/10.12.2/firebase-auth.js";
 import { initializeFirestore, getFirestore, persistentLocalCache, persistentMultipleTabManager, doc, collection, query, where, onSnapshot, getDoc, setDoc, updateDoc, deleteDoc, writeBatch } from "https://www.gstatic.com/firebasejs/10.12.2/firebase-firestore.js";
 
-const VERSION = "v2.9";
+const VERSION = "v2.10";
 /* ================= Utilidades ================= */
 const $ = (s, r = document) => r.querySelector(s);
 const esc = s => String(s ?? "").replace(/[&<>"']/g, c => ({"&":"&amp;","<":"&lt;",">":"&gt;",'"':"&quot;","'":"&#39;"}[c]));
@@ -795,9 +806,9 @@ function doRender(){
   <aside class="side">
     <div class="logo">${I("shirt")}</div>
     ${nav("resumen","home","Resumen")}
-    ${nav("avisos","bell","Avisos", nAv)}
-    <button class="nav new" data-act="nuevo"><span class="ring">${I("plus")}</span>Nuevo</button>
     ${nav("pedidos","list","Pedidos")}
+    <button class="nav new" data-act="nuevo"><span class="ring">${I("plus")}</span>Nuevo</button>
+    ${nav("avisos","bell","Avisos", nAv)}
     ${pr.admin ? `<span class="d-only">${nav("equipo","shield","Equipo")}${nav("ajustes","sliders","Ajustes")}</span><button class="nav m-only" data-view="equipo" aria-current="${S.view === "equipo" || S.view === "ajustes"}">${I("shield")}Admin</button>`
       : `<button class="nav m-only" data-act="cuenta">${I("user")}Cuenta</button>`}
     <div class="grow"></div>
@@ -854,7 +865,8 @@ function viewResumen(a, pr){
       ${tile("var(--t-info)","msg","Por avisar", a.avisar.length, "clientes con pedido listo", "avisar")}
     </div>
     ${tipos.length ? `<div class="sec">${I("list")}Pendientes por tipo</div>
-    <div class="tiles">${tipos.map(t => tile(TIPOS[t].c, TIPOS[t].icon, TIPOS[t].label, pendTipo(t), "ver pedidos", "tipo-" + t)).join("")}</div>` : ""}`;
+    <div class="tiles">${tipos.map(t => tile(TIPOS[t].c, TIPOS[t].icon, TIPOS[t].label, pendTipo(t), "ver pedidos", "tipo-" + t)).join("")}</div>` : ""}
+    <p class="appver">${esc(cfg().negocio)} · Pedidos · versión ${VERSION}</p>`;
 }
 function viewPedidos(a, pr){
   const tipos = ["personalizado","sublimacion"].filter(t => pr.ver[t]);
@@ -1657,7 +1669,12 @@ function openDetail(id){
   const upd = async (data, msg) => { try { await updateDoc(doc(S.db, "pedidos/" + id), data); toast(msg); ov.close(); } catch(e) { toast("No se pudo actualizar el pedido", true); } };
   const on = (s, fn) => { const b = $(s, ov); if (b) b.onclick = fn; };
   on("#d-edit", () => { ov.close(); openForm(id); });
-  on("#d-listo", () => upd({estado:"listo", listoEn:new Date().toISOString(), listoPor:S.me.usuario, avisado:false}, "Pedido listo · recuerda avisar al cliente"));
+  on("#d-listo", async () => {
+    try { await updateDoc(doc(S.db, "pedidos/" + id), {estado:"listo", listoEn:new Date().toISOString(), listoPor:S.me.usuario, avisado:false}); }
+    catch(e) { return toast("No se pudo actualizar el pedido", true); }
+    ov.close();
+    popupListo(Object.assign({}, p, {estado:"listo"}));
+  });
   on("#d-wa", () => { marcarAvisado(id); ov.close(); });
   on("#d-ent", () => upd({estado:"entregado", entregadoEn:new Date().toISOString()}, "Pedido entregado"));
   on("#d-reab", () => upd({estado:"pendiente", avisado:false}, "Pedido reabierto"));
@@ -1666,6 +1683,19 @@ function openDetail(id){
     for (const im of (p.imagenes || [])) deleteDoc(doc(S.db, "fotos/" + im)).catch(() => {});
     ov.close(); toast("Pedido eliminado");
   }));
+}
+function popupListo(p){
+  const nombre = (p.cliente.nombre || "").split(" ")[0];
+  const pop = modal(`<div class="okpop">
+      <div class="okic">${I("check")}</div>
+      <h2>¡Pedido listo!</h2>
+      <p>${esc(p.codigo)} · ${esc(p.cliente.nombre)}</p>
+      <p class="note">Avísale a ${esc(nombre)} que ya puede retirarlo. El mensaje se escribe solo.</p>
+      <a class="btn wa big" id="pw" href="${esc(waLink(p))}" target="_blank" rel="noopener">${I("msg")}Avisar ahora por WhatsApp</a>
+      <button class="btn" data-close>Más tarde</button>
+      <span class="note" style="font-size:12px">Si lo dejas para después, aparece en Avisos → Por avisar al cliente.</span>
+    </div>`, "sm pop");
+  $("#pw", pop).onclick = () => { marcarAvisado(p._id); pop.close(); };
 }
 async function marcarAvisado(id){
   try { await updateDoc(doc(S.db, "pedidos/" + id), {avisado:true, avisadoEn:new Date().toISOString(), avisadoPor:S.me.usuario}); toast("Marcado como avisado"); }
