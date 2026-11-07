@@ -387,6 +387,27 @@ table.mx{border-collapse:collapse;width:100%;font-size:13px}
 .btn.listo:hover{border-color:var(--accent)}
 .btn.wa.big{min-height:48px;font-size:15px}
 
+/* fila de prenda (v2.9) */
+.irow3{background:var(--surface-2);border:1px solid var(--line);border-radius:12px;padding:8px;display:flex;flex-direction:column;gap:6px;margin-bottom:8px}
+.irow3 .r1{display:grid;grid-template-columns:repeat(3,minmax(0,1fr));gap:6px}
+.irow3 .r2{display:flex;gap:6px;align-items:center}
+.irow3 .inp{background-color:var(--surface);padding:8px 28px 8px 10px;font-size:13.5px;min-height:38px}
+.irow3 input.inp{padding:8px 10px}
+.irow3 .tl{width:92px;flex:none}
+.irow3 .nm{flex:1;min-width:0}
+.irow3 .nu{width:54px;flex:none;text-align:center}
+.irow3 .nmlink{flex:1;text-align:left;font-size:12.5px}
+.qty{flex:none;display:flex;align-items:center;border:1px solid var(--line);border-radius:9px;overflow:hidden;background:var(--surface);height:38px}
+.qty button{border:0;background:var(--surface-2);width:34px;height:100%;font-weight:800;font-size:16px;display:grid;place-items:center;color:var(--ink)}
+.qty button.del{color:var(--err);background:color-mix(in srgb,var(--err) 9%,var(--surface))}
+.qty button.del svg.i{width:16px;height:16px}
+.qty span{min-width:30px;text-align:center;font-weight:800}
+.irow3 .isel-o{min-width:0}
+#f-marca .inp{font-weight:700}
+.nav.m-only{display:none}
+.d-only{display:contents}
+.m-tabs{display:none}
+
 @media (max-width:1000px){
   .cols{grid-template-columns:minmax(0,1fr)}
   .tipotabs{display:flex}
@@ -437,6 +458,11 @@ table.mx{border-collapse:collapse;width:100%;font-size:13px}
   .toolbar .seg button{padding:8px 2px;font-size:11.5px;white-space:nowrap;border-left:0}
   .toolbar .seg button+button{border-left:1px solid var(--line)}
   .toolbar .search{min-width:0;max-width:none;width:100%}
+  .d-only{display:none}
+  .nav.m-only{display:flex}
+  .m-tabs{display:grid;grid-template-columns:1fr 1fr;width:100%}
+  .m-tabs button{padding:9px}
+  .irow3 .tl{width:82px}
   .ov{padding:0}
   .md{border-radius:0;height:100%;max-width:none;border:0}
   .mh,.mf{border-radius:0}
@@ -460,7 +486,7 @@ import { initializeApp, deleteApp } from "https://www.gstatic.com/firebasejs/10.
 import { getAuth, onAuthStateChanged, signInWithEmailAndPassword, createUserWithEmailAndPassword, signOut, updatePassword, reauthenticateWithCredential, EmailAuthProvider } from "https://www.gstatic.com/firebasejs/10.12.2/firebase-auth.js";
 import { initializeFirestore, getFirestore, persistentLocalCache, persistentMultipleTabManager, doc, collection, query, where, onSnapshot, getDoc, setDoc, updateDoc, deleteDoc, writeBatch } from "https://www.gstatic.com/firebasejs/10.12.2/firebase-firestore.js";
 
-const VERSION = "v2.8";
+const VERSION = "v2.9";
 /* ================= Utilidades ================= */
 const $ = (s, r = document) => r.querySelector(s);
 const esc = s => String(s ?? "").replace(/[&<>"']/g, c => ({"&":"&amp;","<":"&lt;",">":"&gt;",'"':"&quot;","'":"&#39;"}[c]));
@@ -769,10 +795,11 @@ function doRender(){
   <aside class="side">
     <div class="logo">${I("shirt")}</div>
     ${nav("resumen","home","Resumen")}
-    <button class="nav new" data-act="nuevo"><span class="ring">${I("plus")}</span>Nuevo</button>
     ${nav("avisos","bell","Avisos", nAv)}
+    <button class="nav new" data-act="nuevo"><span class="ring">${I("plus")}</span>Nuevo</button>
     ${nav("pedidos","list","Pedidos")}
-    ${pr.admin ? nav("equipo","shield","Equipo") + nav("ajustes","sliders","Ajustes") : ""}
+    ${pr.admin ? `<span class="d-only">${nav("equipo","shield","Equipo")}${nav("ajustes","sliders","Ajustes")}</span><button class="nav m-only" data-view="equipo" aria-current="${S.view === "equipo" || S.view === "ajustes"}">${I("shield")}Admin</button>`
+      : `<button class="nav m-only" data-act="cuenta">${I("user")}Cuenta</button>`}
     <div class="grow"></div>
     <button class="theme" id="themeBtn" title="Cambiar tema">${I("sun","sun")}${I("moon","moon")}</button>
     <div class="ver">${VERSION}</div>
@@ -923,7 +950,7 @@ function notifyIfNeeded(a){
 function viewEquipo(){
   const us = Object.entries(S.usuarios).sort((a, b) => (a[1].rol === "admin" ? -1 : 1) - (b[1].rol === "admin" ? -1 : 1) || String(a[1].nombre).localeCompare(b[1].nombre));
   const tg = (uid, k, t, v) => `<label class="tg"><input type="checkbox" data-perm="${k}" data-uid="${esc(uid)}" ${v ? "checked" : ""}>${t}</label>`;
-  return `<div class="hello"><h1>Equipo</h1><span class="date">${I("shield")}${us.length} usuario${us.length === 1 ? "" : "s"}</span></div>
+  return `${adminTabs()}<div class="hello"><h1>Equipo</h1><span class="date">${I("shield")}${us.length} usuario${us.length === 1 ? "" : "s"}</span></div>
     <div class="card"><div class="toolbar"><div class="sec">${I("users")}Usuarios</div><button class="btn primary" id="newUser">${I("plus")}Nuevo usuario</button></div>
       <p class="note">Tú creas el usuario y su PIN. "Solo sus asignados" hace que la persona vea únicamente los pedidos que tú le asignes o que ella misma registre. Si un pedido tiene personas asignadas, solo ellas (y tú) lo ven.</p>
       <div>${us.map(([uid, u]) => `<div class="urow"><span class="av" style="--c:${u.rol === "admin" ? "var(--accent)" : "var(--t-info)"}">${esc((u.nombre || u.usuario).slice(0,1).toUpperCase())}</span>
@@ -936,10 +963,11 @@ function viewEquipo(){
 }
 
 /* ---------- Ajustes (admin) ---------- */
+const adminTabs = () => `<div class="seg m-tabs"><button data-view="equipo" aria-pressed="${S.view === "equipo"}">Equipo</button><button data-view="ajustes" aria-pressed="${S.view === "ajustes"}">Ajustes</button></div>`;
 function viewAjustes(){
   const c = cfg(), k = c.cat;
   const ta = (key, label) => `<div class="f"><label>${label}</label><textarea class="inp" data-cat="${key}" style="min-height:120px">${esc(k[key].join("\n"))}</textarea></div>`;
-  return `<div class="hello"><h1>Ajustes</h1><span class="date">${I("sliders")}Se aplican a todo el equipo</span></div>
+  return `${adminTabs()}<div class="hello"><h1>Ajustes</h1><span class="date">${I("sliders")}Se aplican a todo el equipo</span></div>
     <div class="card">
       <div class="sec">${I("sliders")}General</div>
       <div class="g3">
@@ -970,6 +998,7 @@ function bindMain(){
     if (d.filtro) { S.filtro = d.filtro; render(); return; }
     if (d.act === "nuevo") return d.tipo ? openForm(null, d.tipo) : chooseTipo();
     if (d.act === "mipin") return cambiarMiPin();
+    if (d.act === "cuenta") return openCuenta();
     if (d.avisar) { marcarAvisado(d.avisar); return; }
     if (d.ya) return marcarAvisado(d.ya);
     if (d.open) return openDetail(d.open);
@@ -1265,8 +1294,8 @@ function openForm(id, tipo, cliente){
       </section>
 
       <section class="step" data-step="1" hidden>
-        <div class="fsec"><div class="f" id="f-marca"><label>Marca <span class="req">*</span></label><select class="inp" id="in-etiq"><option value="">Elegir marca</option>${marcas.map(t => `<option ${F.etiqueta === t ? "selected" : ""}>${esc(t)}</option>`).join("")}</select><span class="msg"></span></div></div>
-        <div class="fsec"><div class="f" id="f-items"><div class="sec">${I("list")}Lista del pedido <small id="itcount"></small></div><p class="note">Elige en cada fila la prenda, el color, la horma y la talla, y ajusta las unidades. "Agregar otra prenda" copia la fila anterior para que solo cambies la talla.</p><div class="itemsbox" id="items"></div><span class="msg"></span></div></div>
+        <div class="fsec"><div class="f" id="f-marca"><select class="inp" id="in-etiq" aria-label="Marca"><option value="">Elegir marca</option>${marcas.map(t => `<option ${F.etiqueta === t ? "selected" : ""}>${esc(t)}</option>`).join("")}</select><span class="msg"></span></div></div>
+        <div class="fsec"><div class="f" id="f-items"><span id="itcount" hidden></span><div class="itemsbox" id="items"></div><span class="msg"></span></div></div>
       </section>
 
       <section class="step" data-step="2" hidden>
@@ -1407,7 +1436,7 @@ function erroresPaso(i){
     const llenas = F.items.filter(x => !itemVacio(x));
     const incompl = F.items.findIndex(x => !itemVacio(x) && (!x.prenda || !x.color || !x.talla));
     if (!llenas.length) e.push(["f-items", "Agrega al menos una prenda con su color y talla"]);
-    else if (incompl >= 0) e.push(["f-items", `Completa prenda, color y talla en la fila ${incompl + 1}`]);
+    else if (incompl >= 0) e.push(["f-items", "Completa la prenda, el color y la talla marcados en rojo"]);
   }
   if (i === 2) {
     if (!F.fechaEntrega) e.push(["f-fecha", "Elige la fecha de entrega"]);
@@ -1454,24 +1483,22 @@ function renderItems(){
     const campo = (fld, html) => it["_otro_" + fld]
       ? `<div class="isel-o" data-err="${fld}"><input class="inp" data-otro="${fld}" placeholder="¿Cuál ${fld === "prenda" ? "prenda" : "color"}?" value="${esc(it[fld])}"><button type="button" class="ib2" data-cancelotro="${fld}" title="Volver a la lista">${I("x")}</button></div>`
       : html;
-    return `<div class="irow2" data-i="${i}">
-      <span class="inum">${i + 1}</span>
-      <div class="isel">
+    return `<div class="irow3" data-i="${i}">
+      <div class="r1">
         ${campo("prenda", `<select class="inp" data-fld="prenda" data-err="prenda">${selOpts(prendas, it.prenda, isP ? "Prenda" : "Producto", true)}</select>`)}
         ${campo("color", `<div class="csel" data-err="color"><i style="${swatchStyle(hex || "")}"></i><select class="inp" data-fld="color">${selOpts(colores.map(x => x[0]), it.color, "Color", true)}</select></div>`)}
         <select class="inp" data-fld="horma">${selOpts(c.hormas, it.horma, "Horma")}</select>
-        <select class="inp" data-fld="talla" data-err="talla">${tallaOpts(it.talla)}</select>
       </div>
-      <div class="ibot">
-        <div class="stepper"><button type="button" data-q="-1">−</button><span>${it.cant}</span><button type="button" data-q="1">+</button></div>
+      <div class="r2">
+        <select class="inp tl" data-fld="talla" data-err="talla">${tallaOpts(it.talla)}</select>
         ${it.cant === 1 ? `<input class="inp nm" data-fld="nombre" placeholder="Nombre" value="${esc(it.nombre || "")}"><input class="inp nu" data-fld="numero" placeholder="N°" value="${esc(it.numero || "")}">`
-          : `<button type="button" class="lk nmlink" data-split="${i}">Poner un nombre a cada una</button>`}
-        <button type="button" class="ib2" data-del title="Quitar fila">${I("trash")}</button>
+          : `<button type="button" class="lk nmlink" data-split="${i}">Nombre a cada una</button>`}
+        <div class="qty">${it.cant === 1 ? `<button type="button" class="del" data-del title="Quitar">${I("trash")}</button>` : `<button type="button" data-q="-1">−</button>`}<span>${it.cant}</span><button type="button" data-q="1">+</button></div>
       </div>
     </div>`;
   }).join("") + `<button type="button" class="addrow" id="addItem">${I("plus")}Agregar otra prenda</button>`;
   box.onclick = e => {
-    if (e.target.closest("#addItem")) { const prev = [...F.items].reverse().find(x => !itemVacio(x)); F.items.push(blankItem(prev)); renderItems(); const rows = box.querySelectorAll(".irow2"); const last = rows[rows.length - 1]; last.scrollIntoView({behavior:"smooth", block:"center"}); const t = last.querySelector('[data-fld="talla"]'); setTimeout(() => (prev ? t : last.querySelector("select")).focus(), 250); return; }
+    if (e.target.closest("#addItem")) { const prev = [...F.items].reverse().find(x => !itemVacio(x)); F.items.push(blankItem(prev)); renderItems(); const rows = box.querySelectorAll(".irow3"); const last = rows[rows.length - 1]; last.scrollIntoView({behavior:"smooth", block:"center"}); const t = last.querySelector('[data-fld="talla"]'); setTimeout(() => (prev ? t : last.querySelector("select")).focus(), 250); return; }
     const row = e.target.closest("[data-i]"); if (!row) return;
     const n = Number(row.dataset.i), it = F.items[n], t = e.target.closest("button"); if (!t) return;
     if (t.dataset.q) { it.cant = Math.max(1, it.cant + Number(t.dataset.q)); if (it.cant > 1) { it.nombre = ""; it.numero = ""; } renderItems(); renderTotals(); }
