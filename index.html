@@ -428,7 +428,7 @@ import { initializeApp, deleteApp } from "https://www.gstatic.com/firebasejs/10.
 import { getAuth, onAuthStateChanged, signInWithEmailAndPassword, createUserWithEmailAndPassword, signOut, updatePassword, reauthenticateWithCredential, EmailAuthProvider } from "https://www.gstatic.com/firebasejs/10.12.2/firebase-auth.js";
 import { initializeFirestore, getFirestore, persistentLocalCache, persistentMultipleTabManager, doc, collection, query, where, onSnapshot, getDoc, setDoc, updateDoc, deleteDoc, writeBatch } from "https://www.gstatic.com/firebasejs/10.12.2/firebase-firestore.js";
 
-const VERSION = "v2.5";
+const VERSION = "v2.6";
 /* ================= Utilidades ================= */
 const $ = (s, r = document) => r.querySelector(s);
 const esc = s => String(s ?? "").replace(/[&<>"']/g, c => ({"&":"&amp;","<":"&lt;",">":"&gt;",'"':"&quot;","'":"&#39;"}[c]));
@@ -543,6 +543,7 @@ function parsePhone(raw, pais){
   if (d.length < 6 || d.length > 12) return {ok:false, msg:"La cantidad de dígitos no es válida para ese país"};
   return {ok:true, e164:cc+d, pretty:`+${cc} ${d}`};
 }
+const ccOf = e => { const m = PAISES.filter(p => p.c && String(e || "").startsWith(p.c)).sort((a, b) => b.c.length - a.c.length)[0]; return m ? m.c : ""; };
 const prettyPhone = e => { const r = parsePhone("+" + e, ""); return r.ok ? r.pretty : "+" + e; };
 
 /* ================= Estado ================= */
@@ -557,7 +558,7 @@ const cfg = () => {
   const r = S.cfgRaw || {}, cat = Object.assign({}, DEF.cat, r.cat || {});
   // Firestore no admite listas dentro de listas: los colores se guardan como {n, h}
   cat.colores = (cat.colores || []).map(x => Array.isArray(x) ? x : [x.n, x.h || ""]).filter(x => x[0]);
-  return {negocio:r.negocio || DEF.negocio, dias:(r.dias ?? DEF.dias), pais:r.pais ?? DEF.pais, plantilla:r.plantilla || DEF.plantilla, cat};
+  return {negocio:r.negocio || DEF.negocio, dias:(r.dias ?? DEF.dias), pais:r.pais || DEF.pais, plantilla:r.plantilla || DEF.plantilla, cat};
 };
 const loginEmail = (u, k) => `${u}.${k}@comicshop-pedidos.app`;
 const pinPass = pin => "cs-" + pin;
@@ -1214,7 +1215,7 @@ function openForm(id, tipo, cliente){
           <div class="g2">
             <div class="f ac" id="f-nombre"><label>Nombre y apellido <span class="req">*</span></label><input class="inp" id="in-nombre" autocomplete="off" value="${esc(F.cliente.nombre)}"><div id="acl"></div><span class="msg"></span></div>
             <div class="f" id="f-tel"><label>WhatsApp <span class="req">*</span></label>
-              <div class="phone"><select id="in-pais">${PAISES.map(p => `<option value="${p.c}" ${p.c === (F.cliente.telefono ? "" : c.pais) ? "selected" : ""}>${p.f} ${p.c ? "+" + p.c : "Otro"}</option>`).join("")}</select><input id="in-tel" inputmode="tel" autocomplete="off" value="${esc(F.cliente.telefono ? prettyPhone(F.cliente.telefono) : "")}"></div>
+              <div class="phone"><select id="in-pais">${PAISES.map(p => `<option value="${p.c}" ${p.c === (F.cliente.telefono ? (ccOf(F.cliente.telefono) || "58") : (c.pais || "58")) ? "selected" : ""}>${p.f} ${p.c ? "+" + p.c : "Otro"}</option>`).join("")}</select><input id="in-tel" inputmode="tel" autocomplete="off" value="${esc(F.cliente.telefono ? prettyPhone(F.cliente.telefono) : "")}"></div>
               <span class="msg" id="tel-msg"></span></div>
           </div>
         </div>
@@ -1288,7 +1289,7 @@ function openForm(id, tipo, cliente){
   };
   inNom.onblur = () => setTimeout(() => acl.innerHTML = "", 200);
   acl.onmousedown = e => e.preventDefault();
-  acl.onclick = e => { const b = e.target.closest("[data-pick]"); if (!b) return; const cl = S.clientes[b.dataset.pick]; F.cliente.nombre = cl.nombre; inNom.value = cl.nombre; inTel.value = prettyPhone(b.dataset.pick); inPais.value = ""; checkTel(); acl.innerHTML = ""; clearErr("f-nombre"); };
+  acl.onclick = e => { const b = e.target.closest("[data-pick]"); if (!b) return; const cl = S.clientes[b.dataset.pick]; F.cliente.nombre = cl.nombre; inNom.value = cl.nombre; inTel.value = prettyPhone(b.dataset.pick); inPais.value = ccOf(b.dataset.pick) || "58"; checkTel(); acl.innerHTML = ""; clearErr("f-nombre"); };
   const checkTel = final => {
     const r = parsePhone(inTel.value, inPais.value), box = $("#f-tel", ov), msg = $("#tel-msg", ov);
     box.classList.remove("err", "okf");
@@ -1307,8 +1308,8 @@ function openForm(id, tipo, cliente){
     const u = $("#usarNom", ov); if (u) u.onclick = () => { F.cliente.nombre = ex.nombre; inNom.value = ex.nombre; clearErr("f-nombre"); checkTel(); };
     return r;
   };
-  inTel.oninput = () => { if (inTel.value.trim().startsWith("+")) inPais.value = ""; checkTel(); };
-  inTel.onblur = () => { const r = checkTel(true); if (r.ok) inTel.value = r.pretty; };
+  inTel.oninput = () => { checkTel(); };
+  inTel.onblur = () => { const r = checkTel(true); if (r.ok) { const cc = ccOf(r.e164); if (cc) inPais.value = cc; inTel.value = r.pretty; } };
   inPais.onchange = () => checkTel();
   if (inTel.value) checkTel();
   F._checkTel = () => parsePhone(inTel.value, inPais.value);
