@@ -1,0 +1,79 @@
+rules_version = '2';
+// Reglas de seguridad de Comic Shop · Pedidos
+// Copia TODO este archivo en Firebase → Firestore Database → Reglas → Publicar.
+service cloud.firestore {
+  match /databases/{database}/documents {
+
+    function signed() { return request.auth != null; }
+    function uPath() { return /databases/$(database)/documents/usuarios/$(request.auth.uid); }
+    function me() { return get(uPath()).data; }
+    function activo() { return signed() && exists(uPath()) && me().activo == true; }
+    function admin() { return activo() && me().rol == 'admin'; }
+    function sinIniciar() { return !exists(/databases/$(database)/documents/sistema/estado); }
+    function seIniciaAhora() { return sinIniciar() && existsAfter(/databases/$(database)/documents/sistema/estado); }
+    function verTipo(t) {
+      return (t == 'personalizado' && me().verPersonalizado == true)
+          || (t == 'sublimacion' && me().verSublimacion == true);
+    }
+    // ¿Puede este usuario ver el pedido "p"?
+    function puedeVer(p) {
+      return admin()
+        || (activo() && me().usuario in p.lectores)
+        || (activo() && p.publico == true && me().soloAsignados != true && verTipo(p.tipo));
+    }
+
+    // Estado del sistema: público (la pantalla de inicio necesita saber si ya hay administrador)
+    match /sistema/estado {
+      allow read: if true;
+      allow create: if signed() && sinIniciar()
+        && getAfter(uPath()).data.rol == 'admin';
+      allow update, delete: if admin();
+    }
+
+    // Usuario → correo interno de inicio de sesión (público, no contiene datos de pedidos)
+    match /logins/{usuario} {
+      allow read: if true;
+      allow create: if admin() || (seIniciaAhora() && request.resource.data.uid == request.auth.uid);
+      allow update, delete: if admin();
+    }
+
+    // Perfiles y permisos del equipo: solo el administrador los cambia
+    match /usuarios/{uid} {
+      allow read: if signed() && (request.auth.uid == uid || activo());
+      allow create: if admin()
+        || (request.auth.uid == uid && seIniciaAhora() && request.resource.data.rol == 'admin');
+      allow update, delete: if admin();
+    }
+
+    match /config/{doc} {
+      allow read: if activo();
+      allow write: if admin();
+    }
+
+    match /clientes/{tel} {
+      allow read, write: if activo();
+    }
+
+    match /fotos/{id} {
+      allow read, create: if activo();
+      allow update, delete: if activo();
+    }
+
+    match /pedidos/{id} {
+      allow read: if puedeVer(resource.data);
+      allow create: if activo()
+        && (admin() || verTipo(request.resource.data.tipo))
+        && request.resource.data.creadoPor == me().usuario
+        && me().usuario in request.resource.data.lectores;
+      allow update: if admin()
+        || (puedeVer(resource.data)
+            && request.resource.data.creadoEn == resource.data.creadoEn
+            && request.resource.data.creadoPor == resource.data.creadoPor
+            && request.resource.data.codigo == resource.data.codigo
+            && request.resource.data.tipo == resource.data.tipo
+            && request.resource.data.lectores == resource.data.lectores
+            && request.resource.data.publico == resource.data.publico);
+      allow delete: if admin() || (puedeVer(resource.data) && me().eliminar == true);
+    }
+  }
+}
