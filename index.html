@@ -340,11 +340,13 @@ table.mx{border-collapse:collapse;width:100%;font-size:13px}
 .ti.ok{color:var(--ok);background:color-mix(in srgb,var(--ok) 10%,var(--surface))}
 .ti.bad{color:var(--err);background:color-mix(in srgb,var(--err) 9%,var(--surface))}
 .ti.warn{color:var(--warn);background:color-mix(in srgb,var(--warn) 10%,var(--surface))}
-.ti.lnk{color:var(--muted);border:1px solid var(--line);margin-left:auto}
-.ti.lnk:hover{color:var(--ink);border-color:var(--ink)}
+.ti.wa{color:#fff;background:#1fae55;padding:5px 12px;font-size:12px}
+.ti.wa:hover{filter:brightness(1.06)}
+.ti.wa:active{filter:brightness(.92)}
 .tiw{flex-basis:100%;display:flex;align-items:center;gap:6px;flex-wrap:wrap;font-size:12px;color:var(--warn);background:color-mix(in srgb,var(--warn) 8%,var(--surface));border:1px solid color-mix(in srgb,var(--warn) 25%,var(--line));border-radius:9px;padding:6px 9px}
 .tiw svg.i{width:13px;height:13px}
-.tiw .lk{color:var(--warn);margin-left:auto}
+.pillb{margin-left:auto;border:0;border-radius:99px;padding:4px 11px;font-size:11.5px;font-weight:800;background:var(--t-info);color:#fff}
+.pillb:active{filter:brightness(.9)}
 .f.okf .phone{border-color:color-mix(in srgb,var(--ok) 45%,var(--line))}
 /* pantalla del tipo de pedido */
 .tsplit{position:fixed;inset:0;z-index:55;display:grid;grid-template-columns:1fr 1fr;background:var(--bg)}
@@ -358,6 +360,32 @@ table.mx{border-collapse:collapse;width:100%;font-size:13px}
 .thalf span:last-child{max-width:340px;color:var(--muted);font-weight:600;font-size:14px}
 .tq{position:absolute;top:18px;left:0;right:0;text-align:center;font-weight:800;font-size:13px;letter-spacing:.12em;text-transform:uppercase;color:var(--muted);pointer-events:none}
 .tclose{position:absolute;top:12px;right:12px;width:42px;height:42px;border-radius:50%;border:1px solid var(--line);background:var(--surface);display:grid;place-items:center;color:var(--ink)}
+
+/* avisos compactos */
+.asec{display:flex;flex-direction:column;gap:8px}
+.asec .sec svg.i{color:var(--c)}
+.alist{border:1px solid var(--line);border-radius:var(--r);background:var(--surface);overflow:hidden}
+.arow{display:flex;align-items:center;gap:10px;padding:9px 12px;border-bottom:1px solid var(--line);border-left:3px solid var(--c);cursor:pointer;min-width:0}
+.arow:last-child{border-bottom:0}
+.arow:hover{background:var(--surface-2)}
+.atx{flex:1;min-width:0;display:flex;flex-direction:column;line-height:1.25}
+.atx b{font-size:14px;white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
+.atx small{font-size:12px;color:var(--muted);font-weight:600;white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
+.aday{flex:none;font-size:11.5px;font-weight:800;border-radius:99px;padding:3px 9px}
+.aday.err{color:var(--err);background:color-mix(in srgb,var(--err) 10%,var(--surface))}
+.aday.warn{color:var(--warn);background:color-mix(in srgb,var(--warn) 12%,var(--surface))}
+.aw,.ac2{flex:none;width:36px;height:36px;border-radius:10px;display:grid;place-items:center;border:1px solid var(--line);background:var(--surface);color:var(--ink)}
+.aw{background:#1fae55;border-color:#1fae55;color:#fff}
+.aw svg.i,.ac2 svg.i{width:18px;height:18px}
+.aempty{font-size:13px;color:var(--muted);padding:10px 12px;border:1px dashed var(--line);border-radius:var(--r)}
+/* pie del detalle */
+.dfoot{flex-direction:column;align-items:stretch}
+.drow{display:flex;gap:8px;align-items:center}
+.dgrid{display:grid;grid-template-columns:1fr 1fr;gap:8px}
+.btn.listo{width:100%;min-height:48px;font-size:15px;background:color-mix(in srgb,var(--accent) 16%,var(--surface));border-color:color-mix(in srgb,var(--accent) 35%,var(--line));color:color-mix(in srgb,var(--accent) 75%,#000)}
+:root[data-theme="dark"] .btn.listo{color:var(--accent)}
+.btn.listo:hover{border-color:var(--accent)}
+.btn.wa.big{min-height:48px;font-size:15px}
 
 @media (max-width:1000px){
   .cols{grid-template-columns:minmax(0,1fr)}
@@ -428,7 +456,7 @@ import { initializeApp, deleteApp } from "https://www.gstatic.com/firebasejs/10.
 import { getAuth, onAuthStateChanged, signInWithEmailAndPassword, createUserWithEmailAndPassword, signOut, updatePassword, reauthenticateWithCredential, EmailAuthProvider } from "https://www.gstatic.com/firebasejs/10.12.2/firebase-auth.js";
 import { initializeFirestore, getFirestore, persistentLocalCache, persistentMultipleTabManager, doc, collection, query, where, onSnapshot, getDoc, setDoc, updateDoc, deleteDoc, writeBatch } from "https://www.gstatic.com/firebasejs/10.12.2/firebase-firestore.js";
 
-const VERSION = "v2.6";
+const VERSION = "v2.7";
 /* ================= Utilidades ================= */
 const $ = (s, r = document) => r.querySelector(s);
 const esc = s => String(s ?? "").replace(/[&<>"']/g, c => ({"&":"&amp;","<":"&lt;",">":"&gt;",'"':"&quot;","'":"&#39;"}[c]));
@@ -842,15 +870,26 @@ function cardHTML(p){
 }
 
 /* ---------- Avisos ---------- */
+function avisoRow(p, modo){
+  const T = TIPOS[p.tipo], t = totales(p);
+  const n = p.fechaEntrega ? daysUntil(p.fechaEntrega) : null;
+  const cuando = n === null ? "" : n < 0 ? `vencido hace ${-n} d` : n === 0 ? "hoy" : n === 1 ? "mañana" : `en ${n} días`;
+  const right = modo === "avisar"
+    ? `<a class="aw" href="${esc(waLink(p))}" target="_blank" rel="noopener" data-avisar="${esc(p._id)}" title="Avisar por WhatsApp">${I("msg")}</a><button class="ac2" data-ya="${esc(p._id)}" title="Ya le avisé">${I("check")}</button>`
+    : `<span class="aday ${n < 0 ? "err" : "warn"}">${cuando}</span>`;
+  return `<div class="arow" style="--c:${T.c}" data-open="${esc(p._id)}" role="button" tabindex="0">
+    <div class="atx"><b>${esc(p.cliente.nombre)}</b><small>${esc(p.codigo)} · ${t.piezas} pz · ${fmtDate(p.fechaEntrega).slice(0, -5)}${t.saldo > 0 ? ` · Saldo ${esc(money(t.saldo, p.moneda))}` : ""}</small></div>
+    ${right}
+  </div>`;
+}
 function viewAvisos(a){
   const notifOK = "Notification" in window;
-  const sec = (c, ic, t, sub, l, extra) => `<div class="card edge" style="--c:${c}"><div class="sec">${I(ic)}${t} <small>${l.length}</small></div><p class="note">${sub}</p>${l.length ? `<div class="col">${l.map(p => cardHTML(p) + (extra ? extra(p) : "")).join("")}</div>` : `<div class="empty">Nada por aquí 👌</div>`}</div>`;
-  const wa = p => `<div style="display:flex;gap:8px;flex-wrap:wrap;margin:-2px 0 6px"><a class="btn wa sm" href="${esc(waLink(p))}" target="_blank" rel="noopener" data-avisar="${esc(p._id)}">${I("msg")}Avisar a ${esc(prettyPhone(p.cliente.telefono))}</a><button class="btn sm" data-ya="${esc(p._id)}">${I("check")}Ya le avisé</button></div>`;
-  return `<div class="hello"><h1>Avisos</h1><span class="date">${I("bell")}Recordatorios con ${cfg().dias} día${cfg().dias == 1 ? "" : "s"} de anticipación</span></div>
-    ${notifOK && Notification.permission !== "granted" ? `<div class="card tint" style="--c:var(--t-info);flex-direction:row;align-items:center;flex-wrap:wrap"><p class="note" style="flex:1;min-width:220px">Activa las notificaciones para que este dispositivo te avise cada día al abrir la app si hay entregas cerca o clientes por avisar.</p><button class="btn primary" id="notifBtn">${I("bell")}Activar notificaciones</button></div>` : ""}
-    ${sec("var(--t-info)","msg","Clientes por avisar","Pedidos completos. El botón verde abre WhatsApp con el mensaje ya escrito y marca el pedido como avisado.", a.avisar, wa)}
-    ${sec("var(--err)","alert","Entregas vencidas","Pendientes cuya fecha de entrega ya pasó.", a.vencidos)}
-    ${sec("var(--warn)","clock","Se entregan pronto",`Pendientes con entrega en los próximos ${cfg().dias} días (lo cambias en Ajustes).`, a.proximos)}`;
+  const sec = (c, ic, t, l, modo) => `<div class="asec" style="--c:${c}"><div class="sec">${I(ic)}${t} <small>${l.length}</small></div>${l.length ? `<div class="alist">${l.map(p => avisoRow(p, modo)).join("")}</div>` : `<div class="aempty">Nada por aquí</div>`}</div>`;
+  return `<div class="hello"><h1>Avisos</h1><span class="date">${I("bell")}Entregas con ${cfg().dias} día${cfg().dias == 1 ? "" : "s"} de anticipación</span></div>
+    ${notifOK && Notification.permission !== "granted" ? `<div class="card tint" style="--c:var(--t-info);flex-direction:row;align-items:center;flex-wrap:wrap;padding:12px 14px"><p class="note" style="flex:1;min-width:200px">Activa las notificaciones para recibir un aviso diario al abrir la app.</p><button class="btn primary sm" id="notifBtn">${I("bell")}Activar</button></div>` : ""}
+    ${sec("var(--t-info)","msg","Por avisar al cliente", a.avisar, "avisar")}
+    ${sec("var(--err)","alert","Entregas vencidas", a.vencidos, "fecha")}
+    ${sec("var(--warn)","clock","Se entregan pronto", a.proximos, "fecha")}`;
 }
 function notifyIfNeeded(a){
   try {
@@ -1205,7 +1244,7 @@ function openForm(id, tipo, cliente){
   const marcas = c.cat.marcas.includes(F.etiqueta) || !F.etiqueta ? c.cat.marcas : [...c.cat.marcas, F.etiqueta];
   const empleados = Object.values(S.usuarios).filter(u => u.activo && u.rol !== "admin");
   const ov = modal(`
-    <div class="mh"><span class="chip" style="--c:${T.c}">${I(T.icon)}</span><h2 class="up">${orig ? "EDITAR " + esc(orig.codigo) : "NUEVO PEDIDO"} <small>${T.label.toUpperCase()}</small></h2><button class="ib" data-cerrar>${I("x")}</button></div>
+    <div class="mh"><span class="chip" style="--c:${T.c}">${I(T.icon)}</span><h2 class="up">${T.label.toUpperCase()}${orig ? ` <small>${esc(orig.codigo)}</small>` : ""}</h2><button class="ib" data-cerrar>${I("x")}</button></div>
     <div class="steps" style="--c:${T.c}">${PASOS.map(([ic, t], i) => `<button type="button" data-go="${i}"><span class="n">${i + 1}</span>${t}</button>`).join("")}</div>
     <div class="mb" id="fbody">
       <div id="errsum"></div>
@@ -1220,9 +1259,8 @@ function openForm(id, tipo, cliente){
           </div>
         </div>
         <div class="fsec"><div class="sec">${I(T.icon)}${isP ? "Estampado" : "Diseño"}</div>
-          <div class="g2">
+          <div>
             <div class="f" id="f-tema"><label>Tema / diseño <span class="req">*</span></label><input class="inp" id="in-tema" value="${esc(F.tema)}"><span class="msg"></span></div>
-            <div class="f" id="f-marca"><label>Marca <span class="req">*</span></label><select class="inp" id="in-etiq"><option value="">Elegir marca</option>${marcas.map(t => `<option ${F.etiqueta === t ? "selected" : ""}>${esc(t)}</option>`).join("")}</select><span class="msg"></span></div>
           </div>
           ${isP ? `
           <div class="f" id="f-servicio"><label>Tipo de estampado <span class="req">*</span></label><div class="opts">${c.cat.servicios.map(o => `<button type="button" class="opt" data-servicio="${esc(o)}" aria-pressed="${F.servicio === o}">${esc(o)}</button>`).join("")}</div><span class="msg"></span></div>
@@ -1231,6 +1269,7 @@ function openForm(id, tipo, cliente){
       </section>
 
       <section class="step" data-step="1" hidden>
+        <div class="fsec"><div class="f" id="f-marca"><label>Marca <span class="req">*</span></label><select class="inp" id="in-etiq"><option value="">Elegir marca</option>${marcas.map(t => `<option ${F.etiqueta === t ? "selected" : ""}>${esc(t)}</option>`).join("")}</select><span class="msg"></span></div></div>
         <div class="fsec"><div class="f" id="f-items"><div class="sec">${I("list")}Lista del pedido <small id="itcount"></small></div><p class="note">Elige en cada fila la prenda, el color, la horma y la talla, y ajusta las unidades. "Agregar otra prenda" copia la fila anterior para que solo cambies la talla.</p><div class="itemsbox" id="items"></div><span class="msg"></span></div></div>
       </section>
 
@@ -1293,19 +1332,23 @@ function openForm(id, tipo, cliente){
   const checkTel = final => {
     const r = parsePhone(inTel.value, inPais.value), box = $("#f-tel", ov), msg = $("#tel-msg", ov);
     box.classList.remove("err", "okf");
-    if (r.empty) { msg.innerHTML = ""; return r; }
+    if (r.empty) { msg.innerHTML = ""; msg._h = ""; return r; }
     if (!r.ok) {
       // Mientras escribe no molesta; el error aparece al salir del campo o al intentar avanzar
-      msg.innerHTML = final ? `<span class="ti bad">${I("alert")}${esc(r.msg)}</span>` : "";
+      msg.innerHTML = final ? `<span class="ti bad">${I("alert")}${esc(r.msg)}</span>` : ""; msg._h = null;
       if (final) box.classList.add("err");
       return r;
     }
     box.classList.add("okf");
     const ex = S.clientes[r.e164];
     const otro = ex && ex.nombre && F.cliente.nombre && norm(ex.nombre).trim() !== norm(F.cliente.nombre).trim();
-    msg.innerHTML = `<span class="ti ok">${I("check")}${r.op ? esc(r.op) : "Número válido"}</span>${r.warn ? `<span class="ti warn">${esc(r.warn)}</span>` : ""}<a class="ti lnk" href="https://wa.me/${esc(r.e164)}" target="_blank" rel="noopener">${I("msg")}Probar</a>`
-      + (otro ? `<div class="tiw">${I("user")}<span>Este número ya está guardado como <b>${esc(ex.nombre)}</b></span><button type="button" class="lk" id="usarNom">Usar ese nombre</button></div>` : "");
-    const u = $("#usarNom", ov); if (u) u.onclick = () => { F.cliente.nombre = ex.nombre; inNom.value = ex.nombre; clearErr("f-nombre"); checkTel(); };
+    const html = (r.warn ? `<span class="ti warn">${esc(r.warn)}</span>` : "") + `<a class="ti wa" href="https://wa.me/${esc(r.e164)}" target="_blank" rel="noopener">${I("msg")}Probar en WhatsApp</a>`
+      + (otro ? `<div class="tiw">${I("user")}<span>Ya existe como <b>${esc(ex.nombre)}</b></span><button type="button" class="pillb" id="usarNom">Usar ese nombre</button></div>` : "");
+    // Solo se redibuja si cambió: así el primer toque en "Probar" no se pierde al salir del campo
+    if (msg._h !== html) {
+      msg.innerHTML = html; msg._h = html;
+      const u = $("#usarNom", ov); if (u) u.onclick = () => { F.cliente.nombre = ex.nombre; inNom.value = ex.nombre; clearErr("f-nombre"); checkTel(); };
+    }
     return r;
   };
   inTel.oninput = () => { checkTel(); };
@@ -1360,11 +1403,11 @@ function erroresPaso(i){
     if ((F.cliente.nombre || "").trim().length < 3) e.push(["f-nombre", "Escribe el nombre del cliente"]);
     const t = F._checkTel(); if (!t.ok) e.push(["f-tel", t.empty ? t.msg : "WhatsApp: " + t.msg]);
     if (!(F.tema || "").trim()) e.push(["f-tema", "Escribe el tema o diseño"]);
-    if (!F.etiqueta) e.push(["f-marca", "Elige la marca"]);
     if (isP && !F.servicio) e.push(["f-servicio", "Elige el tipo de estampado"]);
     if (isP && !F.prendaDe) e.push(["f-prendade", "Indica quién pone la prenda"]);
   }
   if (i === 1) {
+    if (!F.etiqueta) e.push(["f-marca", "Elige la marca"]);
     const llenas = F.items.filter(x => !itemVacio(x));
     const incompl = F.items.findIndex(x => !itemVacio(x) && (!x.prenda || !x.color || !x.talla));
     if (!llenas.length) e.push(["f-items", "Agrega al menos una prenda con su color y talla"]);
@@ -1380,7 +1423,7 @@ function erroresPaso(i){
 }
 function marcarErrores(errs){
   const ov = F._ov;
-  if (errs.some(([id]) => id === "f-tel")) { const t = F._checkTel(); $("#f-tel", ov).classList.add("err"); $("#tel-msg", ov).innerHTML = `<span class="ti bad">${I("alert")}${esc(t.msg)}</span>`; }
+  if (errs.some(([id]) => id === "f-tel")) { const t = F._checkTel(); $("#f-tel", ov).classList.add("err"); $("#tel-msg", ov).innerHTML = `<span class="ti bad">${I("alert")}${esc(t.msg)}</span>`; $("#tel-msg", ov)._h = null; }
   if (errs.some(([id]) => id === "f-items")) marcarFilas();
   errs.forEach(([id, msg]) => {
     const el = id && $("#" + id, ov); if (!el) return;
@@ -1570,27 +1613,28 @@ function openDetail(id){
         ${p.tipo === "personalizado" ? `<dt>Prenda</dt><dd>${p.prendaDe === "cliente" ? "La trae el cliente" : "La pone la tienda"}</dd>` : ""}
         <dt>Marca</dt><dd>${esc(p.etiqueta || "—")}</dd></dl></div>
       <div class="fsec"><div class="sec">${I("shirt")}Prendas <small>${t.piezas} piezas</small></div>
-        <ul class="il">${(p.items || []).map(i => `<li><span class="q">${i.cant}×</span><span><b>${esc(i.prenda)} ${esc(i.color)} ${esc(i.talla)}</b>${i.nombre ? ` — ${esc(i.nombre)}` : ""}${i.numero ? ` <b>#${esc(i.numero)}</b>` : ""}${i.horma ? ` <span class="note" style="display:inline">· ${esc(i.horma)}</span>` : ""}</span></li>`).join("")}</ul>
-        <div class="lbl">Resumen para producción</div>${tallyTable(p)}</div>
+        <ul class="il">${(p.items || []).map(i => `<li><span class="q">${i.cant}×</span><span><b>${esc(i.prenda)} ${esc(i.color)} ${esc(i.talla)}</b>${i.nombre ? ` — ${esc(i.nombre)}` : ""}${i.numero ? ` <b>#${esc(i.numero)}</b>` : ""}${i.horma ? ` <span class="note" style="display:inline">· ${esc(i.horma)}</span>` : ""}</span></li>`).join("")}</ul></div>
       <div class="fsec"><div class="sec">${I("cash")}Pago</div><div class="totals"><div class="tot"><small>Precio unidad</small><b class="num">${esc(money(p.precio, p.moneda))}</b></div><div class="tot"><small>Total</small><b class="num">${esc(money(t.total, p.moneda))}</b></div><div class="tot"><small>Abono</small><b class="num">${esc(money(t.abono, p.moneda))}</b></div><div class="tot"><small>Saldo</small><b class="num" style="color:${t.saldo > 0 ? "var(--err)" : "var(--ok)"}">${esc(money(t.saldo, p.moneda))}</b></div></div>${p.motivoSinAbono ? `<p class="note"><b>Sin abono:</b> ${esc(p.motivoSinAbono)}</p>` : ""}</div>
       ${(p.imagenes || []).length ? `<div class="fsec"><div class="sec">${I("camera")}Referencias</div><div class="imgs">${p.imagenes.map(im => `<div class="imgbox"><img data-foto="${esc(im)}" alt=""></div>`).join("")}</div></div>` : ""}
       ${p.nota ? `<div class="fsec"><div class="sec">${I("note")}Nota</div><div class="notebox">${esc(p.nota)}</div></div>` : ""}
       <p class="hist">Registrado: ${fmtDT(p.creadoEn)} por ${esc(nameOf(p.creadoPor))}${p.editadoEn ? `<br>Última edición: ${fmtDT(p.editadoEn)} por ${esc(nameOf(p.editadoPor))}` : ""}${p.listoEn ? `<br>Completado: ${fmtDT(p.listoEn)}` : ""}${p.avisadoEn ? `<br>Cliente avisado: ${fmtDT(p.avisadoEn)}` : ""}${p.entregadoEn ? `<br>Entregado: ${fmtDT(p.entregadoEn)}` : ""}${(p.asignados || []).length ? `<br>Visible solo para: ${esc(p.asignados.map(nameOf).join(", "))}` : ""}</p>
     </div>
-    <div class="mf">
-      ${pr.eliminar ? `<button class="btn danger" id="d-del" style="margin-right:auto">${I("trash")}Eliminar</button>` : ""}
-      <button class="btn" id="d-copy">${I("copy")}Copiar</button><button class="btn" id="d-edit">${I("edit")}Editar</button>
-      ${est === "pendiente" ? `<button class="btn primary" id="d-listo">${I("check")}Marcar completo</button>` : ""}
-      ${est === "listo" ? `<button class="btn" id="d-reab">${I("undo")}Reabrir</button><a class="btn wa" id="d-wa" href="${esc(waLink(p))}" target="_blank" rel="noopener">${I("msg")}${p.avisado ? "Volver a avisar" : "Avisar al cliente"}</a><button class="btn primary" id="d-ent">${I("box")}Entregado</button>` : ""}
-      ${est === "entregado" ? `<button class="btn" id="d-reab">${I("undo")}Reabrir</button>` : ""}
+    <div class="mf dfoot">
+      <div class="drow">
+        ${est !== "pendiente" ? `<button class="btn" id="d-reab">${I("undo")}Reabrir</button>` : ""}
+        <span style="flex:1"></span>
+        ${pr.eliminar ? `<button class="btn danger" id="d-del">${I("trash")}Eliminar</button>` : ""}
+        <button class="btn" id="d-edit">${I("edit")}Editar</button>
+      </div>
+      ${est === "pendiente" ? `<button class="btn listo" id="d-listo">${I("check")}Pedido listo</button>` : ""}
+      ${est === "listo" ? `<div class="dgrid"><a class="btn wa big" id="d-wa" href="${esc(waLink(p))}" target="_blank" rel="noopener">${I("msg")}${p.avisado ? "Volver a avisar" : "Avisar al cliente"}</a><button class="btn listo" id="d-ent">${I("box")}Entregado</button></div>` : ""}
     </div>`);
   loadFotos(ov);
   ov.querySelectorAll(".imgbox img").forEach(i => i.onclick = () => i.src && lightbox(i.src));
   const upd = async (data, msg) => { try { await updateDoc(doc(S.db, "pedidos/" + id), data); toast(msg); ov.close(); } catch(e) { toast("No se pudo actualizar el pedido", true); } };
   const on = (s, fn) => { const b = $(s, ov); if (b) b.onclick = fn; };
   on("#d-edit", () => { ov.close(); openForm(id); });
-  on("#d-copy", async () => { try { await navigator.clipboard.writeText(resumenTexto(p)); toast("Resumen copiado"); } catch(e) { toast("No se pudo copiar", true); } });
-  on("#d-listo", () => upd({estado:"listo", listoEn:new Date().toISOString(), listoPor:S.me.usuario, avisado:false}, "Pedido completo · recuerda avisar al cliente"));
+  on("#d-listo", () => upd({estado:"listo", listoEn:new Date().toISOString(), listoPor:S.me.usuario, avisado:false}, "Pedido listo · recuerda avisar al cliente"));
   on("#d-wa", () => { marcarAvisado(id); ov.close(); });
   on("#d-ent", () => upd({estado:"entregado", entregadoEn:new Date().toISOString()}, "Pedido entregado"));
   on("#d-reab", () => upd({estado:"pendiente", avisado:false}, "Pedido reabierto"));
