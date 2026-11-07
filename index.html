@@ -127,9 +127,9 @@ button.pill:hover{border-color:var(--ink)}
 .colhead .n{font-weight:800;font-size:12px;border-radius:99px;padding:2px 9px;background:var(--surface);border:1px solid color-mix(in srgb,var(--c) 30%,var(--line));color:var(--c)}
 .empty{color:var(--muted);text-align:center;padding:28px 10px;font-size:13px;border:1px dashed var(--line);border-radius:var(--r)}
 
-.oc{background:var(--surface);border:1px solid var(--line);border-left:3px solid var(--c);border-radius:var(--r);padding:12px 14px;display:flex;gap:12px;cursor:pointer;text-align:left;width:100%}
+.oc{min-width:0;max-width:100%;background:var(--surface);border:1px solid var(--line);border-left:3px solid var(--c);border-radius:var(--r);padding:12px 14px;display:flex;gap:12px;cursor:pointer;text-align:left;width:100%}
 .oc:hover{border-color:color-mix(in srgb,var(--c) 45%,var(--line));border-left-color:var(--c)}
-.oc .tx{flex:1;min-width:0}
+.oc .tx{flex:1;min-width:0;display:block}
 .oc .r1{display:flex;align-items:center;gap:6px;flex-wrap:wrap}
 .code{font-size:11px;font-weight:800;color:var(--muted);letter-spacing:.06em}
 .oc .nm{font-weight:800;font-size:15.5px;margin:2px 0 3px}
@@ -147,6 +147,7 @@ button.pill:hover{border-color:var(--ink)}
 .ov{position:fixed;inset:0;z-index:50;background:rgba(10,15,20,.45);display:flex;align-items:center;justify-content:center;padding:24px 12px}
 .md{background:var(--bg);border:1px solid var(--line);border-radius:16px;width:100%;max-width:860px;max-height:100%;display:flex;flex-direction:column;box-shadow:0 20px 50px rgba(0,0,0,.25);position:relative;overflow:hidden}
 .md.sm{max-width:460px}
+.md.wide{max-width:1040px}
 .mh{flex:none;display:flex;align-items:center;gap:10px;padding:14px 18px;border-radius:16px 16px 0 0;background:var(--surface);border-bottom:1px solid var(--line)}
 .mh h2{font-size:17px;font-weight:800;flex:1;min-width:0}
 .mh .ib{width:36px;height:36px;border:1px solid var(--line);border-radius:10px;background:var(--surface);display:grid;place-items:center;color:var(--muted)}
@@ -162,10 +163,10 @@ button.pill:hover{border-color:var(--ink)}
 .f{display:flex;flex-direction:column;gap:5px;min-width:0}
 .f>label,.lbl{font-size:11px;text-transform:uppercase;letter-spacing:.08em;color:var(--muted);font-weight:700}
 .req{color:var(--err)}
-.inp{width:100%;font-size:14px;color:var(--ink);border:1px solid var(--line);background:var(--surface-2);border-radius:9px;padding:9px 11px;min-width:0;font-weight:600;outline:none}
+.inp{width:100%;font-size:14px;color:var(--ink);border:1px solid var(--line);background-color:var(--surface-2);border-radius:9px;padding:9px 11px;min-width:0;font-weight:600;outline:none}
 textarea.inp{min-height:70px;resize:vertical;font-weight:500}
 .inp:focus{border-color:var(--accent);box-shadow:0 0 0 3px color-mix(in srgb,var(--accent) 22%,transparent)}
-.f.err .inp,.f.err .phone,.f.err .datebtn,.f.err .opts,.f.err .itemsbox{border-color:var(--err)!important;background:color-mix(in srgb,var(--err) 5%,var(--surface))}
+.f.err>.inp,.f.err .phone,.f.err .datebtn,.f.err .opts{border-color:var(--err)!important;background:color-mix(in srgb,var(--err) 5%,var(--surface))}
 .msg{font-size:12px;font-weight:600}
 .msg.bad{color:var(--err)}.msg.ok{color:var(--ok)}.msg.warn{color:var(--warn)}.msg.mut{color:var(--muted)}
 .opts{display:flex;flex-wrap:wrap;gap:6px;border:1px solid transparent;border-radius:10px}
@@ -311,6 +312,53 @@ table.mx{border-collapse:collapse;width:100%;font-size:13px}
 .mx input:focus{outline:none;border-color:var(--accent);box-shadow:0 0 0 3px color-mix(in srgb,var(--accent) 22%,transparent)}
 #b-add{align-self:flex-start}
 
+/* lista del pedido con desplegables */
+.mh h2.up{text-transform:uppercase;letter-spacing:.02em}
+.irow2{display:grid;grid-template-columns:24px minmax(0,1fr) auto;gap:8px 10px;align-items:center;padding:10px 0;border-bottom:1px solid var(--line)}
+.inum{width:24px;height:24px;border-radius:50%;background:var(--surface-2);border:1px solid var(--line);display:grid;place-items:center;font-size:11px;font-weight:800;color:var(--muted)}
+.isel{display:grid;grid-template-columns:1.2fr 1.2fr 1fr .8fr;gap:6px;min-width:0}
+.isel select.inp,.isel .inp{padding:8px 30px 8px 10px;font-size:13.5px}
+.csel{position:relative;min-width:0}
+.csel i{position:absolute;left:9px;top:50%;transform:translateY(-50%);width:16px;height:16px;border-radius:50%;border:1px solid #0002;pointer-events:none}
+.csel select.inp{padding-left:32px}
+.isel-o{display:flex;gap:4px;min-width:0}
+.isel-o .inp{padding:8px 10px}
+[data-err].bad,.csel.bad select,.isel-o.bad .inp{border-color:var(--err)!important;background-color:color-mix(in srgb,var(--err) 6%,var(--surface))!important}
+.ibot{display:flex;align-items:center;gap:6px}
+.ibot .stepper{width:100px;flex:none}
+.ibot .inp{padding:8px 10px;font-size:13.5px}
+.ibot .nm{width:150px}.ibot .nu{width:56px}
+.nmlink{width:212px;text-align:left}
+.addrow{margin-top:10px;width:100%;border:1px dashed var(--line);background:var(--surface);border-radius:10px;padding:10px;font-weight:700;color:var(--accent);display:flex;align-items:center;justify-content:center;gap:6px}
+.addrow:hover{border-color:var(--accent);background:var(--accent-soft)}
+.addrow svg.i{width:16px;height:16px}
+/* avisos del WhatsApp */
+#tel-msg{display:flex;flex-wrap:wrap;gap:6px;align-items:center;min-height:0}
+#tel-msg:empty{display:none}
+.ti{display:inline-flex;align-items:center;gap:4px;font-size:11.5px;font-weight:700;border-radius:99px;padding:2px 8px;text-decoration:none}
+.ti svg.i{width:12px;height:12px}
+.ti.ok{color:var(--ok);background:color-mix(in srgb,var(--ok) 10%,var(--surface))}
+.ti.bad{color:var(--err);background:color-mix(in srgb,var(--err) 9%,var(--surface))}
+.ti.warn{color:var(--warn);background:color-mix(in srgb,var(--warn) 10%,var(--surface))}
+.ti.lnk{color:var(--muted);border:1px solid var(--line);margin-left:auto}
+.ti.lnk:hover{color:var(--ink);border-color:var(--ink)}
+.tiw{flex-basis:100%;display:flex;align-items:center;gap:6px;flex-wrap:wrap;font-size:12px;color:var(--warn);background:color-mix(in srgb,var(--warn) 8%,var(--surface));border:1px solid color-mix(in srgb,var(--warn) 25%,var(--line));border-radius:9px;padding:6px 9px}
+.tiw svg.i{width:13px;height:13px}
+.tiw .lk{color:var(--warn);margin-left:auto}
+.f.okf .phone{border-color:color-mix(in srgb,var(--ok) 45%,var(--line))}
+/* pantalla del tipo de pedido */
+.tsplit{position:fixed;inset:0;z-index:55;display:grid;grid-template-columns:1fr 1fr;background:var(--bg)}
+.thalf{border:0;display:flex;flex-direction:column;align-items:center;justify-content:center;gap:14px;padding:40px 24px;text-align:center;color:var(--c);background:linear-gradient(160deg,color-mix(in srgb,var(--c) 16%,var(--surface)) 0%,color-mix(in srgb,var(--c) 6%,var(--surface)) 100%);transition:filter .15s}
+.thalf:hover{filter:brightness(.97)}
+.thalf:active{filter:brightness(.93)}
+.thalf+.thalf{border-left:1px solid var(--line)}
+.thalf .tic{width:112px;height:112px;border-radius:30px;background:var(--c);color:#fff;display:grid;place-items:center;box-shadow:0 14px 34px color-mix(in srgb,var(--c) 35%,transparent)}
+.thalf .tic svg.i{width:58px;height:58px;stroke-width:1.7}
+.thalf b{font-size:26px;font-weight:800;letter-spacing:.04em}
+.thalf span:last-child{max-width:340px;color:var(--muted);font-weight:600;font-size:14px}
+.tq{position:absolute;top:18px;left:0;right:0;text-align:center;font-weight:800;font-size:13px;letter-spacing:.12em;text-transform:uppercase;color:var(--muted);pointer-events:none}
+.tclose{position:absolute;top:12px;right:12px;width:42px;height:42px;border-radius:50%;border:1px solid var(--line);background:var(--surface);display:grid;place-items:center;color:var(--ink)}
+
 @media (max-width:1000px){
   .cols{grid-template-columns:minmax(0,1fr)}
   .tipotabs{display:flex}
@@ -344,6 +392,19 @@ table.mx{border-collapse:collapse;width:100%;font-size:13px}
   .tot{padding:8px}
   .tot b{font-size:15px}
   .steps{padding:6px 8px}
+  .irow2{grid-template-columns:22px minmax(0,1fr);gap:6px 8px}
+  .irow2 .ibot{grid-column:2}
+  .isel{grid-template-columns:1fr 1fr}
+  .ibot .nm{flex:1;width:auto;min-width:0}.nmlink{flex:1;width:auto}
+  .tsplit{grid-template-columns:1fr;grid-template-rows:1fr 1fr}
+  .thalf+.thalf{border-left:0;border-top:1px solid var(--line)}
+  .thalf{gap:10px;padding:56px 20px 24px}
+  .thalf+.thalf{padding-top:24px}
+  .thalf .tic{width:84px;height:84px;border-radius:24px}
+  .thalf .tic svg.i{width:44px;height:44px}
+  .thalf b{font-size:21px}
+  .ov.popup{padding:16px;align-items:center}
+  .ov.popup .md{height:auto;max-height:100%;border-radius:16px;border:1px solid var(--line)}
   .ov{padding:0}
   .md{border-radius:0;height:100%;max-width:none;border:0}
   .mh,.mf{border-radius:0}
@@ -367,7 +428,7 @@ import { initializeApp, deleteApp } from "https://www.gstatic.com/firebasejs/10.
 import { getAuth, onAuthStateChanged, signInWithEmailAndPassword, createUserWithEmailAndPassword, signOut, updatePassword, reauthenticateWithCredential, EmailAuthProvider } from "https://www.gstatic.com/firebasejs/10.12.2/firebase-auth.js";
 import { initializeFirestore, getFirestore, persistentLocalCache, persistentMultipleTabManager, doc, collection, query, where, onSnapshot, getDoc, setDoc, updateDoc, deleteDoc, writeBatch } from "https://www.gstatic.com/firebasejs/10.12.2/firebase-firestore.js";
 
-const VERSION = "v2.3";
+const VERSION = "v2.4";
 /* ================= Utilidades ================= */
 const $ = (s, r = document) => r.querySelector(s);
 const esc = s => String(s ?? "").replace(/[&<>"']/g, c => ({"&":"&amp;","<":"&lt;",">":"&gt;",'"':"&quot;","'":"&#39;"}[c]));
@@ -435,7 +496,7 @@ const DEF = {
     prendasSub: ["Franela","Chemise","Suéter","Camisa deportiva","Short deportivo","Uniforme completo","Traje de baño","Licra","Franelilla","Otro"],
     colores: [["Fullprint","full"],["Blanco","#ffffff"],["Negro","#111111"],["Gris claro","#cfd2d6"],["Gris oscuro","#4b5055"],["Azul rey","#1d4ed8"],["Azul marino","#1e2a4a"],["Azul cielo","#7cc4f0"],["Rojo","#d92b2b"],["Vinotinto","#6d1a2a"],["Verde","#1f8a4c"],["Verde manzana","#8cc63f"],["Amarillo","#f5c518"],["Naranja","#f07c1b"],["Rosado","#f4a6c1"],["Morado","#6b3fa0"],["Beige","#e6d3b3"]],
     hormas: ["Caballero","Dama","Niño","Unisex","Oversize"],
-    etiquetas: ["Sin marca","Marca de la tienda","Marca del cliente"],
+    marcas: ["AS","Etanol","Comic Shop","Serfe"],
     tallasNino: ["2","4","6","8","10","12","14","16"],
     tallasAdulto: ["XS","S","M","L","XL","2XL","3XL","4XL"]
   }
@@ -470,9 +531,9 @@ function parsePhone(raw, pais){
   }
   if (cc === "58") {
     if (d.startsWith("0")) d = d.slice(1);
-    if (d.length !== 10) return {ok:false, msg:`Un celular venezolano tiene 11 dígitos (ej. 0424 123 4567). Hay ${d.length+1}.`};
+    if (d.length !== 10) return {ok:false, msg:`Debe tener 11 dígitos y tiene ${d.length+1}`};
     const op = d.slice(0, 3);
-    if (!OPS_VE[op]) return {ok:false, msg:`0${op} no es un prefijo de celular (usa 0412, 0414, 0416, 0422, 0424 o 0426)`};
+    if (!OPS_VE[op]) return {ok:false, msg:`0${op} no es un prefijo de celular válido`};
     return {ok:true, e164:"58"+d, pretty:`+58 ${op}-${d.slice(3,6)}-${d.slice(6)}`, op:OPS_VE[op]};
   }
   if (cc === "57") { if (d.length !== 10 || d[0] !== "3") return {ok:false, msg:"Celular colombiano: 10 dígitos que empiezan por 3"}; return {ok:true, e164:"57"+d, pretty:`+57 ${d.slice(0,3)} ${d.slice(3,6)} ${d.slice(6)}`}; }
@@ -767,7 +828,7 @@ function totales(p){
 }
 function cardHTML(p){
   const T = TIPOS[p.tipo], t = totales(p), g = grupos(p), im = (p.imagenes || [])[0];
-  return `<button class="oc" style="--c:${T.c}" data-open="${esc(p._id)}">
+  return `<div class="oc" role="button" tabindex="0" style="--c:${T.c}" data-open="${esc(p._id)}">
     <span class="tx">
       <span class="r1"><span class="code">${esc(p.codigo)}</span>${p.urgente ? `<span class="tag urg">URGENTE</span>` : ""}${p.servicio ? `<span class="tag c">${esc(p.servicio)}</span>` : ""}</span>
       <div class="nm">${esc(p.cliente && p.cliente.nombre)}</div>
@@ -775,7 +836,7 @@ function cardHTML(p){
       <span class="mt">${dueTag(p)}<span class="tag">${I("shirt")}${t.piezas} pz</span>${t.saldo > 0 ? `<span class="tag">${I("cash")}Saldo ${esc(money(t.saldo, p.moneda))}</span>` : `<span class="tag c ok">${I("cash")}Pagado</span>`}${(p.asignados || []).length ? `<span class="tag">${I("lock")}${p.asignados.length}</span>` : ""}</span>
     </span>
     ${im ? `<img class="thumb" data-foto="${esc(im)}" alt="">` : ""}
-  </button>`;
+  </div>`;
 }
 
 /* ---------- Avisos ---------- */
@@ -851,7 +912,7 @@ function viewAjustes(){
     </div>
     <div class="card">
       <div class="sec">${I("list")}Listas de opciones <small>una por línea</small></div>
-      <div class="g3">${ta("servicios","Tipos de estampado")}${ta("prendasPers","Prendas · Personalizado")}${ta("prendasSub","Productos · Sublimación")}${ta("hormas","Hormas")}${ta("etiquetas","Marcas")}${ta("tallasAdulto","Tallas adulto")}${ta("tallasNino","Tallas niño")}</div>
+      <div class="g3">${ta("servicios","Tipos de estampado")}${ta("prendasPers","Prendas · Personalizado")}${ta("prendasSub","Productos · Sublimación")}${ta("hormas","Hormas")}${ta("marcas","Marcas")}${ta("tallasAdulto","Tallas adulto")}${ta("tallasNino","Tallas niño")}</div>
       <div class="f"><label>Colores (Nombre | #código; usa "full" para fullprint)</label><textarea class="inp" id="cCol" style="min-height:170px">${esc(k.colores.map(x => x[0] + " | " + x[1]).join("\n"))}</textarea></div>
       <div style="display:flex;gap:8px;flex-wrap:wrap"><button class="btn primary" id="cSave">${I("check")}Guardar ajustes</button><button class="btn" id="cReset">${I("undo")}Restaurar listas originales</button></div>
     </div>`;
@@ -1031,7 +1092,7 @@ function overlay(el){
     el.remove();
     const i = NAV.stack.indexOf(el); if (i >= 0) NAV.stack.splice(i, 1);
     if (!fromPop) navSilentBack();
-    if (!document.querySelector(".ov,.dp-ov,.lbx")) document.body.style.overflow = "";
+    if (!document.querySelector(".ov,.dp-ov,.lbx,.tsplit")) document.body.style.overflow = "";
   };
   return el;
 }
@@ -1039,14 +1100,14 @@ function overlay(el){
 /* ================= Modales ================= */
 function modal(html, size, keep){
   const ov = document.createElement("div");
-  ov.className = "ov";
+  ov.className = "ov" + (/\bpop\b/.test(size || "") ? " popup" : "");
   ov.innerHTML = `<div class="md ${size || ""}">${html}</div>`;
   overlay(ov);
   ov.addEventListener("click", e => { if (e.target.closest("[data-close]")) ov.close(); else if (e.target === ov && !keep) ov.close(); });
   return ov;
 }
 function confirmar(title, text, okTxt, fn){
-  const ov = modal(`<div class="mh"><h2>${esc(title)}</h2><button class="ib" data-close>${I("x")}</button></div><div class="mb"><p class="note">${esc(text)}</p></div><div class="mf"><button class="btn" data-close>Cancelar</button><button class="btn primary" id="okc">${esc(okTxt)}</button></div>`, "sm");
+  const ov = modal(`<div class="mh"><h2>${esc(title)}</h2><button class="ib" data-close>${I("x")}</button></div><div class="mb"><p class="note">${esc(text)}</p></div><div class="mf"><button class="btn" data-close>Cancelar</button><button class="btn primary" id="okc">${esc(okTxt)}</button></div>`, "sm pop");
   $("#okc", ov).onclick = async () => { $("#okc", ov).disabled = true; try { await fn(); ov.close(); } catch(e) { console.warn(e); toast("No se pudo completar: " + (e.code || e.message || ""), true); $("#okc", ov).disabled = false; } };
   return ov;
 }
@@ -1054,12 +1115,19 @@ function chooseTipo(cliente){
   const pr = perm(), tipos = ["personalizado","sublimacion"].filter(t => pr.ver[t]);
   if (!tipos.length) return toast("No tienes permiso para crear pedidos", true);
   if (tipos.length === 1) return openForm(null, tipos[0], cliente);
-  const ov = modal(`<div class="mh"><h2>¿Qué tipo de pedido es?</h2><button class="ib" data-close>${I("x")}</button></div>
-    <div class="mb">
-      <button class="tile tint" style="--c:var(--t-pers)" data-t="personalizado"><span class="bg">${I("palette")}</span><span class="lb"><span class="chip sm">${I("palette")}</span>Personalizado</span><span class="sub" style="color:var(--muted)">DTF · Vinilo textil · Sublimación sencilla · Estampado en prenda del cliente</span></button>
-      <button class="tile tint" style="--c:var(--t-sub)" data-t="sublimacion"><span class="bg">${I("shirt")}</span><span class="lb"><span class="chip sm">${I("shirt")}</span>Sublimación completa</span><span class="sub" style="color:var(--muted)">Fullprint fabricado desde cero: franelas, suéteres, uniformes, trajes de baño…</span></button>
-    </div>`, "sm");
-  ov.querySelectorAll("[data-t]").forEach(b => b.onclick = () => { ov.close(); openForm(null, b.dataset.t, cliente); });
+  const info = {
+    personalizado: "DTF · Vinilo textil · Sublimación sencilla · Estampado en prenda del cliente",
+    sublimacion: "Fullprint fabricado desde cero: franelas, suéteres, uniformes, trajes de baño"
+  };
+  const el = document.createElement("div");
+  el.className = "tsplit";
+  el.innerHTML = tipos.map(t => `<button class="thalf" style="--c:${TIPOS[t].c}" data-t="${t}"><span class="tic">${I(TIPOS[t].icon)}</span><b>${TIPOS[t].label.toUpperCase()}</b><span>${info[t]}</span></button>`).join("")
+    + `<div class="tq">¿Qué tipo de pedido es?</div><button class="tclose" data-close aria-label="Cerrar">${I("x")}</button>`;
+  overlay(el);
+  el.onclick = e => {
+    if (e.target.closest("[data-close]")) return el.close();
+    const b = e.target.closest("[data-t]"); if (b) { el.close(); openForm(null, b.dataset.t, cliente); }
+  };
 }
 function lightbox(src){ const lb = document.createElement("div"); lb.className = "lbx"; lb.innerHTML = `<img src="${esc(src)}" alt="">`; overlay(lb); lb.onclick = () => lb.close(); }
 
@@ -1122,21 +1190,20 @@ function openCalendar(current, onPick){
 }
 
 /* ================= Formulario de pedido (por pasos) ================= */
-let F = null, B = null;
+let F = null;
 const PASOS = [["user","Cliente"],["shirt","Prendas"],["cal","Entrega"],["camera","Extras"]];
-const newBuilder = () => ({prendas:[], colores:[], hormas:[], tallas:[], prendaOtra:"", colorOtro:"", q:{}});
 function openForm(id, tipo, cliente){
   const orig = id ? S.pedidos[id] : null;
   if (orig) tipo = orig.tipo;
   const c = cfg(), pr = perm(), T = TIPOS[tipo], isP = tipo === "personalizado";
-  F = orig ? JSON.parse(JSON.stringify(orig)) : {tipo, cliente:{nombre:(cliente && cliente.nombre) || "", telefono:(cliente && cliente.telefono) || ""}, tema:"", servicio:"", prendaDe:"tienda", etiqueta:c.cat.etiquetas[0] || "", items:[], fechaEntrega:"", precio:"", moneda:"USD", abono:"", urgente:false, imagenes:[], nota:"", asignados:[]};
+  F = orig ? JSON.parse(JSON.stringify(orig)) : {tipo, cliente:{nombre:(cliente && cliente.nombre) || "", telefono:(cliente && cliente.telefono) || ""}, tema:"", servicio:"", prendaDe:"", etiqueta:"", items:[blankItem()], fechaEntrega:"", precio:"", moneda:"COP", abono:"", motivoSinAbono:"", urgente:false, imagenes:[], nota:"", asignados:[]};
+  if (!F.items || !F.items.length) F.items = [blankItem()];
   F.imagenes = (F.imagenes || []).map(id => ({id}));
   F.step = 0; F.visto = [true, false, false, false];
-  B = newBuilder();
-  const marcas = c.cat.etiquetas.includes(F.etiqueta) || !F.etiqueta ? c.cat.etiquetas : [...c.cat.etiquetas, F.etiqueta];
+  const marcas = c.cat.marcas.includes(F.etiqueta) || !F.etiqueta ? c.cat.marcas : [...c.cat.marcas, F.etiqueta];
   const empleados = Object.values(S.usuarios).filter(u => u.activo && u.rol !== "admin");
   const ov = modal(`
-    <div class="mh"><span class="chip" style="--c:${T.c}">${I(T.icon)}</span><h2>${orig ? esc(orig.codigo) : "Nuevo"} <small>${T.label}</small></h2><button class="ib" data-cerrar>${I("x")}</button></div>
+    <div class="mh"><span class="chip" style="--c:${T.c}">${I(T.icon)}</span><h2 class="up">${orig ? "EDITAR " + esc(orig.codigo) : "NUEVO PEDIDO"} <small>${T.label.toUpperCase()}</small></h2><button class="ib" data-cerrar>${I("x")}</button></div>
     <div class="steps" style="--c:${T.c}">${PASOS.map(([ic, t], i) => `<button type="button" data-go="${i}"><span class="n">${i + 1}</span>${t}</button>`).join("")}</div>
     <div class="mb" id="fbody">
       <div id="errsum"></div>
@@ -1152,18 +1219,17 @@ function openForm(id, tipo, cliente){
         </div>
         <div class="fsec"><div class="sec">${I(T.icon)}${isP ? "Estampado" : "Diseño"}</div>
           <div class="g2">
-            <div class="f"><label>Tema / diseño</label><input class="inp" id="in-tema" value="${esc(F.tema)}"></div>
-            <div class="f"><label>Marca</label><select class="inp" id="in-etiq">${marcas.map(t => `<option ${F.etiqueta === t ? "selected" : ""}>${esc(t)}</option>`).join("")}</select></div>
+            <div class="f" id="f-tema"><label>Tema / diseño <span class="req">*</span></label><input class="inp" id="in-tema" value="${esc(F.tema)}"><span class="msg"></span></div>
+            <div class="f" id="f-marca"><label>Marca <span class="req">*</span></label><select class="inp" id="in-etiq"><option value="">Elegir marca</option>${marcas.map(t => `<option ${F.etiqueta === t ? "selected" : ""}>${esc(t)}</option>`).join("")}</select><span class="msg"></span></div>
           </div>
           ${isP ? `
           <div class="f" id="f-servicio"><label>Tipo de estampado <span class="req">*</span></label><div class="opts">${c.cat.servicios.map(o => `<button type="button" class="opt" data-servicio="${esc(o)}" aria-pressed="${F.servicio === o}">${esc(o)}</button>`).join("")}</div><span class="msg"></span></div>
-          <div class="f"><label>¿Quién pone la prenda?</label><div class="opts"><button type="button" class="opt" data-prendade="tienda" aria-pressed="${F.prendaDe !== "cliente"}">La tienda</button><button type="button" class="opt" data-prendade="cliente" aria-pressed="${F.prendaDe === "cliente"}">El cliente la trae</button></div></div>` : ""}
+          <div class="f" id="f-prendade"><label>¿Quién pone la prenda? <span class="req">*</span></label><div class="opts"><button type="button" class="opt" data-prendade="tienda" aria-pressed="${F.prendaDe === "tienda"}">La tienda</button><button type="button" class="opt" data-prendade="cliente" aria-pressed="${F.prendaDe === "cliente"}">El cliente la trae</button></div><span class="msg"></span></div>` : ""}
         </div>
       </section>
 
       <section class="step" data-step="1" hidden>
-        <div class="fsec"><div class="builder" id="builder"></div></div>
-        <div class="fsec"><div class="f" id="f-items"><div class="sec">${I("list")}Lista del pedido <small id="itcount"></small></div><div class="itemsbox" id="items"></div><span class="msg"></span></div></div>
+        <div class="fsec"><div class="f" id="f-items"><div class="sec">${I("list")}Lista del pedido <small id="itcount"></small></div><p class="note">Elige en cada fila la prenda, el color, la horma y la talla, y ajusta las unidades. "Agregar otra prenda" copia la fila anterior para que solo cambies la talla.</p><div class="itemsbox" id="items"></div><span class="msg"></span></div></div>
       </section>
 
       <section class="step" data-step="2" hidden>
@@ -1175,11 +1241,12 @@ function openForm(id, tipo, cliente){
         </div>
         <div class="fsec"><div class="sec">${I("cash")}Pago</div>
           <div class="g3 keep">
-            <div class="f"><label>Moneda</label><select class="inp" id="in-mon">${["USD","Bs","COP"].map(m => `<option ${F.moneda === m ? "selected" : ""}>${m}</option>`).join("")}</select></div>
+            <div class="f"><label>Moneda</label><select class="inp" id="in-mon">${["COP","USD","Bs"].map(m => `<option ${F.moneda === m ? "selected" : ""}>${m}</option>`).join("")}</select></div>
             <div class="f" id="f-precio"><label>Precio unidad <span class="req">*</span></label><input class="inp" id="in-precio" inputmode="decimal" value="${esc(F.precio)}"></div>
             <div class="f" id="f-abono"><label>Abono</label><input class="inp" id="in-abono" inputmode="decimal" value="${esc(F.abono)}"></div>
           </div>
           <span class="msg" id="pago-msg"></span>
+          <div class="f" id="f-motivo"><label>Motivo por el que no hay abono <span class="req">*</span></label><input class="inp" id="in-motivo" value="${esc(F.motivoSinAbono || "")}"><span class="msg"></span></div>
           <div class="totals" id="totals"></div>
         </div>
       </section>
@@ -1198,7 +1265,7 @@ function openForm(id, tipo, cliente){
         <p class="hist">${orig ? `Registrado el ${fmtDT(orig.creadoEn)} por ${esc(nameOf(orig.creadoPor))}${orig.editadoEn ? ` · Última edición ${fmtDT(orig.editadoEn)} por ${esc(nameOf(orig.editadoPor))}` : ""}` : `Fecha de registro: ${fmtDate(ymd(new Date()))} (se guarda sola y no cambia al editar)`}</p>
       </section>
     </div>
-    <div class="mf"><button class="btn" id="prev">${I("undo")}Atrás</button><span style="flex:1"></span><button class="btn" id="save">${I("check")}Guardar</button><button class="btn c" style="--c:${T.c}" id="next">Siguiente</button></div>`, "", true);
+    <div class="mf"><button class="btn" id="prev">${I("undo")}Atrás</button><span style="flex:1"></span><button class="btn" id="save">${I("check")}Guardar</button><button class="btn c" style="--c:${T.c}" id="next">Siguiente</button></div>`, "wide", true);
   F._ov = ov;
   const salir = () => confirmar("¿Salir sin guardar?", "Los datos de este pedido se perderán.", "Salir", async () => { ov.close(); F = null; });
   ov.querySelectorAll("[data-cerrar]").forEach(b => b.onclick = salir);
@@ -1223,14 +1290,20 @@ function openForm(id, tipo, cliente){
   acl.onclick = e => { const b = e.target.closest("[data-pick]"); if (!b) return; const cl = S.clientes[b.dataset.pick]; F.cliente.nombre = cl.nombre; inNom.value = cl.nombre; inTel.value = prettyPhone(b.dataset.pick); inPais.value = ""; checkTel(); acl.innerHTML = ""; clearErr("f-nombre"); };
   const checkTel = final => {
     const r = parsePhone(inTel.value, inPais.value), box = $("#f-tel", ov), msg = $("#tel-msg", ov);
-    box.classList.remove("err");
-    if (r.empty) { msg.className = "msg"; msg.textContent = ""; return r; }
-    if (!r.ok) { msg.className = "msg " + (final ? "bad" : "warn"); msg.textContent = "✗ " + r.msg; if (final) box.classList.add("err"); return r; }
+    box.classList.remove("err", "okf");
+    if (r.empty) { msg.innerHTML = ""; return r; }
+    if (!r.ok) {
+      // Mientras escribe no molesta; el error aparece al salir del campo o al intentar avanzar
+      msg.innerHTML = final ? `<span class="ti bad">${I("alert")}${esc(r.msg)}</span>` : "";
+      if (final) box.classList.add("err");
+      return r;
+    }
+    box.classList.add("okf");
     const ex = S.clientes[r.e164];
-    let t = `✓ ${r.pretty}${r.op ? " · " + r.op : ""}`; msg.className = "msg ok";
-    if (r.warn) { t += " · " + r.warn; msg.className = "msg warn"; }
-    if (ex && ex.nombre && F.cliente.nombre && norm(ex.nombre).trim() !== norm(F.cliente.nombre).trim()) { t += ` · ⚠ Registrado a nombre de ${ex.nombre}`; msg.className = "msg warn"; }
-    msg.innerHTML = esc(t) + ` · <a href="https://wa.me/${esc(r.e164)}" target="_blank" rel="noopener" style="color:inherit">probar ↗</a>`;
+    const otro = ex && ex.nombre && F.cliente.nombre && norm(ex.nombre).trim() !== norm(F.cliente.nombre).trim();
+    msg.innerHTML = `<span class="ti ok">${I("check")}${r.op ? esc(r.op) : "Número válido"}</span>${r.warn ? `<span class="ti warn">${esc(r.warn)}</span>` : ""}<a class="ti lnk" href="https://wa.me/${esc(r.e164)}" target="_blank" rel="noopener">${I("msg")}Probar</a>`
+      + (otro ? `<div class="tiw">${I("user")}<span>Este número ya está guardado como <b>${esc(ex.nombre)}</b></span><button type="button" class="lk" id="usarNom">Usar ese nombre</button></div>` : "");
+    const u = $("#usarNom", ov); if (u) u.onclick = () => { F.cliente.nombre = ex.nombre; inNom.value = ex.nombre; clearErr("f-nombre"); checkTel(); };
     return r;
   };
   inTel.oninput = () => { if (inTel.value.trim().startsWith("+")) inPais.value = ""; checkTel(); };
@@ -1239,17 +1312,18 @@ function openForm(id, tipo, cliente){
   if (inTel.value) checkTel();
   F._checkTel = () => parsePhone(inTel.value, inPais.value);
 
-  $("#in-tema", ov).oninput = e => F.tema = e.target.value;
-  $("#in-etiq", ov).onchange = e => F.etiqueta = e.target.value;
+  $("#in-tema", ov).oninput = e => { F.tema = e.target.value; clearErr("f-tema"); };
+  $("#in-etiq", ov).onchange = e => { F.etiqueta = e.target.value; clearErr("f-marca"); };
   $("#in-nota", ov).oninput = e => F.nota = e.target.value;
   $("#in-mon", ov).onchange = e => { F.moneda = e.target.value; renderTotals(); };
   $("#in-precio", ov).oninput = e => { F.precio = e.target.value; clearErr("f-precio"); renderTotals(); };
   $("#in-abono", ov).oninput = e => { F.abono = e.target.value; renderTotals(); };
+  $("#in-motivo", ov).oninput = e => { F.motivoSinAbono = e.target.value; clearErr("f-motivo"); };
   ov.addEventListener("click", e => {
     const b = e.target.closest("[data-servicio],[data-prendade],[data-urg],[data-asig]"); if (!b) return;
     const d = b.dataset, single = () => b.parentNode.querySelectorAll(".opt").forEach(x => x.setAttribute("aria-pressed", x === b));
     if (d.servicio !== undefined) { F.servicio = d.servicio; single(); clearErr("f-servicio"); }
-    if (d.prendade !== undefined) { F.prendaDe = d.prendade; single(); }
+    if (d.prendade !== undefined) { F.prendaDe = d.prendade; single(); clearErr("f-prendade"); }
     if (d.urg !== undefined) { F.urgente = d.urg === "1"; single(); }
     if (d.asig !== undefined) { F.asignados = F.asignados || []; const i = F.asignados.indexOf(d.asig); i >= 0 ? F.asignados.splice(i, 1) : F.asignados.push(d.asig); b.setAttribute("aria-pressed", i < 0); }
   });
@@ -1259,7 +1333,7 @@ function openForm(id, tipo, cliente){
   $("#fileGal", ov).onchange = e => { addFiles(e.target.files); e.target.value = ""; };
   $("#fileCam", ov).onchange = e => { addFiles(e.target.files); e.target.value = ""; };
   $("#save", ov).onclick = () => saveForm(ov, orig);
-  renderBuilder(); renderItems(); renderTotals(); renderImgs(); goStep(0);
+  renderItems(); renderTotals(); renderImgs(); goStep(0);
 }
 function goStep(n){
   const ov = F._ov; F.step = n; F.visto[n] = true;
@@ -1282,24 +1356,35 @@ function erroresPaso(i){
   const e = [], isP = F.tipo === "personalizado";
   if (i === 0) {
     if ((F.cliente.nombre || "").trim().length < 3) e.push(["f-nombre", "Escribe el nombre del cliente"]);
-    const t = F._checkTel(); if (!t.ok) e.push(["f-tel", "WhatsApp: " + t.msg]);
+    const t = F._checkTel(); if (!t.ok) e.push(["f-tel", t.empty ? t.msg : "WhatsApp: " + t.msg]);
+    if (!(F.tema || "").trim()) e.push(["f-tema", "Escribe el tema o diseño"]);
+    if (!F.etiqueta) e.push(["f-marca", "Elige la marca"]);
     if (isP && !F.servicio) e.push(["f-servicio", "Elige el tipo de estampado"]);
+    if (isP && !F.prendaDe) e.push(["f-prendade", "Indica quién pone la prenda"]);
   }
-  if (i === 1 && !F.items.length) e.push(["f-items", "Agrega al menos una prenda con su talla"]);
+  if (i === 1) {
+    const llenas = F.items.filter(x => !itemVacio(x));
+    const incompl = F.items.findIndex(x => !itemVacio(x) && (!x.prenda || !x.color || !x.talla));
+    if (!llenas.length) e.push(["f-items", "Agrega al menos una prenda con su color y talla"]);
+    else if (incompl >= 0) e.push(["f-items", `Completa prenda, color y talla en la fila ${incompl + 1}`]);
+  }
   if (i === 2) {
     if (!F.fechaEntrega) e.push(["f-fecha", "Elige la fecha de entrega"]);
     if (!(num(F.precio) > 0)) e.push(["f-precio", "Escribe el precio por unidad"]);
+    if (!(num(F.abono) > 0) && !(F.motivoSinAbono || "").trim()) e.push(["f-motivo", "Escribe el motivo por el que no hay abono"]);
   }
   if (i === 3 && F.imagenes.some(x => x.subiendo)) e.push(["", "Espera a que terminen de subir las imágenes"]);
   return e;
 }
 function marcarErrores(errs){
   const ov = F._ov;
+  if (errs.some(([id]) => id === "f-tel")) { const t = F._checkTel(); $("#f-tel", ov).classList.add("err"); $("#tel-msg", ov).innerHTML = `<span class="ti bad">${I("alert")}${esc(t.msg)}</span>`; }
+  if (errs.some(([id]) => id === "f-items")) marcarFilas();
   errs.forEach(([id, msg]) => {
     const el = id && $("#" + id, ov); if (!el) return;
     el.classList.add("err");
     const m = el.querySelector(".msg");
-    if (m) { m.className = "msg bad"; m.textContent = "✗ " + msg; }
+    if (m && m.id !== "tel-msg") { m.className = "msg bad"; m.textContent = "✗ " + msg; }
   });
 }
 function pasoOK(i, mostrar){
@@ -1309,104 +1394,81 @@ function pasoOK(i, mostrar){
 }
 function clearErr(id){ const el = F && F._ov && $("#" + id, F._ov); if (!el) return; el.classList.remove("err"); const m = el.querySelector(".msg"); if (m && m.classList.contains("bad") && m.id !== "tel-msg") { m.textContent = ""; m.className = "msg"; } }
 
-/* ---- Selector de prendas: varias prendas, colores, hormas y tallas a la vez ---- */
-function renderBuilder(){
-  const ov = F._ov, c = cfg().cat, isP = F.tipo === "personalizado";
-  const prendas = isP ? c.prendasPers : c.prendasSub, colores = c.colores.filter(x => isP ? x[1] !== "full" : true);
-  const on = (arr, v) => arr.includes(v);
-  const combos = builderCombos();
-  const tallas = builderTallas();
-  const total = combos.reduce((s, k) => s + tallas.reduce((t, ta) => t + (Number(B.q[k.key + "|" + ta]) || 0), 0), 0);
-  $("#builder", ov).innerHTML = `
-    <div class="bhead"><div class="sec">${I("shirt")}Agregar prendas</div><span class="note">Puedes marcar varias opciones en cada grupo</span></div>
-    <div class="bgrid">
-      <div class="f"><div class="lbl">${isP ? "Prendas" : "Productos"}</div><div class="opts">${prendas.map(p => `<button type="button" class="opt" data-bp="${esc(p)}" aria-pressed="${on(B.prendas, p)}">${esc(p)}</button>`).join("")}</div>
-        ${on(B.prendas, "Otro") ? `<input class="inp" id="b-otra" placeholder="¿Cuál?" value="${esc(B.prendaOtra)}">` : ""}</div>
-      <div class="f"><div class="lbl">Hormas <span class="opt-l">(opcional)</span></div><div class="opts">${c.hormas.map(h => `<button type="button" class="opt" data-bh="${esc(h)}" aria-pressed="${on(B.hormas, h)}">${esc(h)}</button>`).join("")}</div></div>
-    </div>
-    <div class="f"><div class="lbl">Colores</div><div class="swatches">${colores.map(([n, h]) => `<button type="button" class="sw" data-bc="${esc(n)}" aria-pressed="${on(B.colores, n)}"><i style="${swatchStyle(h)}"></i><span>${esc(n)}</span></button>`).join("")}<button type="button" class="sw" data-bc="__otro" aria-pressed="${on(B.colores, "__otro")}"><i style="${swatchStyle("")}"></i><span>Otro</span></button></div>
-      ${on(B.colores, "__otro") ? `<input class="inp" id="b-colotro" placeholder="¿Cuál?" value="${esc(B.colorOtro)}">` : ""}</div>
-    <div class="f"><div class="lbl">Tallas</div>
-      <div class="sizes">${c.tallasAdulto.map(s => `<button type="button" class="szb" data-sz="${esc(s)}" aria-pressed="${on(B.tallas, s)}">${esc(s)}</button>`).join("")}</div>
-      <div class="sizes">${c.tallasNino.map(s => `<button type="button" class="szb" data-sz="${esc(s)}" aria-pressed="${on(B.tallas, s)}">${esc(s)}</button>`).join("")}</div></div>
-    ${combos.length && tallas.length ? `
-      <div class="lbl">Cantidades</div>
-      <div class="gridwrap"><table class="mx"><thead><tr><th></th>${tallas.map(t => `<th>${esc(t)}</th>`).join("")}</tr></thead>
-      <tbody>${combos.map(k => `<tr><th>${esc(k.prenda)}<span>${esc(k.color)}${k.horma ? " · " + esc(k.horma) : ""}</span></th>${tallas.map(t => `<td><input type="number" inputmode="numeric" min="0" data-q="${esc(k.key + "|" + t)}" value="${B.q[k.key + "|" + t] || ""}"></td>`).join("")}</tr>`).join("")}</tbody></table></div>`
-      : `<p class="note">Marca al menos una prenda, un color y una talla para escribir las cantidades.</p>`}
-    <button type="button" class="btn primary" id="b-add" ${total ? "" : "disabled"}>${I("plus")}Agregar ${total || ""} pieza${total === 1 ? "" : "s"} a la lista</button>`;
-  const bd = $("#builder", ov);
-  bd.onclick = e => {
-    const b = e.target.closest("[data-bp],[data-bc],[data-bh],[data-sz],#b-add"); if (!b) return;
-    const d = b.dataset, tg = (arr, v) => { const i = arr.indexOf(v); i >= 0 ? arr.splice(i, 1) : arr.push(v); };
-    if (d.bp !== undefined) tg(B.prendas, d.bp);
-    if (d.bc !== undefined) tg(B.colores, d.bc);
-    if (d.bh !== undefined) tg(B.hormas, d.bh);
-    if (d.sz !== undefined) tg(B.tallas, d.sz);
-    if (b.id === "b-add") return addFromBuilder();
-    const y = $("#fbody", ov).scrollTop; renderBuilder(); $("#fbody", ov).scrollTop = y;
-    if (d.bp === "Otro" && on(B.prendas, "Otro")) $("#b-otra", ov)?.focus();
-    if (d.bc === "__otro" && on(B.colores, "__otro")) $("#b-colotro", ov)?.focus();
-  };
-  bd.oninput = e => {
-    if (e.target.dataset.q) { const v = Math.max(0, parseInt(e.target.value) || 0); B.q[e.target.dataset.q] = v; updAddBtn(); return; }
-    if (e.target.id === "b-otra") { B.prendaOtra = e.target.value; }
-    if (e.target.id === "b-colotro") { B.colorOtro = e.target.value; }
-  };
-  bd.onchange = e => { if (e.target.id === "b-otra" || e.target.id === "b-colotro") { const y = $("#fbody", ov).scrollTop; renderBuilder(); $("#fbody", ov).scrollTop = y; } };
-}
-function builderTallas(){ const c = cfg().cat, order = [...c.tallasAdulto, ...c.tallasNino]; return [...B.tallas].sort((a, b) => order.indexOf(a) - order.indexOf(b)); }
-function builderCombos(){
-  const c = cfg().cat, isP = F.tipo === "personalizado";
-  const pOrder = isP ? c.prendasPers : c.prendasSub, colOrder = c.colores.map(x => x[0]);
-  const prendas = [...B.prendas].sort((a, b) => pOrder.indexOf(a) - pOrder.indexOf(b)).map(p => p === "Otro" ? B.prendaOtra.trim() : p).filter(Boolean);
-  const colores = [...B.colores].sort((a, b) => (colOrder.indexOf(a) + 1 || 999) - (colOrder.indexOf(b) + 1 || 999)).map(x => x === "__otro" ? B.colorOtro.trim() : x).filter(Boolean);
-  const hormas = B.hormas.length ? [...B.hormas].sort((a, b) => c.hormas.indexOf(a) - c.hormas.indexOf(b)) : [""];
-  const out = [];
-  prendas.forEach(p => colores.forEach(co => hormas.forEach(h => out.push({prenda:p, color:co, horma:h, key:[p, co, h].join("|")}))));
-  return out;
-}
-function updAddBtn(){
-  const combos = builderCombos(), tallas = builderTallas();
-  const total = combos.reduce((s, k) => s + tallas.reduce((t, ta) => t + (Number(B.q[k.key + "|" + ta]) || 0), 0), 0);
-  const b = $("#b-add", F._ov); b.disabled = !total; b.innerHTML = `${I("plus")}Agregar ${total || ""} pieza${total === 1 ? "" : "s"} a la lista`;
-}
-function addFromBuilder(){
-  const combos = builderCombos(), tallas = builderTallas();
-  let total = 0;
-  combos.forEach(k => tallas.forEach(t => { const n = Number(B.q[k.key + "|" + t]) || 0; if (n > 0) { F.items.push({prenda:k.prenda, color:k.color, horma:k.horma, talla:t, cant:n, nombre:"", numero:""}); total += n; } }));
-  if (!total) return;
-  B = newBuilder();
-  clearErr("f-items"); renderBuilder(); renderItems(); renderTotals();
-  toast(`${total} pieza${total > 1 ? "s" : ""} agregada${total > 1 ? "s" : ""} a la lista`);
-  $("#items", F._ov).scrollIntoView({behavior:"smooth", block:"start"});
+/* ---- Lista del pedido: cada fila se arma con listas desplegables ---- */
+const blankItem = prev => ({prenda: prev ? prev.prenda : "", color: prev ? prev.color : "", horma: prev ? prev.horma : "", talla:"", cant:1, nombre:"", numero:""});
+const itemVacio = i => !i.prenda && !i.color && !i.talla;
+function selOpts(list, cur, ph, otro){
+  const has = !cur || list.includes(cur);
+  return `<option value="">${ph}</option>${list.map(v => `<option ${v === cur ? "selected" : ""}>${esc(v)}</option>`).join("")}${!has ? `<option selected>${esc(cur)}</option>` : ""}${otro ? `<option value="__otro">Otro…</option>` : ""}`;
 }
 function renderItems(){
-  const box = $("#items", F._ov), n = F.items.reduce((s, i) => s + (Number(i.cant) || 1), 0);
-  $("#itcount", F._ov).textContent = n ? `${n} pieza${n > 1 ? "s" : ""}` : "";
-  if (!F.items.length) { box.innerHTML = `<div class="empty" style="padding:14px">Todavía no hay prendas en la lista.</div>`; return; }
-  box.innerHTML = F.items.map((i, n) => `<div class="irow" data-i="${n}">
-      <div class="desc">${esc(i.prenda)} ${esc(i.color)} <span class="tz">${esc(i.talla)}</span><small>${esc(i.horma || "")}${i.cant > 1 ? `${i.horma ? " · " : ""}<button type="button" class="lk" data-split="${n}">nombre a cada una</button>` : ""}</small></div>
-      <div class="stepper"><button type="button" data-q="-1">−</button><span>${i.cant}</span><button type="button" data-q="1">+</button></div>
-      ${i.cant === 1 ? `<input class="inp nmf" data-fld="nombre" placeholder="Nombre" value="${esc(i.nombre || "")}">
-      <input class="inp nuf" data-fld="numero" placeholder="N°" value="${esc(i.numero || "")}">` : `<span class="nmf"></span><span class="nuf"></span>`}
-      <button type="button" class="ib2" data-del title="Quitar">${I("trash")}</button>
-    </div>`).join("");
+  const ov = F._ov, c = cfg().cat, isP = F.tipo === "personalizado";
+  const prendas = (isP ? c.prendasPers : c.prendasSub).filter(p => p !== "Otro");
+  const colores = c.colores.filter(x => isP ? x[1] !== "full" : true);
+  const box = $("#items", ov), n = F.items.filter(i => !itemVacio(i)).reduce((s, i) => s + (Number(i.cant) || 1), 0);
+  $("#itcount", ov).textContent = n ? `${n} pieza${n > 1 ? "s" : ""}` : "";
+  const tallaOpts = cur => { const all = [...c.tallasAdulto, ...c.tallasNino]; return `<option value="">Talla</option><optgroup label="Adulto">${c.tallasAdulto.map(t => `<option ${t === cur ? "selected" : ""}>${esc(t)}</option>`).join("")}</optgroup><optgroup label="Niño">${c.tallasNino.map(t => `<option ${t === cur ? "selected" : ""}>${esc(t)}</option>`).join("")}</optgroup>${cur && !all.includes(cur) ? `<option selected>${esc(cur)}</option>` : ""}`; };
+  box.innerHTML = F.items.map((it, i) => {
+    const hex = (colores.find(x => x[0] === it.color) || [])[1];
+    const campo = (fld, html) => it["_otro_" + fld]
+      ? `<div class="isel-o" data-err="${fld}"><input class="inp" data-otro="${fld}" placeholder="¿Cuál ${fld === "prenda" ? "prenda" : "color"}?" value="${esc(it[fld])}"><button type="button" class="ib2" data-cancelotro="${fld}" title="Volver a la lista">${I("x")}</button></div>`
+      : html;
+    return `<div class="irow2" data-i="${i}">
+      <span class="inum">${i + 1}</span>
+      <div class="isel">
+        ${campo("prenda", `<select class="inp" data-fld="prenda" data-err="prenda">${selOpts(prendas, it.prenda, isP ? "Prenda" : "Producto", true)}</select>`)}
+        ${campo("color", `<div class="csel" data-err="color"><i style="${swatchStyle(hex || "")}"></i><select class="inp" data-fld="color">${selOpts(colores.map(x => x[0]), it.color, "Color", true)}</select></div>`)}
+        <select class="inp" data-fld="horma">${selOpts(c.hormas, it.horma, "Horma")}</select>
+        <select class="inp" data-fld="talla" data-err="talla">${tallaOpts(it.talla)}</select>
+      </div>
+      <div class="ibot">
+        <div class="stepper"><button type="button" data-q="-1">−</button><span>${it.cant}</span><button type="button" data-q="1">+</button></div>
+        ${it.cant === 1 ? `<input class="inp nm" data-fld="nombre" placeholder="Nombre" value="${esc(it.nombre || "")}"><input class="inp nu" data-fld="numero" placeholder="N°" value="${esc(it.numero || "")}">`
+          : `<button type="button" class="lk nmlink" data-split="${i}">Poner un nombre a cada una</button>`}
+        <button type="button" class="ib2" data-del title="Quitar fila">${I("trash")}</button>
+      </div>
+    </div>`;
+  }).join("") + `<button type="button" class="addrow" id="addItem">${I("plus")}Agregar otra prenda</button>`;
   box.onclick = e => {
+    if (e.target.closest("#addItem")) { const prev = [...F.items].reverse().find(x => !itemVacio(x)); F.items.push(blankItem(prev)); renderItems(); const rows = box.querySelectorAll(".irow2"); const last = rows[rows.length - 1]; last.scrollIntoView({behavior:"smooth", block:"center"}); const t = last.querySelector('[data-fld="talla"]'); setTimeout(() => (prev ? t : last.querySelector("select")).focus(), 250); return; }
     const row = e.target.closest("[data-i]"); if (!row) return;
-    const n = Number(row.dataset.i), it = F.items[n], t = e.target.closest("button");
-    if (!t) return;
-    if (t.dataset.q) { it.cant = Math.max(1, it.cant + Number(t.dataset.q)); renderItems(); renderTotals(); }
-    if (t.hasAttribute("data-del")) { F.items.splice(n, 1); renderItems(); renderTotals(); }
-    if (t.dataset.split !== undefined) { const cp = Array.from({length:it.cant}, () => Object.assign({}, it, {cant:1, nombre:"", numero:""})); cp[0].nombre = it.nombre; cp[0].numero = it.numero; F.items.splice(n, 1, ...cp); renderItems(); }
+    const n = Number(row.dataset.i), it = F.items[n], t = e.target.closest("button"); if (!t) return;
+    if (t.dataset.q) { it.cant = Math.max(1, it.cant + Number(t.dataset.q)); if (it.cant > 1) { it.nombre = ""; it.numero = ""; } renderItems(); renderTotals(); }
+    if (t.hasAttribute("data-del")) { F.items.splice(n, 1); if (!F.items.length) F.items.push(blankItem()); renderItems(); renderTotals(); }
+    if (t.dataset.split !== undefined) { const cp = Array.from({length:it.cant}, () => Object.assign({}, it, {cant:1, nombre:"", numero:""})); F.items.splice(n, 1, ...cp); renderItems(); renderTotals(); }
+    if (t.dataset.cancelotro) { const f = t.dataset.cancelotro; it["_otro_" + f] = false; it[f] = ""; renderItems(); }
   };
-  box.oninput = e => { const row = e.target.closest("[data-i]"); if (row && e.target.dataset.fld) F.items[Number(row.dataset.i)][e.target.dataset.fld] = e.target.value; };
+  box.onchange = e => {
+    const row = e.target.closest("[data-i]"); if (!row) return;
+    const it = F.items[Number(row.dataset.i)], f = e.target.dataset.fld; if (!f) return;
+    if (e.target.value === "__otro") { it["_otro_" + f] = true; it[f] = ""; renderItems(); box.querySelector(`[data-i="${row.dataset.i}"] [data-otro="${f}"]`)?.focus(); return; }
+    it[f] = e.target.value;
+    e.target.closest("[data-err]")?.classList.remove("bad");
+    if (f === "color") renderItems();
+    clearErr("f-items"); renderTotals();
+    const cnt = F.items.filter(i => !itemVacio(i)).reduce((s, i) => s + (Number(i.cant) || 1), 0);
+    $("#itcount", F._ov).textContent = cnt ? `${cnt} pieza${cnt > 1 ? "s" : ""}` : "";
+  };
+  box.oninput = e => {
+    const row = e.target.closest("[data-i]"); if (!row) return;
+    const it = F.items[Number(row.dataset.i)];
+    if (e.target.dataset.otro) { it[e.target.dataset.otro] = e.target.value; e.target.closest("[data-err]")?.classList.remove("bad"); return; }
+    if (e.target.dataset.fld === "nombre" || e.target.dataset.fld === "numero") it[e.target.dataset.fld] = e.target.value;
+  };
+}
+function marcarFilas(){
+  const box = $("#items", F._ov);
+  F.items.forEach((it, i) => {
+    if (itemVacio(it) && F.items.length > 1) return;
+    ["prenda", "color", "talla"].forEach(f => { if (!it[f]) box.querySelector(`[data-i="${i}"] [data-err="${f}"]`)?.classList.add("bad"); });
+  });
 }
 function renderTotals(){
   const t = totales(F), ab = num(F.abono);
   $("#totals", F._ov).innerHTML = `<div class="tot"><small>Piezas</small><b class="num">${t.piezas}</b></div><div class="tot"><small>Total</small><b class="num">${esc(money(t.total, F.moneda))}</b></div><div class="tot"><small>Saldo</small><b class="num" style="color:${t.saldo > 0 ? "var(--err)" : "var(--ok)"}">${esc(money(t.saldo, F.moneda))}</b></div>`;
   const m = $("#pago-msg", F._ov);
   if (ab > t.total && t.total > 0) { m.className = "msg warn"; m.textContent = "⚠ El abono es mayor que el total"; } else m.textContent = "";
+  $("#f-motivo", F._ov).hidden = ab > 0;
 }
 function renderImgs(){
   const box = $("#imgs", F._ov);
@@ -1443,10 +1505,10 @@ async function saveForm(ov, orig){
   const tel = F._checkTel(), isP = F.tipo === "personalizado";
   const now = new Date().toISOString(), nombre = F.cliente.nombre.trim().replace(/\s+/g, " "), pr = perm();
   const data = {
-    cliente:{nombre, telefono:tel.e164}, tema:(F.tema || "").trim(), servicio:isP ? F.servicio : "", prendaDe:isP ? (F.prendaDe || "tienda") : "tienda",
+    cliente:{nombre, telefono:tel.e164}, tema:(F.tema || "").trim(), servicio:isP ? F.servicio : "", prendaDe:isP ? F.prendaDe : "tienda",
     etiqueta:F.etiqueta || "",
-    items:F.items.map(i => ({prenda:i.prenda, color:i.color, horma:i.horma || "", talla:i.talla, cant:Number(i.cant) || 1, nombre:(i.nombre || "").trim(), numero:(i.numero || "").trim()})),
-    fechaEntrega:F.fechaEntrega, precio:num(F.precio), moneda:F.moneda, abono:num(F.abono), urgente:!!F.urgente,
+    items:F.items.filter(i => !itemVacio(i)).map(i => ({prenda:i.prenda, color:i.color, horma:i.horma || "", talla:i.talla, cant:Number(i.cant) || 1, nombre:(i.nombre || "").trim(), numero:(i.numero || "").trim()})),
+    fechaEntrega:F.fechaEntrega, precio:num(F.precio), moneda:F.moneda, abono:num(F.abono), motivoSinAbono:num(F.abono) > 0 ? "" : (F.motivoSinAbono || "").trim(), urgente:!!F.urgente,
     imagenes:F.imagenes.filter(i => i.id && !i.error).map(i => i.id), nota:(F.nota || "").trim(),
     editadoEn:now, editadoPor:S.me.usuario
   };
@@ -1484,7 +1546,7 @@ function resumenTexto(p){
     p.etiqueta && `Marca: ${p.etiqueta}`, " ",
     ...(p.items || []).map(i => `• ${i.cant > 1 ? i.cant + "× " : ""}${itemLine(i)}${i.horma ? " (" + i.horma + ")" : ""}`), " ", p.nota && `Nota: ${p.nota}`,
     `Cliente: ${p.cliente.nombre}`, `WhatsApp: ${prettyPhone(p.cliente.telefono)}`, `Entrega: ${fmtDate(p.fechaEntrega)}`,
-    `Precio unidad: ${money(p.precio, p.moneda)} · Total: ${money(t.total, p.moneda)}`, `Abono: ${money(t.abono, p.moneda)} · Saldo: ${money(t.saldo, p.moneda)}`].filter(Boolean).join("\n").replace(/\n \n/g, "\n\n");
+    `Precio unidad: ${money(p.precio, p.moneda)} · Total: ${money(t.total, p.moneda)}`, `Abono: ${money(t.abono, p.moneda)} · Saldo: ${money(t.saldo, p.moneda)}`, p.motivoSinAbono && `Sin abono: ${p.motivoSinAbono}`].filter(Boolean).join("\n").replace(/\n \n/g, "\n\n");
 }
 function tallyTable(p){
   const c = cfg().cat, order = [...c.tallasAdulto, ...c.tallasNino], g = {}, ts = new Set();
@@ -1508,7 +1570,7 @@ function openDetail(id){
       <div class="fsec"><div class="sec">${I("shirt")}Prendas <small>${t.piezas} piezas</small></div>
         <ul class="il">${(p.items || []).map(i => `<li><span class="q">${i.cant}×</span><span><b>${esc(i.prenda)} ${esc(i.color)} ${esc(i.talla)}</b>${i.nombre ? ` — ${esc(i.nombre)}` : ""}${i.numero ? ` <b>#${esc(i.numero)}</b>` : ""}${i.horma ? ` <span class="note" style="display:inline">· ${esc(i.horma)}</span>` : ""}</span></li>`).join("")}</ul>
         <div class="lbl">Resumen para producción</div>${tallyTable(p)}</div>
-      <div class="fsec"><div class="sec">${I("cash")}Pago</div><div class="totals"><div class="tot"><small>Precio unidad</small><b class="num">${esc(money(p.precio, p.moneda))}</b></div><div class="tot"><small>Total</small><b class="num">${esc(money(t.total, p.moneda))}</b></div><div class="tot"><small>Abono</small><b class="num">${esc(money(t.abono, p.moneda))}</b></div><div class="tot"><small>Saldo</small><b class="num" style="color:${t.saldo > 0 ? "var(--err)" : "var(--ok)"}">${esc(money(t.saldo, p.moneda))}</b></div></div></div>
+      <div class="fsec"><div class="sec">${I("cash")}Pago</div><div class="totals"><div class="tot"><small>Precio unidad</small><b class="num">${esc(money(p.precio, p.moneda))}</b></div><div class="tot"><small>Total</small><b class="num">${esc(money(t.total, p.moneda))}</b></div><div class="tot"><small>Abono</small><b class="num">${esc(money(t.abono, p.moneda))}</b></div><div class="tot"><small>Saldo</small><b class="num" style="color:${t.saldo > 0 ? "var(--err)" : "var(--ok)"}">${esc(money(t.saldo, p.moneda))}</b></div></div>${p.motivoSinAbono ? `<p class="note"><b>Sin abono:</b> ${esc(p.motivoSinAbono)}</p>` : ""}</div>
       ${(p.imagenes || []).length ? `<div class="fsec"><div class="sec">${I("camera")}Referencias</div><div class="imgs">${p.imagenes.map(im => `<div class="imgbox"><img data-foto="${esc(im)}" alt=""></div>`).join("")}</div></div>` : ""}
       ${p.nota ? `<div class="fsec"><div class="sec">${I("note")}Nota</div><div class="notebox">${esc(p.nota)}</div></div>` : ""}
       <p class="hist">Registrado: ${fmtDT(p.creadoEn)} por ${esc(nameOf(p.creadoPor))}${p.editadoEn ? `<br>Última edición: ${fmtDT(p.editadoEn)} por ${esc(nameOf(p.editadoPor))}` : ""}${p.listoEn ? `<br>Completado: ${fmtDT(p.listoEn)}` : ""}${p.avisadoEn ? `<br>Cliente avisado: ${fmtDT(p.avisadoEn)}` : ""}${p.entregadoEn ? `<br>Entregado: ${fmtDT(p.entregadoEn)}` : ""}${(p.asignados || []).length ? `<br>Visible solo para: ${esc(p.asignados.map(nameOf).join(", "))}` : ""}</p>
