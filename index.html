@@ -279,6 +279,38 @@ table.tally{border-collapse:collapse;width:100%;font-size:13px}
 .spin{width:30px;height:30px;border:3px solid var(--line);border-top-color:var(--accent);border-radius:50%;animation:sp 1s linear infinite;margin:0 auto}
 @keyframes sp{to{transform:rotate(360deg)}}
 
+/* formulario por pasos */
+.mh h2{white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
+.mh h2 small{font-weight:600;color:var(--muted);font-size:13px;margin-left:4px}
+.steps{flex:none;display:grid;grid-template-columns:repeat(4,1fr);gap:4px;padding:8px 12px;background:var(--surface);border-bottom:1px solid var(--line)}
+.steps button{border:0;background:none;border-radius:9px;padding:5px 2px;display:flex;flex-direction:column;align-items:center;gap:3px;font-size:11px;font-weight:700;color:var(--muted)}
+.steps button:hover{background:var(--surface-2)}
+.steps .n{width:26px;height:26px;border-radius:50%;display:grid;place-items:center;background:var(--surface-2);border:1px solid var(--line);font-size:12px;font-weight:800;color:var(--muted)}
+.steps button[aria-current="true"]{color:var(--ink)}
+.steps button[aria-current="true"] .n{background:var(--c);border-color:var(--c);color:#fff}
+.steps button.ok .n{background:var(--accent-soft);border-color:color-mix(in srgb,var(--accent) 40%,var(--line));color:var(--accent)}
+.steps button.bad .n{background:color-mix(in srgb,var(--err) 12%,var(--surface));border-color:var(--err);color:var(--err)}
+.step{display:flex;flex-direction:column;gap:12px}
+.step[hidden]{display:none!important}
+.builder{display:flex;flex-direction:column;gap:12px}
+.bhead{display:flex;justify-content:space-between;align-items:baseline;gap:4px 10px;flex-wrap:wrap}
+.bgrid{display:grid;grid-template-columns:1fr 1fr;gap:12px}
+.opt-l{text-transform:none;letter-spacing:0;font-weight:600}
+.sizes{display:flex;flex-wrap:wrap;gap:6px}
+.szb{min-width:44px;height:38px;border-radius:9px;border:1px solid var(--line);background:var(--surface);font-weight:800;font-size:13px;color:var(--ink);padding:0 8px}
+.szb:hover{border-color:var(--ink)}
+.szb[aria-pressed="true"]{background:var(--accent);border-color:var(--accent);color:var(--accent-ink)}
+table.mx{border-collapse:collapse;width:100%;font-size:13px}
+.mx th,.mx td{border-bottom:1px solid var(--line);padding:4px;text-align:center}
+.mx thead th{background:var(--surface-2);font-size:12px;font-weight:800;padding:7px 4px}
+.mx tbody th{text-align:left;font-weight:800;padding:6px 8px;line-height:1.2;max-width:130px;position:sticky;left:0;background:var(--surface);z-index:1}
+.mx tbody th span{display:block;font-weight:600;color:var(--muted);font-size:11.5px}
+.mx tr:last-child th,.mx tr:last-child td{border-bottom:0}
+.mx input{width:48px;border:1px solid var(--line);background:var(--surface-2);border-radius:8px;padding:7px 2px;text-align:center;font-weight:800;font-size:15px;-moz-appearance:textfield}
+.mx input::-webkit-outer-spin-button,.mx input::-webkit-inner-spin-button{-webkit-appearance:none;margin:0}
+.mx input:focus{outline:none;border-color:var(--accent);box-shadow:0 0 0 3px color-mix(in srgb,var(--accent) 22%,transparent)}
+#b-add{align-self:flex-start}
+
 @media (max-width:1000px){
   .cols{grid-template-columns:minmax(0,1fr)}
   .tipotabs{display:flex}
@@ -296,6 +328,22 @@ table.tally{border-collapse:collapse;width:100%;font-size:13px}
   .hello h1{font-size:21px}
   .hello .date{padding-left:0;border-left:0;font-size:13px}
   .g2,.g3{grid-template-columns:1fr}
+  .mb{padding:10px 12px;gap:10px}
+  .step{gap:4px}
+  .fsec{border:0;border-radius:0;background:none;padding:6px 0 14px;border-bottom:1px solid var(--line);gap:10px}
+  .step .fsec:last-of-type{border-bottom:0}
+  .mh{padding:10px 12px}
+  .mf{padding:10px 12px calc(10px + env(safe-area-inset-bottom,0px))}
+  .opt{padding:6px 10px;font-size:12.5px}
+  .bgrid{grid-template-columns:1fr}
+  .swatches{display:grid;grid-template-columns:repeat(5,minmax(0,1fr));gap:4px}
+  .sw{flex-direction:column;justify-content:center;padding:5px 1px;border-radius:9px;font-size:9.5px;gap:3px;text-align:center;line-height:1.1}
+  .sw i{width:22px;height:22px}
+  .g3.keep{grid-template-columns:.8fr 1fr 1fr;gap:8px}
+  .totals{grid-template-columns:repeat(3,minmax(0,1fr));gap:6px}
+  .tot{padding:8px}
+  .tot b{font-size:15px}
+  .steps{padding:6px 8px}
   .ov{padding:0}
   .md{border-radius:0;height:100%;max-width:none;border:0}
   .mh,.mf{border-radius:0}
@@ -303,6 +351,7 @@ table.tally{border-collapse:collapse;width:100%;font-size:13px}
   .irow{grid-template-columns:1fr 104px 34px;row-gap:6px}
   .irow .desc{grid-column:1;grid-row:1}.irow .stepper{grid-column:2;grid-row:1}.irow .ib2{grid-column:3;grid-row:1}
   .irow .nmf{grid-column:1;grid-row:2}.irow .nuf{grid-column:2/4;grid-row:2}
+  .irow span.nmf,.irow span.nuf{display:none}
   .kv{grid-template-columns:118px 1fr}
   .toast{bottom:96px}
   .tiles{grid-template-columns:1fr 1fr}
@@ -318,7 +367,7 @@ import { initializeApp, deleteApp } from "https://www.gstatic.com/firebasejs/10.
 import { getAuth, onAuthStateChanged, signInWithEmailAndPassword, createUserWithEmailAndPassword, signOut, updatePassword, reauthenticateWithCredential, EmailAuthProvider } from "https://www.gstatic.com/firebasejs/10.12.2/firebase-auth.js";
 import { initializeFirestore, getFirestore, persistentLocalCache, persistentMultipleTabManager, doc, collection, query, where, onSnapshot, getDoc, setDoc, updateDoc, deleteDoc, writeBatch } from "https://www.gstatic.com/firebasejs/10.12.2/firebase-firestore.js";
 
-const VERSION = "v2.2";
+const VERSION = "v2.3";
 /* ================= Utilidades ================= */
 const $ = (s, r = document) => r.querySelector(s);
 const esc = s => String(s ?? "").replace(/[&<>"']/g, c => ({"&":"&amp;","<":"&lt;",">":"&gt;",'"':"&quot;","'":"&#39;"}[c]));
@@ -384,11 +433,9 @@ const DEF = {
     servicios: ["DTF","Vinilo textil","Sublimación sencilla","Bordado","Otro"],
     prendasPers: ["Franela","Franela oversize","Chemise","Suéter","Hoodie","Franelilla","Gorra","Otro"],
     prendasSub: ["Franela","Chemise","Suéter","Camisa deportiva","Short deportivo","Uniforme completo","Traje de baño","Licra","Franelilla","Otro"],
-    telas: ["Algodón","Algodón peinado","Piqué","Microdurazno","Dry-fit","Poliéster deportivo","Lycra","Rib","Otra"],
     colores: [["Fullprint","full"],["Blanco","#ffffff"],["Negro","#111111"],["Gris claro","#cfd2d6"],["Gris oscuro","#4b5055"],["Azul rey","#1d4ed8"],["Azul marino","#1e2a4a"],["Azul cielo","#7cc4f0"],["Rojo","#d92b2b"],["Vinotinto","#6d1a2a"],["Verde","#1f8a4c"],["Verde manzana","#8cc63f"],["Amarillo","#f5c518"],["Naranja","#f07c1b"],["Rosado","#f4a6c1"],["Morado","#6b3fa0"],["Beige","#e6d3b3"]],
     hormas: ["Caballero","Dama","Niño","Unisex","Oversize"],
-    etiquetas: ["Sin etiqueta","Etiqueta de la tienda","Etiqueta del cliente"],
-    ubicaciones: ["Frente","Espalda","Pecho izq.","Pecho der.","Manga izq.","Manga der."],
+    etiquetas: ["Sin marca","Marca de la tienda","Marca del cliente"],
     tallasNino: ["2","4","6","8","10","12","14","16"],
     tallasAdulto: ["XS","S","M","L","XL","2XL","3XL","4XL"]
   }
@@ -445,7 +492,12 @@ const S = {
   online:navigator.onLine, view:"pedidos", tab:"personalizado", filtro:"pendientes", q:"",
   unsubs:[], installEvt:null
 };
-const cfg = () => { const r = S.cfgRaw || {}; return {negocio:r.negocio || DEF.negocio, dias:(r.dias ?? DEF.dias), pais:r.pais ?? DEF.pais, plantilla:r.plantilla || DEF.plantilla, cat:Object.assign({}, DEF.cat, r.cat || {})}; };
+const cfg = () => {
+  const r = S.cfgRaw || {}, cat = Object.assign({}, DEF.cat, r.cat || {});
+  // Firestore no admite listas dentro de listas: los colores se guardan como {n, h}
+  cat.colores = (cat.colores || []).map(x => Array.isArray(x) ? x : [x.n, x.h || ""]).filter(x => x[0]);
+  return {negocio:r.negocio || DEF.negocio, dias:(r.dias ?? DEF.dias), pais:r.pais ?? DEF.pais, plantilla:r.plantilla || DEF.plantilla, cat};
+};
 const loginEmail = (u, k) => `${u}.${k}@comicshop-pedidos.app`;
 const pinPass = pin => "cs-" + pin;
 const validUser = u => /^[a-z0-9._-]{3,20}$/.test(u);
@@ -472,7 +524,7 @@ function boot(){
   try { S.db = initializeFirestore(S.app, {localCache: persistentLocalCache({tabManager: persistentMultipleTabManager()})}); }
   catch(e) { S.db = getFirestore(S.app); }
   onSnapshot(doc(S.db, "sistema/estado"), s => { S.sistema = s.exists() ? s.data() : null; route(); }, e => { console.warn(e); gateMsg("alert", "No se pudo conectar", "Revisa tu conexión a internet. Si eres el administrador, verifica que publicaste las reglas de Firestore (GUIA.md, paso 4)."); });
-  onAuthStateChanged(S.auth, u => { stopSubs(); S.view = "pedidos"; S.q = ""; S.filtro = "pendientes"; S.uid = u ? u.uid : null; S.me = null; if (u) startMe(); route(); });
+  onAuthStateChanged(S.auth, u => { stopSubs(); S.view = "pedidos"; S.viewPushed = false; S.q = ""; S.filtro = "pendientes"; S.uid = u ? u.uid : null; S.me = null; if (u) startMe(); route(); });
   addEventListener("online", () => { S.online = true; render(); });
   addEventListener("offline", () => { S.online = false; render(); });
   addEventListener("beforeinstallprompt", e => { e.preventDefault(); S.installEvt = e; render(); });
@@ -540,8 +592,8 @@ function renderLogin(){
   $("#app").innerHTML = `<div class="gate"><form class="card" id="loginForm" autocomplete="on">
     <div class="logo">${I("shirt")}</div>
     <div><h1>Comic Shop · Pedidos</h1><p class="note">Entra con el usuario y el PIN que te dio el administrador.</p></div>
-    <div class="f"><label>Usuario</label><input class="inp" id="lu" autocomplete="username" autocapitalize="none" spellcheck="false" placeholder="ej. yurelsi"></div>
-    <div class="f"><label>PIN</label><input class="inp pinin" id="lp" type="password" inputmode="numeric" autocomplete="current-password" maxlength="8" placeholder="••••••"></div>
+    <div class="f"><label>Usuario</label><input class="inp" id="lu" autocomplete="username" autocapitalize="none" spellcheck="false"></div>
+    <div class="f"><label>PIN</label><input class="inp pinin" id="lp" type="password" inputmode="numeric" autocomplete="current-password" maxlength="8"></div>
     <span class="msg bad" id="lmsg"></span>
     <button class="btn primary" style="min-height:46px">${I("key")}Entrar</button>
   </form></div>`;
@@ -567,8 +619,8 @@ function renderBootstrap(){
   $("#app").innerHTML = `<div class="gate"><form class="card" id="bootForm">
     <div class="logo">${I("shield")}</div>
     <div><h1>Crear administrador</h1><p class="note">Primera vez que se abre la app. Crea tu usuario de administrador: con él darás de alta al resto del equipo. Esta pantalla no vuelve a aparecer.</p></div>
-    <div class="f"><label>Tu nombre</label><input class="inp" id="bn" placeholder="Carlos Cadenas"></div>
-    <div class="f"><label>Usuario</label><input class="inp" id="bu" autocapitalize="none" spellcheck="false" placeholder="carlos"><span class="msg mut">Minúsculas, sin espacios (3 a 20 caracteres)</span></div>
+    <div class="f"><label>Tu nombre</label><input class="inp" id="bn"></div>
+    <div class="f"><label>Usuario</label><input class="inp" id="bu" autocapitalize="none" spellcheck="false"><span class="msg mut">Minúsculas, sin espacios (3 a 20 caracteres)</span></div>
     <div class="f"><label>PIN (4 a 8 números)</label><input class="inp pinin" id="bp" type="password" inputmode="numeric" maxlength="8"></div>
     <div class="f"><label>Repite el PIN</label><input class="inp pinin" id="bp2" type="password" inputmode="numeric" maxlength="8"></div>
     <span class="msg bad" id="bmsg"></span>
@@ -799,7 +851,7 @@ function viewAjustes(){
     </div>
     <div class="card">
       <div class="sec">${I("list")}Listas de opciones <small>una por línea</small></div>
-      <div class="g3">${ta("servicios","Tipos de estampado")}${ta("prendasPers","Prendas · Personalizado")}${ta("prendasSub","Productos · Sublimación")}${ta("telas","Telas")}${ta("hormas","Hormas")}${ta("etiquetas","Etiquetas")}${ta("ubicaciones","Ubicación del estampado")}${ta("tallasAdulto","Tallas adulto")}${ta("tallasNino","Tallas niño")}</div>
+      <div class="g3">${ta("servicios","Tipos de estampado")}${ta("prendasPers","Prendas · Personalizado")}${ta("prendasSub","Productos · Sublimación")}${ta("hormas","Hormas")}${ta("etiquetas","Marcas")}${ta("tallasAdulto","Tallas adulto")}${ta("tallasNino","Tallas niño")}</div>
       <div class="f"><label>Colores (Nombre | #código; usa "full" para fullprint)</label><textarea class="inp" id="cCol" style="min-height:170px">${esc(k.colores.map(x => x[0] + " | " + x[1]).join("\n"))}</textarea></div>
       <div style="display:flex;gap:8px;flex-wrap:wrap"><button class="btn primary" id="cSave">${I("check")}Guardar ajustes</button><button class="btn" id="cReset">${I("undo")}Restaurar listas originales</button></div>
     </div>`;
@@ -812,8 +864,8 @@ function bindMain(){
     const b = e.target.closest("[data-view],[data-tab],[data-filtro],[data-act],[data-open],[data-avisar],[data-ya],[data-buscar],[data-nc],[data-tile],[data-reset],[data-deluser]");
     if (!b) return;
     const d = b.dataset;
-    if (d.view) { S.view = d.view; S.q = ""; render(); scrollTo(0, 0); return; }
-    if (d.tile) { if (d.tile === "avisos") { S.view = "avisos"; } else { S.filtro = d.tile; } render(); return; }
+    if (d.view) { setView(d.view); return; }
+    if (d.tile) { if (d.tile === "avisos") setView("avisos"); else { S.filtro = d.tile; render(); } return; }
     if (d.tab) { S.tab = d.tab; render(); return; }
     if (d.filtro) { S.filtro = d.filtro; render(); return; }
     if (d.act === "nuevo") return d.tipo ? openForm(null, d.tipo) : chooseTipo();
@@ -821,7 +873,7 @@ function bindMain(){
     if (d.avisar) { marcarAvisado(d.avisar); return; }
     if (d.ya) return marcarAvisado(d.ya);
     if (d.open) return openDetail(d.open);
-    if (d.buscar) { S.view = "pedidos"; S.filtro = "todos"; S.q = d.buscar; render(); return; }
+    if (d.buscar) { setView("pedidos"); S.filtro = "todos"; S.q = d.buscar; render(); return; }
     if (d.nc) { const c = S.clientes[d.nc]; return chooseTipo({nombre:c ? c.nombre : "", telefono:d.nc}); }
     if (d.reset) return resetPin(d.reset);
     if (d.deluser) { const u = S.usuarios[d.deluser]; return confirmar(`¿Eliminar a ${u.nombre}?`, "No podrá entrar más. Sus pedidos se conservan.", "Eliminar", async () => { const bt = writeBatch(S.db); bt.delete(doc(S.db, "usuarios/" + d.deluser)); bt.delete(doc(S.db, "logins/" + u.usuario)); await bt.commit(); toast("Usuario eliminado"); }); }
@@ -846,10 +898,10 @@ function bindMain(){
 async function saveCfg(){
   const cat = {};
   document.querySelectorAll("[data-cat]").forEach(t => cat[t.dataset.cat] = t.value.split("\n").map(s => s.trim()).filter(Boolean));
-  cat.colores = $("#cCol").value.split("\n").map(l => l.split("|").map(s => s.trim())).filter(x => x[0]).map(x => [x[0], x[1] || ""]);
+  cat.colores = $("#cCol").value.split("\n").map(l => l.split("|").map(s => s.trim())).filter(x => x[0]).map(x => ({n:x[0], h:x[1] || ""}));
   for (const k in cat) if (!cat[k].length) return toast("Una lista no puede quedar vacía", true);
   try { await setDoc(doc(S.db, "config/ajustes"), {negocio:$("#cNeg").value.trim() || DEF.negocio, dias:Number($("#cDias").value), pais:$("#cPais").value, plantilla:$("#cPl").value.trim() || DEF.plantilla, cat}); toast("Ajustes guardados"); }
-  catch(e) { toast("No se pudieron guardar los ajustes", true); }
+  catch(e) { console.warn(e); toast("No se pudieron guardar los ajustes: " + (e.code || e.message), true); }
 }
 
 /* ================= Usuarios: crear, PIN ================= */
@@ -876,8 +928,8 @@ function nuevoUsuario(){
   const pin0 = genPin();
   const ov = modal(`<div class="mh"><h2>Nuevo usuario</h2><button class="ib" data-close>${I("x")}</button></div>
     <div class="mb">
-      <div class="f"><label>Nombre</label><input class="inp" id="nn" placeholder="Ej. Yurelsi"></div>
-      <div class="f"><label>Usuario (para entrar)</label><input class="inp" id="nu" autocapitalize="none" spellcheck="false" placeholder="yurelsi"><span class="msg mut" id="num">Minúsculas, sin espacios</span></div>
+      <div class="f"><label>Nombre</label><input class="inp" id="nn"></div>
+      <div class="f"><label>Usuario (para entrar)</label><input class="inp" id="nu" autocapitalize="none" spellcheck="false"><span class="msg mut" id="num">Minúsculas, sin espacios</span></div>
       <div class="f"><label>PIN</label><div style="display:flex;gap:8px"><input class="inp pinin" id="np" inputmode="numeric" maxlength="8" value="${pin0}"><button class="btn" id="gp" type="button">Otro</button></div></div>
       <div class="lbl">Puede ver</div>
       <div class="opts">
@@ -952,20 +1004,51 @@ function openCuenta(){
   $("#lo", ov).onclick = () => { ov.close(); signOut(S.auth); };
 }
 
+/* ================= Navegación con el botón Atrás ================= */
+// Cada ventana abierta (pedido, detalle, calendario, foto…) ocupa una entrada del historial.
+// El botón Atrás cierra lo que esté arriba; en la pantalla principal, recién entonces sale de la app.
+const NAV = {ignore:0, pend:0, stack:[], t:null};
+function navPush(){ if (NAV.pend > 0) { NAV.pend--; return; } try { history.pushState({cs:Date.now()}, ""); } catch(e) {} }
+function navSilentBack(){ NAV.pend++; clearTimeout(NAV.t); NAV.t = setTimeout(() => { const n = NAV.pend; NAV.pend = 0; if (n > 0) { NAV.ignore++; history.go(-n); } }, 0); }
+addEventListener("popstate", () => {
+  if (NAV.ignore > 0) { NAV.ignore--; return; }
+  const top = NAV.stack[NAV.stack.length - 1];
+  if (top) { if (top.onBack) top.onBack(); else top.close(true); return; }
+  if (S.me && S.view !== "pedidos") { S.viewPushed = false; S.view = "pedidos"; S.q = ""; render(); scrollTo(0, 0); }
+});
+function setView(v){
+  if (v === S.view) return;
+  if (v === "pedidos") { if (S.viewPushed) { S.viewPushed = false; navSilentBack(); } }
+  else if (!S.viewPushed) { S.viewPushed = true; navPush(); }
+  S.view = v; S.q = ""; render(); scrollTo(0, 0);
+}
+function overlay(el){
+  document.body.appendChild(el);
+  NAV.stack.push(el); navPush();
+  document.body.style.overflow = "hidden";
+  el.close = fromPop => {
+    if (!el.isConnected) return;
+    el.remove();
+    const i = NAV.stack.indexOf(el); if (i >= 0) NAV.stack.splice(i, 1);
+    if (!fromPop) navSilentBack();
+    if (!document.querySelector(".ov,.dp-ov,.lbx")) document.body.style.overflow = "";
+  };
+  return el;
+}
+
 /* ================= Modales ================= */
 function modal(html, size, keep){
   const ov = document.createElement("div");
   ov.className = "ov";
   ov.innerHTML = `<div class="md ${size || ""}">${html}</div>`;
-  document.body.appendChild(ov);
-  document.body.style.overflow = "hidden";
-  ov.close = () => { ov.remove(); if (!document.querySelector(".ov")) document.body.style.overflow = ""; };
+  overlay(ov);
   ov.addEventListener("click", e => { if (e.target.closest("[data-close]")) ov.close(); else if (e.target === ov && !keep) ov.close(); });
   return ov;
 }
 function confirmar(title, text, okTxt, fn){
   const ov = modal(`<div class="mh"><h2>${esc(title)}</h2><button class="ib" data-close>${I("x")}</button></div><div class="mb"><p class="note">${esc(text)}</p></div><div class="mf"><button class="btn" data-close>Cancelar</button><button class="btn primary" id="okc">${esc(okTxt)}</button></div>`, "sm");
   $("#okc", ov).onclick = async () => { $("#okc", ov).disabled = true; try { await fn(); ov.close(); } catch(e) { console.warn(e); toast("No se pudo completar: " + (e.code || e.message || ""), true); $("#okc", ov).disabled = false; } };
+  return ov;
 }
 function chooseTipo(cliente){
   const pr = perm(), tipos = ["personalizado","sublimacion"].filter(t => pr.ver[t]);
@@ -978,7 +1061,7 @@ function chooseTipo(cliente){
     </div>`, "sm");
   ov.querySelectorAll("[data-t]").forEach(b => b.onclick = () => { ov.close(); openForm(null, b.dataset.t, cliente); });
 }
-function lightbox(src){ const lb = document.createElement("div"); lb.className = "lbx"; lb.innerHTML = `<img src="${esc(src)}" alt="">`; lb.onclick = () => lb.remove(); document.body.appendChild(lb); }
+function lightbox(src){ const lb = document.createElement("div"); lb.className = "lbx"; lb.innerHTML = `<img src="${esc(src)}" alt="">`; overlay(lb); lb.onclick = () => lb.close(); }
 
 /* ================= Fotos (comprimidas dentro de Firestore) ================= */
 const fotoCache = {};
@@ -1018,8 +1101,8 @@ async function subirFoto(file){
 function openCalendar(current, onPick){
   const sel = current ? parseYmd(current) : null;
   const v = sel ? new Date(sel) : today0(); v.setDate(1);
-  const ov = document.createElement("div"); ov.className = "dp-ov"; document.body.appendChild(ov);
-  const close = () => ov.remove();
+  const ov = document.createElement("div"); ov.className = "dp-ov"; overlay(ov);
+  const close = () => ov.close();
   const draw = () => {
     const y = v.getFullYear(), m = v.getMonth(), first = (new Date(y, m, 1).getDay() + 6) % 7, nd = new Date(y, m + 1, 0).getDate();
     const t0 = ymd(today0()), sv = sel ? ymd(sel) : "";
@@ -1038,72 +1121,93 @@ function openCalendar(current, onPick){
   draw();
 }
 
-/* ================= Formulario de pedido ================= */
+/* ================= Formulario de pedido (por pasos) ================= */
 let F = null, B = null;
-const newBuilder = tipo => ({prenda:"", color: tipo === "sublimacion" ? "Fullprint" : "", colorOtro:"", horma:"", cant:{}, nombre:"", numero:"", prendaOtra:""});
+const PASOS = [["user","Cliente"],["shirt","Prendas"],["cal","Entrega"],["camera","Extras"]];
+const newBuilder = () => ({prendas:[], colores:[], hormas:[], tallas:[], prendaOtra:"", colorOtro:"", q:{}});
 function openForm(id, tipo, cliente){
   const orig = id ? S.pedidos[id] : null;
   if (orig) tipo = orig.tipo;
   const c = cfg(), pr = perm(), T = TIPOS[tipo], isP = tipo === "personalizado";
-  F = orig ? JSON.parse(JSON.stringify(orig)) : {tipo, cliente:{nombre:(cliente && cliente.nombre) || "", telefono:(cliente && cliente.telefono) || ""}, tema:"", servicio:"", prendaDe:"tienda", ubicacion:[], tela:"", etiqueta:c.cat.etiquetas[0] || "", items:[], fechaEntrega:"", precio:"", moneda:"USD", abono:"", urgente:false, imagenes:[], nota:"", asignados:[]};
+  F = orig ? JSON.parse(JSON.stringify(orig)) : {tipo, cliente:{nombre:(cliente && cliente.nombre) || "", telefono:(cliente && cliente.telefono) || ""}, tema:"", servicio:"", prendaDe:"tienda", etiqueta:c.cat.etiquetas[0] || "", items:[], fechaEntrega:"", precio:"", moneda:"USD", abono:"", urgente:false, imagenes:[], nota:"", asignados:[]};
   F.imagenes = (F.imagenes || []).map(id => ({id}));
-  B = newBuilder(tipo);
-  const opts = (arr, cur, key, multi) => arr.map(o => `<button type="button" class="opt" data-${key}="${esc(o)}" aria-pressed="${multi ? (cur || []).includes(o) : cur === o}">${esc(o)}</button>`).join("");
+  F.step = 0; F.visto = [true, false, false, false];
+  B = newBuilder();
+  const marcas = c.cat.etiquetas.includes(F.etiqueta) || !F.etiqueta ? c.cat.etiquetas : [...c.cat.etiquetas, F.etiqueta];
   const empleados = Object.values(S.usuarios).filter(u => u.activo && u.rol !== "admin");
   const ov = modal(`
-    <div class="mh"><span class="chip" style="--c:${T.c}">${I(T.icon)}</span><h2>${orig ? "Editar " + esc(orig.codigo) : "Nuevo pedido"} · ${T.label}</h2><button class="ib" data-cerrar>${I("x")}</button></div>
-    <div class="mb">
+    <div class="mh"><span class="chip" style="--c:${T.c}">${I(T.icon)}</span><h2>${orig ? esc(orig.codigo) : "Nuevo"} <small>${T.label}</small></h2><button class="ib" data-cerrar>${I("x")}</button></div>
+    <div class="steps" style="--c:${T.c}">${PASOS.map(([ic, t], i) => `<button type="button" data-go="${i}"><span class="n">${i + 1}</span>${t}</button>`).join("")}</div>
+    <div class="mb" id="fbody">
       <div id="errsum"></div>
-      <div class="fsec"><div class="sec">${I("user")}Cliente</div>
-        <div class="g2">
-          <div class="f ac" id="f-nombre"><label>Nombre y apellido <span class="req">*</span></label><input class="inp" id="in-nombre" autocomplete="off" placeholder="Ej. José Ramírez" value="${esc(F.cliente.nombre)}"><div id="acl"></div><span class="msg"></span></div>
-          <div class="f" id="f-tel"><label>WhatsApp <span class="req">*</span></label>
-            <div class="phone"><select id="in-pais">${PAISES.map(p => `<option value="${p.c}" ${p.c === (F.cliente.telefono ? "" : c.pais) ? "selected" : ""}>${p.f} ${p.c ? "+" + p.c : "Otro"}</option>`).join("")}</select><input id="in-tel" inputmode="tel" autocomplete="off" placeholder="0424 123 4567" value="${esc(F.cliente.telefono ? prettyPhone(F.cliente.telefono) : "")}"></div>
-            <span class="msg" id="tel-msg"></span></div>
+
+      <section class="step" data-step="0">
+        <div class="fsec"><div class="sec">${I("user")}Cliente</div>
+          <div class="g2">
+            <div class="f ac" id="f-nombre"><label>Nombre y apellido <span class="req">*</span></label><input class="inp" id="in-nombre" autocomplete="off" value="${esc(F.cliente.nombre)}"><div id="acl"></div><span class="msg"></span></div>
+            <div class="f" id="f-tel"><label>WhatsApp <span class="req">*</span></label>
+              <div class="phone"><select id="in-pais">${PAISES.map(p => `<option value="${p.c}" ${p.c === (F.cliente.telefono ? "" : c.pais) ? "selected" : ""}>${p.f} ${p.c ? "+" + p.c : "Otro"}</option>`).join("")}</select><input id="in-tel" inputmode="tel" autocomplete="off" value="${esc(F.cliente.telefono ? prettyPhone(F.cliente.telefono) : "")}"></div>
+              <span class="msg" id="tel-msg"></span></div>
+          </div>
         </div>
-      </div>
-      <div class="fsec"><div class="sec">${I(T.icon)}${isP ? "Estampado" : "Diseño y confección"}</div>
-        <div class="f"><label>Tema / diseño</label><input class="inp" id="in-tema" placeholder="${isP ? "Ej. Logo Tu Mandao, frente y espalda" : "Ej. Uniforme Guaraque Mérida, azul y blanco"}" value="${esc(F.tema)}"></div>
-        ${isP ? `
-        <div class="f" id="f-servicio"><label>Tipo de estampado <span class="req">*</span></label><div class="opts">${opts(c.cat.servicios, F.servicio, "servicio")}</div><span class="msg"></span></div>
-        <div class="f"><label>¿Quién pone la prenda? <span class="req">*</span></label><div class="opts"><button type="button" class="opt" data-prendade="tienda" aria-pressed="${F.prendaDe === "tienda"}">La tienda (incluida)</button><button type="button" class="opt" data-prendade="cliente" aria-pressed="${F.prendaDe === "cliente"}">El cliente trae la prenda</button></div></div>
-        <div class="f"><label>Ubicación del estampado</label><div class="opts">${opts(c.cat.ubicaciones, F.ubicacion, "ubic", true)}</div></div>` : ""}
-        <div class="g2">
-          <div class="f" id="f-tela"><label>Tela <span class="req" id="tela-req">*</span></label><select class="inp" id="in-tela"><option value="">— Elegir tela —</option>${c.cat.telas.map(t => `<option ${F.tela === t ? "selected" : ""}>${esc(t)}</option>`).join("")}${F.tela && !c.cat.telas.includes(F.tela) ? `<option selected>${esc(F.tela)}</option>` : ""}</select><span class="msg"></span></div>
-          <div class="f"><label>Etiqueta</label><select class="inp" id="in-etiq">${c.cat.etiquetas.map(t => `<option ${F.etiqueta === t ? "selected" : ""}>${esc(t)}</option>`).join("")}</select></div>
+        <div class="fsec"><div class="sec">${I(T.icon)}${isP ? "Estampado" : "Diseño"}</div>
+          <div class="g2">
+            <div class="f"><label>Tema / diseño</label><input class="inp" id="in-tema" value="${esc(F.tema)}"></div>
+            <div class="f"><label>Marca</label><select class="inp" id="in-etiq">${marcas.map(t => `<option ${F.etiqueta === t ? "selected" : ""}>${esc(t)}</option>`).join("")}</select></div>
+          </div>
+          ${isP ? `
+          <div class="f" id="f-servicio"><label>Tipo de estampado <span class="req">*</span></label><div class="opts">${c.cat.servicios.map(o => `<button type="button" class="opt" data-servicio="${esc(o)}" aria-pressed="${F.servicio === o}">${esc(o)}</button>`).join("")}</div><span class="msg"></span></div>
+          <div class="f"><label>¿Quién pone la prenda?</label><div class="opts"><button type="button" class="opt" data-prendade="tienda" aria-pressed="${F.prendaDe !== "cliente"}">La tienda</button><button type="button" class="opt" data-prendade="cliente" aria-pressed="${F.prendaDe === "cliente"}">El cliente la trae</button></div></div>` : ""}
         </div>
-      </div>
-      <div class="fsec"><div class="sec">${I("shirt")}Prendas, colores y tallas <span class="req">*</span></div>
-        <div class="builder" id="builder"></div>
-        <div class="f" id="f-items"><label>Lista del pedido</label><div class="itemsbox" id="items"></div><span class="msg"></span></div>
-      </div>
-      <div class="fsec"><div class="sec">${I("cal")}Entrega y pago</div>
-        <div class="g2">
-          <div class="f" id="f-fecha"><label>Fecha de entrega <span class="req">*</span></label><button type="button" class="datebtn" id="in-fecha">${I("cal")}<span class="d"></span></button><span class="msg"></span></div>
-          <div class="f"><label>Prioridad</label><div class="opts"><button type="button" class="opt" data-urg="0" aria-pressed="${!F.urgente}">Normal</button><button type="button" class="opt" data-urg="1" aria-pressed="${!!F.urgente}">🔥 Urgente</button></div></div>
+      </section>
+
+      <section class="step" data-step="1" hidden>
+        <div class="fsec"><div class="builder" id="builder"></div></div>
+        <div class="fsec"><div class="f" id="f-items"><div class="sec">${I("list")}Lista del pedido <small id="itcount"></small></div><div class="itemsbox" id="items"></div><span class="msg"></span></div></div>
+      </section>
+
+      <section class="step" data-step="2" hidden>
+        <div class="fsec"><div class="sec">${I("cal")}Entrega</div>
+          <div class="g2">
+            <div class="f" id="f-fecha"><label>Fecha de entrega <span class="req">*</span></label><button type="button" class="datebtn" id="in-fecha">${I("cal")}<span class="d"></span></button><span class="msg"></span></div>
+            <div class="f"><label>Prioridad</label><div class="opts"><button type="button" class="opt" data-urg="0" aria-pressed="${!F.urgente}">Normal</button><button type="button" class="opt" data-urg="1" aria-pressed="${!!F.urgente}">🔥 Urgente</button></div></div>
+          </div>
         </div>
-        <div class="g3">
-          <div class="f"><label>Moneda</label><select class="inp" id="in-mon">${["USD","Bs","COP"].map(m => `<option ${F.moneda === m ? "selected" : ""}>${m}</option>`).join("")}</select></div>
-          <div class="f" id="f-precio"><label>Precio por unidad <span class="req">*</span></label><input class="inp" id="in-precio" inputmode="decimal" placeholder="0.00" value="${esc(F.precio)}"><span class="msg"></span></div>
-          <div class="f" id="f-abono"><label>Abono</label><input class="inp" id="in-abono" inputmode="decimal" placeholder="0.00" value="${esc(F.abono)}"><span class="msg"></span></div>
+        <div class="fsec"><div class="sec">${I("cash")}Pago</div>
+          <div class="g3 keep">
+            <div class="f"><label>Moneda</label><select class="inp" id="in-mon">${["USD","Bs","COP"].map(m => `<option ${F.moneda === m ? "selected" : ""}>${m}</option>`).join("")}</select></div>
+            <div class="f" id="f-precio"><label>Precio unidad <span class="req">*</span></label><input class="inp" id="in-precio" inputmode="decimal" value="${esc(F.precio)}"></div>
+            <div class="f" id="f-abono"><label>Abono</label><input class="inp" id="in-abono" inputmode="decimal" value="${esc(F.abono)}"></div>
+          </div>
+          <span class="msg" id="pago-msg"></span>
+          <div class="totals" id="totals"></div>
         </div>
-        <div class="totals" id="totals"></div>
-      </div>
-      <div class="fsec"><div class="sec">${I("camera")}Imágenes de referencia</div>
-        <div class="imgs" id="imgs"></div>
-        <input type="file" id="fileGal" accept="image/*" multiple hidden><input type="file" id="fileCam" accept="image/*" capture="environment" hidden>
-      </div>
-      <div class="fsec"><div class="sec">${I("note")}Nota / información adicional</div>
-        <textarea class="inp" id="in-nota" rows="3" placeholder="Ej. Agregar logos de polar en la manga. Número de teléfono atrás.">${esc(F.nota)}</textarea>
-      </div>
-      ${pr.admin ? `<div class="fsec"><div class="sec">${I("lock")}¿Quién puede ver este pedido?</div>
-        <p class="note">Si no marcas a nadie, lo ve todo el equipo con permiso para ${T.label.toLowerCase()}. Si marcas personas, solo ellas (y tú) lo verán.</p>
-        <div class="opts">${empleados.map(u => `<button type="button" class="opt" data-asig="${esc(u.usuario)}" aria-pressed="${(F.asignados || []).includes(u.usuario)}">${esc(u.nombre)}</button>`).join("") || `<span class="note">Aún no hay personas en el equipo.</span>`}</div></div>` : ""}
-      <p class="hist">${orig ? `Registrado el ${fmtDT(orig.creadoEn)} por ${esc(nameOf(orig.creadoPor))}${orig.editadoEn ? ` · Última edición ${fmtDT(orig.editadoEn)} por ${esc(nameOf(orig.editadoPor))}` : ""}` : `Fecha de registro: ${fmtDate(ymd(new Date()))} (se guarda sola y no cambia al editar)`}</p>
+      </section>
+
+      <section class="step" data-step="3" hidden>
+        <div class="fsec"><div class="sec">${I("camera")}Imágenes de referencia</div>
+          <div class="imgs" id="imgs"></div>
+          <input type="file" id="fileGal" accept="image/*" multiple hidden><input type="file" id="fileCam" accept="image/*" capture="environment" hidden>
+        </div>
+        <div class="fsec"><div class="sec">${I("note")}Nota / información adicional</div>
+          <textarea class="inp" id="in-nota" rows="3">${esc(F.nota)}</textarea>
+        </div>
+        ${pr.admin ? `<div class="fsec"><div class="sec">${I("lock")}¿Quién puede verlo?</div>
+          <p class="note">Sin marcar a nadie, lo ve todo el equipo con permiso para ${T.label.toLowerCase()}. Si marcas personas, solo ellas (y tú).</p>
+          <div class="opts">${empleados.map(u => `<button type="button" class="opt" data-asig="${esc(u.usuario)}" aria-pressed="${(F.asignados || []).includes(u.usuario)}">${esc(u.nombre)}</button>`).join("") || `<span class="note">Aún no hay personas en el equipo.</span>`}</div></div>` : ""}
+        <p class="hist">${orig ? `Registrado el ${fmtDT(orig.creadoEn)} por ${esc(nameOf(orig.creadoPor))}${orig.editadoEn ? ` · Última edición ${fmtDT(orig.editadoEn)} por ${esc(nameOf(orig.editadoPor))}` : ""}` : `Fecha de registro: ${fmtDate(ymd(new Date()))} (se guarda sola y no cambia al editar)`}</p>
+      </section>
     </div>
-    <div class="mf"><button class="btn" data-cerrar>Cancelar</button><button class="btn c" style="--c:${T.c}" id="save">${I("check")}${orig ? "Guardar cambios" : "Guardar pedido"}</button></div>`, "", true);
+    <div class="mf"><button class="btn" id="prev">${I("undo")}Atrás</button><span style="flex:1"></span><button class="btn" id="save">${I("check")}Guardar</button><button class="btn c" style="--c:${T.c}" id="next">Siguiente</button></div>`, "", true);
   F._ov = ov;
-  ov.querySelectorAll("[data-cerrar]").forEach(b => b.onclick = () => confirmar("¿Salir sin guardar?", "Los cambios de este pedido se perderán.", "Salir", async () => { ov.close(); F = null; }));
+  const salir = () => confirmar("¿Salir sin guardar?", "Los datos de este pedido se perderán.", "Salir", async () => { ov.close(); F = null; });
+  ov.querySelectorAll("[data-cerrar]").forEach(b => b.onclick = salir);
+  ov.onBack = () => { navPush(); if (F && F.step > 0) goStep(F.step - 1); else salir(); };
+
+  // Pasos
+  ov.querySelector(".steps").onclick = e => { const b = e.target.closest("[data-go]"); if (!b) return; const n = Number(b.dataset.go); if (n > F.step && !pasoOK(F.step, true)) return; goStep(n); };
+  $("#prev", ov).onclick = () => { if (F.step > 0) goStep(F.step - 1); };
+  $("#next", ov).onclick = () => { if (pasoOK(F.step, true)) goStep(F.step + 1); };
 
   // Cliente + autocompletado
   const inNom = $("#in-nombre", ov), acl = $("#acl", ov), inTel = $("#in-tel", ov), inPais = $("#in-pais", ov);
@@ -1125,8 +1229,8 @@ function openForm(id, tipo, cliente){
     const ex = S.clientes[r.e164];
     let t = `✓ ${r.pretty}${r.op ? " · " + r.op : ""}`; msg.className = "msg ok";
     if (r.warn) { t += " · " + r.warn; msg.className = "msg warn"; }
-    if (ex && ex.nombre && F.cliente.nombre && norm(ex.nombre).trim() !== norm(F.cliente.nombre).trim()) { t += ` · ⚠ Este número está registrado a nombre de ${ex.nombre}`; msg.className = "msg warn"; }
-    msg.innerHTML = esc(t) + ` · <a href="https://wa.me/${esc(r.e164)}" target="_blank" rel="noopener" style="color:inherit">probar en WhatsApp ↗</a>`;
+    if (ex && ex.nombre && F.cliente.nombre && norm(ex.nombre).trim() !== norm(F.cliente.nombre).trim()) { t += ` · ⚠ Registrado a nombre de ${ex.nombre}`; msg.className = "msg warn"; }
+    msg.innerHTML = esc(t) + ` · <a href="https://wa.me/${esc(r.e164)}" target="_blank" rel="noopener" style="color:inherit">probar ↗</a>`;
     return r;
   };
   inTel.oninput = () => { if (inTel.value.trim().startsWith("+")) inPais.value = ""; checkTel(); };
@@ -1136,90 +1240,158 @@ function openForm(id, tipo, cliente){
   F._checkTel = () => parsePhone(inTel.value, inPais.value);
 
   $("#in-tema", ov).oninput = e => F.tema = e.target.value;
-  $("#in-tela", ov).onchange = e => { F.tela = e.target.value; clearErr("f-tela"); };
   $("#in-etiq", ov).onchange = e => F.etiqueta = e.target.value;
   $("#in-nota", ov).oninput = e => F.nota = e.target.value;
   $("#in-mon", ov).onchange = e => { F.moneda = e.target.value; renderTotals(); };
   $("#in-precio", ov).oninput = e => { F.precio = e.target.value; clearErr("f-precio"); renderTotals(); };
   $("#in-abono", ov).oninput = e => { F.abono = e.target.value; renderTotals(); };
-  const telaReq = () => { const need = !(isP && F.prendaDe === "cliente"); $("#tela-req", ov).hidden = !need; };
-  telaReq();
   ov.addEventListener("click", e => {
-    const b = e.target.closest("[data-servicio],[data-prendade],[data-ubic],[data-urg],[data-asig]"); if (!b) return;
+    const b = e.target.closest("[data-servicio],[data-prendade],[data-urg],[data-asig]"); if (!b) return;
     const d = b.dataset, single = () => b.parentNode.querySelectorAll(".opt").forEach(x => x.setAttribute("aria-pressed", x === b));
-    const toggle = (arr, v) => { const i = arr.indexOf(v); i >= 0 ? arr.splice(i, 1) : arr.push(v); b.setAttribute("aria-pressed", i < 0); };
     if (d.servicio !== undefined) { F.servicio = d.servicio; single(); clearErr("f-servicio"); }
-    if (d.prendade !== undefined) { F.prendaDe = d.prendade; single(); telaReq(); clearErr("f-tela"); }
+    if (d.prendade !== undefined) { F.prendaDe = d.prendade; single(); }
     if (d.urg !== undefined) { F.urgente = d.urg === "1"; single(); }
-    if (d.ubic !== undefined) toggle(F.ubicacion = F.ubicacion || [], d.ubic);
-    if (d.asig !== undefined) toggle(F.asignados = F.asignados || [], d.asig);
+    if (d.asig !== undefined) { F.asignados = F.asignados || []; const i = F.asignados.indexOf(d.asig); i >= 0 ? F.asignados.splice(i, 1) : F.asignados.push(d.asig); b.setAttribute("aria-pressed", i < 0); }
   });
-  const drawFecha = () => { const s = $("#in-fecha .d", ov); if (F.fechaEntrega) { const n = daysUntil(F.fechaEntrega); s.innerHTML = esc(fmtDate(F.fechaEntrega)) + ` <span class="ph">(${n < 0 ? "hace " + (-n) + " días" : n === 0 ? "hoy" : n === 1 ? "mañana" : "en " + n + " días"})</span>`; } else s.innerHTML = `<span class="ph">Toca para elegir en el calendario</span>`; };
+  const drawFecha = () => { const s = $("#in-fecha .d", ov); if (F.fechaEntrega) { const n = daysUntil(F.fechaEntrega); s.innerHTML = esc(fmtDate(F.fechaEntrega)) + ` <span class="ph">(${n < 0 ? "hace " + (-n) + " días" : n === 0 ? "hoy" : n === 1 ? "mañana" : "en " + n + " días"})</span>`; } else s.innerHTML = `<span class="ph">Elegir en el calendario</span>`; };
   $("#in-fecha", ov).onclick = () => openCalendar(F.fechaEntrega, d => { F.fechaEntrega = d; clearErr("f-fecha"); drawFecha(); const m = $("#f-fecha .msg", ov); m.className = "msg warn"; m.textContent = daysUntil(d) < 0 ? "⚠ La fecha elegida ya pasó" : ""; });
   drawFecha();
   $("#fileGal", ov).onchange = e => { addFiles(e.target.files); e.target.value = ""; };
   $("#fileCam", ov).onchange = e => { addFiles(e.target.files); e.target.value = ""; };
   $("#save", ov).onclick = () => saveForm(ov, orig);
-  renderBuilder(); renderItems(); renderTotals(); renderImgs();
+  renderBuilder(); renderItems(); renderTotals(); renderImgs(); goStep(0);
+}
+function goStep(n){
+  const ov = F._ov; F.step = n; F.visto[n] = true;
+  ov.querySelectorAll(".step").forEach(s => s.hidden = Number(s.dataset.step) !== n);
+  ov.querySelectorAll(".steps [data-go]").forEach((b, i) => {
+    b.setAttribute("aria-current", i === n);
+    const errs = erroresPaso(i);
+    b.classList.toggle("bad", F.visto[i] && i !== n && errs.length > 0);
+    b.classList.toggle("ok", F.visto[i] && i !== n && errs.length === 0);
+  });
+  const last = n === PASOS.length - 1;
+  $("#prev", ov).style.visibility = n === 0 ? "hidden" : "";
+  $("#next", ov).hidden = last;
+  $("#save", ov).className = "btn" + (last ? " c" : "");
+  $("#save", ov).style.cssText = last ? `--c:${TIPOS[F.tipo].c}` : "";
+  $("#errsum", ov).innerHTML = "";
+  $("#fbody", ov).scrollTo(0, 0);
+}
+function erroresPaso(i){
+  const e = [], isP = F.tipo === "personalizado";
+  if (i === 0) {
+    if ((F.cliente.nombre || "").trim().length < 3) e.push(["f-nombre", "Escribe el nombre del cliente"]);
+    const t = F._checkTel(); if (!t.ok) e.push(["f-tel", "WhatsApp: " + t.msg]);
+    if (isP && !F.servicio) e.push(["f-servicio", "Elige el tipo de estampado"]);
+  }
+  if (i === 1 && !F.items.length) e.push(["f-items", "Agrega al menos una prenda con su talla"]);
+  if (i === 2) {
+    if (!F.fechaEntrega) e.push(["f-fecha", "Elige la fecha de entrega"]);
+    if (!(num(F.precio) > 0)) e.push(["f-precio", "Escribe el precio por unidad"]);
+  }
+  if (i === 3 && F.imagenes.some(x => x.subiendo)) e.push(["", "Espera a que terminen de subir las imágenes"]);
+  return e;
+}
+function marcarErrores(errs){
+  const ov = F._ov;
+  errs.forEach(([id, msg]) => {
+    const el = id && $("#" + id, ov); if (!el) return;
+    el.classList.add("err");
+    const m = el.querySelector(".msg");
+    if (m) { m.className = "msg bad"; m.textContent = "✗ " + msg; }
+  });
+}
+function pasoOK(i, mostrar){
+  const errs = erroresPaso(i);
+  if (errs.length && mostrar) { marcarErrores(errs); toast(errs[0][1], true); }
+  return !errs.length;
 }
 function clearErr(id){ const el = F && F._ov && $("#" + id, F._ov); if (!el) return; el.classList.remove("err"); const m = el.querySelector(".msg"); if (m && m.classList.contains("bad") && m.id !== "tel-msg") { m.textContent = ""; m.className = "msg"; } }
+
+/* ---- Selector de prendas: varias prendas, colores, hormas y tallas a la vez ---- */
 function renderBuilder(){
   const ov = F._ov, c = cfg().cat, isP = F.tipo === "personalizado";
   const prendas = isP ? c.prendasPers : c.prendasSub, colores = c.colores.filter(x => isP ? x[1] !== "full" : true);
-  const sizes = arr => arr.map(s => { const n = B.cant[s] || 0; return `<div class="sz ${n ? "on" : ""}"><button type="button" class="t" data-sz="${esc(s)}">${esc(s)}</button>${n ? `<span class="cnt">${n}</span><button type="button" class="minus" data-szm="${esc(s)}">− quitar</button>` : ""}</div>`; }).join("");
-  const total = Object.values(B.cant).reduce((a, b) => a + b, 0);
+  const on = (arr, v) => arr.includes(v);
+  const combos = builderCombos();
+  const tallas = builderTallas();
+  const total = combos.reduce((s, k) => s + tallas.reduce((t, ta) => t + (Number(B.q[k.key + "|" + ta]) || 0), 0), 0);
   $("#builder", ov).innerHTML = `
-    <div class="lbl">1 · ${isP ? "Prenda" : "Producto"}</div>
-    <div class="opts">${prendas.map(p => `<button type="button" class="opt" data-bp="${esc(p)}" aria-pressed="${B.prenda === p}">${esc(p)}</button>`).join("")}</div>
-    ${B.prenda === "Otro" ? `<input class="inp" id="b-otra" placeholder="¿Cuál prenda?" value="${esc(B.prendaOtra)}">` : ""}
-    <div class="lbl" style="margin-top:8px">2 · Color</div>
-    <div class="swatches">${colores.map(([n, h]) => `<button type="button" class="sw" data-bc="${esc(n)}" aria-pressed="${B.color === n}"><i style="${swatchStyle(h)}"></i>${esc(n)}</button>`).join("")}<button type="button" class="sw" data-bc="__otro" aria-pressed="${B.color === "__otro"}"><i style="${swatchStyle("")}"></i>Otro…</button></div>
-    ${B.color === "__otro" ? `<input class="inp" id="b-colotro" placeholder="Escribe el color" value="${esc(B.colorOtro)}">` : ""}
-    <div class="lbl" style="margin-top:8px">3 · Horma</div>
-    <div class="opts">${c.hormas.map(h => `<button type="button" class="opt" data-bh="${esc(h)}" aria-pressed="${B.horma === h}">${esc(h)}</button>`).join("")}</div>
-    <div class="lbl" style="margin-top:8px">4 · Tallas y cantidades <span style="text-transform:none;letter-spacing:0;font-weight:600">· toca una talla varias veces para sumar</span></div>
-    <div class="sizes">${sizes(c.tallasAdulto)}</div>
-    <div class="sizes" style="margin-top:6px">${sizes(c.tallasNino)}</div>
-    ${total === 1 ? `<div class="g2" style="margin-top:8px"><div class="f"><label>Nombre en la prenda / persona (opcional)</label><input class="inp" id="b-nombre" placeholder="Ej. José Ramírez" value="${esc(B.nombre)}"></div><div class="f"><label>Número (opcional)</label><input class="inp" id="b-numero" placeholder="Ej. 10" value="${esc(B.numero)}"></div></div>` : ""}
-    <div style="display:flex;gap:10px;align-items:center;margin-top:10px;flex-wrap:wrap"><button type="button" class="btn primary" id="b-add" ${total ? "" : "disabled"}>${I("plus")}Agregar ${total || ""} pieza${total === 1 ? "" : "s"} a la lista</button><span class="note">${total ? "" : "Elige prenda, color y al menos una talla."}</span></div>`;
+    <div class="bhead"><div class="sec">${I("shirt")}Agregar prendas</div><span class="note">Puedes marcar varias opciones en cada grupo</span></div>
+    <div class="bgrid">
+      <div class="f"><div class="lbl">${isP ? "Prendas" : "Productos"}</div><div class="opts">${prendas.map(p => `<button type="button" class="opt" data-bp="${esc(p)}" aria-pressed="${on(B.prendas, p)}">${esc(p)}</button>`).join("")}</div>
+        ${on(B.prendas, "Otro") ? `<input class="inp" id="b-otra" placeholder="¿Cuál?" value="${esc(B.prendaOtra)}">` : ""}</div>
+      <div class="f"><div class="lbl">Hormas <span class="opt-l">(opcional)</span></div><div class="opts">${c.hormas.map(h => `<button type="button" class="opt" data-bh="${esc(h)}" aria-pressed="${on(B.hormas, h)}">${esc(h)}</button>`).join("")}</div></div>
+    </div>
+    <div class="f"><div class="lbl">Colores</div><div class="swatches">${colores.map(([n, h]) => `<button type="button" class="sw" data-bc="${esc(n)}" aria-pressed="${on(B.colores, n)}"><i style="${swatchStyle(h)}"></i><span>${esc(n)}</span></button>`).join("")}<button type="button" class="sw" data-bc="__otro" aria-pressed="${on(B.colores, "__otro")}"><i style="${swatchStyle("")}"></i><span>Otro</span></button></div>
+      ${on(B.colores, "__otro") ? `<input class="inp" id="b-colotro" placeholder="¿Cuál?" value="${esc(B.colorOtro)}">` : ""}</div>
+    <div class="f"><div class="lbl">Tallas</div>
+      <div class="sizes">${c.tallasAdulto.map(s => `<button type="button" class="szb" data-sz="${esc(s)}" aria-pressed="${on(B.tallas, s)}">${esc(s)}</button>`).join("")}</div>
+      <div class="sizes">${c.tallasNino.map(s => `<button type="button" class="szb" data-sz="${esc(s)}" aria-pressed="${on(B.tallas, s)}">${esc(s)}</button>`).join("")}</div></div>
+    ${combos.length && tallas.length ? `
+      <div class="lbl">Cantidades</div>
+      <div class="gridwrap"><table class="mx"><thead><tr><th></th>${tallas.map(t => `<th>${esc(t)}</th>`).join("")}</tr></thead>
+      <tbody>${combos.map(k => `<tr><th>${esc(k.prenda)}<span>${esc(k.color)}${k.horma ? " · " + esc(k.horma) : ""}</span></th>${tallas.map(t => `<td><input type="number" inputmode="numeric" min="0" data-q="${esc(k.key + "|" + t)}" value="${B.q[k.key + "|" + t] || ""}"></td>`).join("")}</tr>`).join("")}</tbody></table></div>`
+      : `<p class="note">Marca al menos una prenda, un color y una talla para escribir las cantidades.</p>`}
+    <button type="button" class="btn primary" id="b-add" ${total ? "" : "disabled"}>${I("plus")}Agregar ${total || ""} pieza${total === 1 ? "" : "s"} a la lista</button>`;
   const bd = $("#builder", ov);
   bd.onclick = e => {
-    const b = e.target.closest("[data-bp],[data-bc],[data-bh],[data-sz],[data-szm],#b-add"); if (!b) return;
-    const d = b.dataset;
-    if (d.bp !== undefined) B.prenda = d.bp;
-    if (d.bc !== undefined) B.color = d.bc;
-    if (d.bh !== undefined) B.horma = B.horma === d.bh ? "" : d.bh;
-    if (d.sz !== undefined) B.cant[d.sz] = (B.cant[d.sz] || 0) + 1;
-    if (d.szm !== undefined) { B.cant[d.szm] = Math.max(0, (B.cant[d.szm] || 0) - 1); if (!B.cant[d.szm]) delete B.cant[d.szm]; }
+    const b = e.target.closest("[data-bp],[data-bc],[data-bh],[data-sz],#b-add"); if (!b) return;
+    const d = b.dataset, tg = (arr, v) => { const i = arr.indexOf(v); i >= 0 ? arr.splice(i, 1) : arr.push(v); };
+    if (d.bp !== undefined) tg(B.prendas, d.bp);
+    if (d.bc !== undefined) tg(B.colores, d.bc);
+    if (d.bh !== undefined) tg(B.hormas, d.bh);
+    if (d.sz !== undefined) tg(B.tallas, d.sz);
     if (b.id === "b-add") return addFromBuilder();
-    renderBuilder();
-    if (d.bp === "Otro") $("#b-otra", ov)?.focus();
-    if (d.bc === "__otro") $("#b-colotro", ov)?.focus();
+    const y = $("#fbody", ov).scrollTop; renderBuilder(); $("#fbody", ov).scrollTop = y;
+    if (d.bp === "Otro" && on(B.prendas, "Otro")) $("#b-otra", ov)?.focus();
+    if (d.bc === "__otro" && on(B.colores, "__otro")) $("#b-colotro", ov)?.focus();
   };
-  bd.oninput = e => { const m = {"b-otra":"prendaOtra","b-colotro":"colorOtro","b-nombre":"nombre","b-numero":"numero"}[e.target.id]; if (m) B[m] = e.target.value; };
+  bd.oninput = e => {
+    if (e.target.dataset.q) { const v = Math.max(0, parseInt(e.target.value) || 0); B.q[e.target.dataset.q] = v; updAddBtn(); return; }
+    if (e.target.id === "b-otra") { B.prendaOtra = e.target.value; }
+    if (e.target.id === "b-colotro") { B.colorOtro = e.target.value; }
+  };
+  bd.onchange = e => { if (e.target.id === "b-otra" || e.target.id === "b-colotro") { const y = $("#fbody", ov).scrollTop; renderBuilder(); $("#fbody", ov).scrollTop = y; } };
+}
+function builderTallas(){ const c = cfg().cat, order = [...c.tallasAdulto, ...c.tallasNino]; return [...B.tallas].sort((a, b) => order.indexOf(a) - order.indexOf(b)); }
+function builderCombos(){
+  const c = cfg().cat, isP = F.tipo === "personalizado";
+  const pOrder = isP ? c.prendasPers : c.prendasSub, colOrder = c.colores.map(x => x[0]);
+  const prendas = [...B.prendas].sort((a, b) => pOrder.indexOf(a) - pOrder.indexOf(b)).map(p => p === "Otro" ? B.prendaOtra.trim() : p).filter(Boolean);
+  const colores = [...B.colores].sort((a, b) => (colOrder.indexOf(a) + 1 || 999) - (colOrder.indexOf(b) + 1 || 999)).map(x => x === "__otro" ? B.colorOtro.trim() : x).filter(Boolean);
+  const hormas = B.hormas.length ? [...B.hormas].sort((a, b) => c.hormas.indexOf(a) - c.hormas.indexOf(b)) : [""];
+  const out = [];
+  prendas.forEach(p => colores.forEach(co => hormas.forEach(h => out.push({prenda:p, color:co, horma:h, key:[p, co, h].join("|")}))));
+  return out;
+}
+function updAddBtn(){
+  const combos = builderCombos(), tallas = builderTallas();
+  const total = combos.reduce((s, k) => s + tallas.reduce((t, ta) => t + (Number(B.q[k.key + "|" + ta]) || 0), 0), 0);
+  const b = $("#b-add", F._ov); b.disabled = !total; b.innerHTML = `${I("plus")}Agregar ${total || ""} pieza${total === 1 ? "" : "s"} a la lista`;
 }
 function addFromBuilder(){
-  const prenda = B.prenda === "Otro" ? B.prendaOtra.trim() : B.prenda, color = B.color === "__otro" ? B.colorOtro.trim() : B.color;
-  if (!prenda) return toast("Elige la prenda", true);
-  if (!color) return toast("Elige el color", true);
-  const c = cfg().cat, order = [...c.tallasAdulto, ...c.tallasNino];
-  const tallas = Object.keys(B.cant).sort((a, b) => order.indexOf(a) - order.indexOf(b));
-  const total = Object.values(B.cant).reduce((a, b) => a + b, 0);
-  tallas.forEach(t => F.items.push({prenda, color, horma:B.horma, talla:t, cant:B.cant[t], nombre: total === 1 ? B.nombre.trim() : "", numero: total === 1 ? B.numero.trim() : ""}));
-  B.cant = {}; B.nombre = ""; B.numero = "";
+  const combos = builderCombos(), tallas = builderTallas();
+  let total = 0;
+  combos.forEach(k => tallas.forEach(t => { const n = Number(B.q[k.key + "|" + t]) || 0; if (n > 0) { F.items.push({prenda:k.prenda, color:k.color, horma:k.horma, talla:t, cant:n, nombre:"", numero:""}); total += n; } }));
+  if (!total) return;
+  B = newBuilder();
   clearErr("f-items"); renderBuilder(); renderItems(); renderTotals();
-  toast(`${total} pieza${total > 1 ? "s" : ""} agregada${total > 1 ? "s" : ""}`);
+  toast(`${total} pieza${total > 1 ? "s" : ""} agregada${total > 1 ? "s" : ""} a la lista`);
+  $("#items", F._ov).scrollIntoView({behavior:"smooth", block:"start"});
 }
 function renderItems(){
-  const box = $("#items", F._ov);
-  if (!F.items.length) { box.innerHTML = `<div class="empty" style="padding:14px">Todavía no hay prendas. Usa el selector de arriba.</div>`; return; }
+  const box = $("#items", F._ov), n = F.items.reduce((s, i) => s + (Number(i.cant) || 1), 0);
+  $("#itcount", F._ov).textContent = n ? `${n} pieza${n > 1 ? "s" : ""}` : "";
+  if (!F.items.length) { box.innerHTML = `<div class="empty" style="padding:14px">Todavía no hay prendas en la lista.</div>`; return; }
   box.innerHTML = F.items.map((i, n) => `<div class="irow" data-i="${n}">
-      <div class="desc">${esc(i.prenda)} ${esc(i.color)} <span class="tz">${esc(i.talla)}</span><small>${esc(i.horma || "")}${i.cant > 1 ? ` · <button type="button" class="lk" data-split="${n}">poner un nombre a cada una</button>` : ""}</small></div>
+      <div class="desc">${esc(i.prenda)} ${esc(i.color)} <span class="tz">${esc(i.talla)}</span><small>${esc(i.horma || "")}${i.cant > 1 ? `${i.horma ? " · " : ""}<button type="button" class="lk" data-split="${n}">nombre a cada una</button>` : ""}</small></div>
       <div class="stepper"><button type="button" data-q="-1">−</button><span>${i.cant}</span><button type="button" data-q="1">+</button></div>
-      <input class="inp nmf" data-fld="nombre" placeholder="Nombre (opcional)" value="${esc(i.nombre || "")}">
-      <input class="inp nuf" data-fld="numero" placeholder="N°" value="${esc(i.numero || "")}">
+      ${i.cant === 1 ? `<input class="inp nmf" data-fld="nombre" placeholder="Nombre" value="${esc(i.nombre || "")}">
+      <input class="inp nuf" data-fld="numero" placeholder="N°" value="${esc(i.numero || "")}">` : `<span class="nmf"></span><span class="nuf"></span>`}
       <button type="button" class="ib2" data-del title="Quitar">${I("trash")}</button>
-    </div>`).join("") + `<p class="note" style="padding-top:8px">Así se verá: <b style="color:var(--ink)">${esc(itemLine(F.items.find(i => i.nombre) || F.items[0]))}</b></p>`;
+    </div>`).join("");
   box.onclick = e => {
     const row = e.target.closest("[data-i]"); if (!row) return;
     const n = Number(row.dataset.i), it = F.items[n], t = e.target.closest("button");
@@ -1233,7 +1405,7 @@ function renderItems(){
 function renderTotals(){
   const t = totales(F), ab = num(F.abono);
   $("#totals", F._ov).innerHTML = `<div class="tot"><small>Piezas</small><b class="num">${t.piezas}</b></div><div class="tot"><small>Total</small><b class="num">${esc(money(t.total, F.moneda))}</b></div><div class="tot"><small>Saldo</small><b class="num" style="color:${t.saldo > 0 ? "var(--err)" : "var(--ok)"}">${esc(money(t.saldo, F.moneda))}</b></div>`;
-  const m = $("#f-abono .msg", F._ov);
+  const m = $("#pago-msg", F._ov);
   if (ab > t.total && t.total > 0) { m.className = "msg warn"; m.textContent = "⚠ El abono es mayor que el total"; } else m.textContent = "";
 }
 function renderImgs(){
@@ -1256,25 +1428,23 @@ async function addFiles(files){
   }
 }
 async function saveForm(ov, orig){
-  const errs = [], isP = F.tipo === "personalizado";
-  const mark = (id, msg) => { const el = $("#" + id, ov); if (el) { el.classList.add("err"); const m = el.querySelector(".msg"); if (m && m.id !== "tel-msg") { m.className = "msg bad"; m.textContent = "✗ " + msg; } } errs.push(msg); };
   ov.querySelectorAll(".f.err").forEach(x => x.classList.remove("err"));
-  if ((F.cliente.nombre || "").trim().length < 3) mark("f-nombre", "Escribe el nombre del cliente");
-  const tel = F._checkTel();
-  if (!tel.ok) { $("#f-tel", ov).classList.add("err"); const m = $("#tel-msg", ov); m.className = "msg bad"; m.textContent = "✗ " + tel.msg; errs.push("WhatsApp: " + tel.msg); }
-  if (isP && !F.servicio) mark("f-servicio", "Elige el tipo de estampado");
-  if (!(isP && F.prendaDe === "cliente") && !F.tela) mark("f-tela", "Elige la tela de la prenda");
-  if (!F.items.length) mark("f-items", "Agrega al menos una prenda con su talla");
-  if (!F.fechaEntrega) mark("f-fecha", "Elige la fecha de entrega");
-  if (!(num(F.precio) > 0)) mark("f-precio", "Escribe el precio por unidad");
-  if (F.imagenes.some(i => i.subiendo)) errs.push("Espera a que terminen de subir las imágenes");
-  const sum = $("#errsum", ov);
-  if (errs.length) { sum.innerHTML = `<div class="errsum">No se puede guardar todavía. Falta completar:<ul>${errs.map(e => `<li>${esc(e)}</li>`).join("")}</ul></div>`; $(".mb", ov).scrollTo({top:0, behavior:"smooth"}); toast("Faltan datos obligatorios", true); return; }
-  sum.innerHTML = "";
+  const todos = [0, 1, 2, 3].map(i => erroresPaso(i));
+  const primero = todos.findIndex(e => e.length);
+  if (primero >= 0) {
+    PASOS.forEach((_, i) => F.visto[i] = true);
+    goStep(primero);
+    marcarErrores(todos[primero]);
+    const lista = todos.flatMap((e, i) => e.map(([, m]) => `${PASOS[i][1]}: ${m}`));
+    $("#errsum", ov).innerHTML = `<div class="errsum">No se puede guardar todavía. Falta completar:<ul>${lista.map(e => `<li>${esc(e)}</li>`).join("")}</ul></div>`;
+    toast("Faltan datos obligatorios", true);
+    return;
+  }
+  const tel = F._checkTel(), isP = F.tipo === "personalizado";
   const now = new Date().toISOString(), nombre = F.cliente.nombre.trim().replace(/\s+/g, " "), pr = perm();
   const data = {
-    cliente:{nombre, telefono:tel.e164}, tema:(F.tema || "").trim(), servicio:isP ? F.servicio : "", prendaDe:isP ? F.prendaDe : "tienda",
-    ubicacion:isP ? (F.ubicacion || []) : [], tela:F.tela || "", etiqueta:F.etiqueta || "",
+    cliente:{nombre, telefono:tel.e164}, tema:(F.tema || "").trim(), servicio:isP ? F.servicio : "", prendaDe:isP ? (F.prendaDe || "tienda") : "tienda",
+    etiqueta:F.etiqueta || "",
     items:F.items.map(i => ({prenda:i.prenda, color:i.color, horma:i.horma || "", talla:i.talla, cant:Number(i.cant) || 1, nombre:(i.nombre || "").trim(), numero:(i.numero || "").trim()})),
     fechaEntrega:F.fechaEntrega, precio:num(F.precio), moneda:F.moneda, abono:num(F.abono), urgente:!!F.urgente,
     imagenes:F.imagenes.filter(i => i.id && !i.error).map(i => i.id), nota:(F.nota || "").trim(),
@@ -1292,8 +1462,9 @@ async function saveForm(ov, orig){
       await setDoc(doc(collection(S.db, "pedidos")), data);
     }
     setDoc(doc(S.db, "clientes/" + tel.e164), {nombre, telefono:tel.e164, actualizadoEn:now}).catch(() => {});
-    S.tab = F.tipo; S.view = "pedidos";
-    ov.close(); F = null; render();
+    S.tab = F.tipo;
+    ov.close(); F = null;
+    setView("pedidos"); render();
     toast(orig ? "Cambios guardados" : "Pedido guardado");
   } catch(e) { console.warn(e); btn.disabled = false; toast("No se pudo guardar: " + (e.code === "permission-denied" ? "no tienes permiso" : "revisa tu conexión"), true); }
 }
@@ -1310,7 +1481,7 @@ function waLink(p){
 function resumenTexto(p){
   const t = totales(p);
   return [`*${TIPOS[p.tipo].label.toUpperCase()}* · ${p.codigo}${p.urgente ? " · 🔥 URGENTE" : ""}`, p.tema && `Tema: ${p.tema}`, p.servicio && `Tipo estampado: ${p.servicio}`, p.prendaDe === "cliente" && "Prenda: la trae el cliente",
-    (p.ubicacion || []).length && `Ubicación: ${p.ubicacion.join(", ")}`, p.tela && `Tela: ${p.tela}`, p.etiqueta && `Etiqueta: ${p.etiqueta}`, " ",
+    p.etiqueta && `Marca: ${p.etiqueta}`, " ",
     ...(p.items || []).map(i => `• ${i.cant > 1 ? i.cant + "× " : ""}${itemLine(i)}${i.horma ? " (" + i.horma + ")" : ""}`), " ", p.nota && `Nota: ${p.nota}`,
     `Cliente: ${p.cliente.nombre}`, `WhatsApp: ${prettyPhone(p.cliente.telefono)}`, `Entrega: ${fmtDate(p.fechaEntrega)}`,
     `Precio unidad: ${money(p.precio, p.moneda)} · Total: ${money(t.total, p.moneda)}`, `Abono: ${money(t.abono, p.moneda)} · Saldo: ${money(t.saldo, p.moneda)}`].filter(Boolean).join("\n").replace(/\n \n/g, "\n\n");
@@ -1333,8 +1504,7 @@ function openDetail(id){
       <div class="fsec"><div class="sec">${I(T.icon)}Detalles</div><dl class="kv">
         ${p.tema ? `<dt>Tema</dt><dd>${esc(p.tema)}</dd>` : ""}${p.servicio ? `<dt>Tipo de estampado</dt><dd>${esc(p.servicio)}</dd>` : ""}
         ${p.tipo === "personalizado" ? `<dt>Prenda</dt><dd>${p.prendaDe === "cliente" ? "La trae el cliente" : "La pone la tienda"}</dd>` : ""}
-        ${(p.ubicacion || []).length ? `<dt>Ubicación</dt><dd>${esc(p.ubicacion.join(", "))}</dd>` : ""}
-        <dt>Tela</dt><dd>${esc(p.tela || "—")}</dd><dt>Etiqueta</dt><dd>${esc(p.etiqueta || "—")}</dd></dl></div>
+        <dt>Marca</dt><dd>${esc(p.etiqueta || "—")}</dd></dl></div>
       <div class="fsec"><div class="sec">${I("shirt")}Prendas <small>${t.piezas} piezas</small></div>
         <ul class="il">${(p.items || []).map(i => `<li><span class="q">${i.cant}×</span><span><b>${esc(i.prenda)} ${esc(i.color)} ${esc(i.talla)}</b>${i.nombre ? ` — ${esc(i.nombre)}` : ""}${i.numero ? ` <b>#${esc(i.numero)}</b>` : ""}${i.horma ? ` <span class="note" style="display:inline">· ${esc(i.horma)}</span>` : ""}</span></li>`).join("")}</ul>
         <div class="lbl">Resumen para producción</div>${tallyTable(p)}</div>
