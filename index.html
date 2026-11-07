@@ -419,6 +419,40 @@ table.mx{border-collapse:collapse;width:100%;font-size:13px}
 @keyframes okin{from{transform:scale(.4);opacity:0}to{transform:scale(1);opacity:1}}
 
 .appver{margin:8px 0 0;text-align:center;font-size:11px;font-weight:600;color:var(--muted);opacity:.8}
+/* botones que abren la ventana de opciones (v2.11) */
+.pbtn{display:flex;align-items:center;gap:7px;min-width:0;width:100%;height:42px;border:1px solid var(--line);background:var(--surface);border-radius:10px;padding:0 10px;font-weight:600;font-size:14px;color:var(--muted);text-align:left}
+.pbtn span{flex:1;min-width:0;white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
+.pbtn svg.i{width:16px;height:16px;color:var(--muted);flex:none}
+.pbtn.on{color:var(--ink);font-weight:700}
+.pbtn:hover{border-color:var(--ink)}
+.pbtn.big{height:48px;background:var(--surface-2);font-size:15px;padding:0 14px}
+.pbtn .sw0{width:20px;height:20px;border-radius:50%;border:1px solid #0002;flex:none}
+#f-marca.err .pbtn,.pbtn.bad{border-color:var(--err)!important;background:color-mix(in srgb,var(--err) 6%,var(--surface))!important}
+.irow3{background:color-mix(in srgb,var(--surface-2) 55%,var(--surface));border:0;padding:4px 2px 8px;border-radius:12px}
+.irow3 .r2 .pbtn{width:90px;flex:none}
+.irow3 .nm{height:42px}
+.irow3 .qty{height:42px}
+.irow3 .qty button{width:40px}
+.irow3 .qty span{min-width:34px}
+/* ventana de opciones */
+.ov.pick .md{max-width:560px}
+.pksec{font-size:11px;font-weight:800;letter-spacing:.1em;text-transform:uppercase;color:var(--muted);margin-top:4px}
+.pkgrid{display:grid;gap:8px}
+.pkgrid.text{grid-template-columns:repeat(auto-fill,minmax(130px,1fr))}
+.pkgrid.talla{grid-template-columns:repeat(auto-fill,minmax(64px,1fr))}
+.pkgrid.color{grid-template-columns:repeat(4,minmax(0,1fr))}
+.pk{min-height:50px;border:1px solid var(--line);background:var(--surface);border-radius:12px;font-weight:800;font-size:14px;color:var(--ink);padding:8px 10px;box-shadow:0 1px 2px rgba(16,24,40,.04)}
+.pk.sz{min-height:50px;font-size:15px}
+.pk:hover,.pkc:hover{border-color:var(--ink)}
+.pk[aria-pressed="true"]{background:var(--accent);border-color:var(--accent);color:var(--accent-ink)}
+.pkc{display:flex;flex-direction:column;align-items:center;justify-content:center;gap:8px;min-height:92px;border:1px solid var(--line);background:var(--surface);border-radius:12px;padding:10px 4px;font-weight:800;font-size:12.5px;color:var(--ink);line-height:1.15;text-align:center;box-shadow:0 1px 2px rgba(16,24,40,.04)}
+.pkc i{width:30px;height:30px;border-radius:50%;border:1px solid #0002;display:block}
+.pkc[aria-pressed="true"]{border-color:var(--accent);box-shadow:0 0 0 2px var(--accent) inset;background:var(--accent-soft)}
+.pk.otro{width:100%;color:var(--muted)}
+.pkc.otro{width:calc(25% - 6px)}
+.pkotro{display:flex;gap:8px}
+.pkotro[hidden]{display:none}
+
 @media (max-width:1000px){
   .cols{grid-template-columns:minmax(0,1fr)}
   .tipotabs{display:flex}
@@ -474,6 +508,7 @@ table.mx{border-collapse:collapse;width:100%;font-size:13px}
   .m-tabs{display:grid;grid-template-columns:1fr 1fr;width:100%}
   .m-tabs button{padding:9px}
   .irow3 .tl{width:82px}
+  .ov.popup.pick .md{max-height:86%}
   .ov{padding:0}
   .md{border-radius:0;height:100%;max-width:none;border:0}
   .mh,.mf{border-radius:0}
@@ -497,7 +532,7 @@ import { initializeApp, deleteApp } from "https://www.gstatic.com/firebasejs/10.
 import { getAuth, onAuthStateChanged, signInWithEmailAndPassword, createUserWithEmailAndPassword, signOut, updatePassword, reauthenticateWithCredential, EmailAuthProvider } from "https://www.gstatic.com/firebasejs/10.12.2/firebase-auth.js";
 import { initializeFirestore, getFirestore, persistentLocalCache, persistentMultipleTabManager, doc, collection, query, where, onSnapshot, getDoc, setDoc, updateDoc, deleteDoc, writeBatch } from "https://www.gstatic.com/firebasejs/10.12.2/firebase-firestore.js";
 
-const VERSION = "v2.10";
+const VERSION = "v2.11";
 /* ================= Utilidades ================= */
 const $ = (s, r = document) => r.querySelector(s);
 const esc = s => String(s ?? "").replace(/[&<>"']/g, c => ({"&":"&amp;","<":"&lt;",">":"&gt;",'"':"&quot;","'":"&#39;"}[c]));
@@ -522,6 +557,7 @@ function money(v, mon){
 function toast(msg, bad){ document.querySelectorAll(".toast").forEach(x => x.remove()); const t = document.createElement("div"); t.className = "toast" + (bad ? " bad" : ""); t.textContent = msg; document.body.appendChild(t); setTimeout(() => t.remove(), bad ? 4500 : 2500); }
 const P = {
   home:'<path d="M3 10.5 12 3l9 7.5V20a1 1 0 0 1-1 1h-5v-6H9v6H4a1 1 0 0 1-1-1z"/>',
+  chev:'<path d="m6 9 6 6 6-6"/>',
   list:'<path d="M9 5h11M9 12h11M9 19h11M4 5h.01M4 12h.01M4 19h.01"/>',
   bell:'<path d="M6 8a6 6 0 1 1 12 0c0 7 3 9 3 9H3s3-2 3-9"/><path d="M10.3 21a1.94 1.94 0 0 0 3.4 0"/>',
   users:'<path d="M16 21v-2a4 4 0 0 0-4-4H6a4 4 0 0 0-4 4v2"/><circle cx="9" cy="7" r="4"/><path d="M22 21v-2a4 4 0 0 0-3-3.87M16 3.13a4 4 0 0 1 0 7.75"/>',
@@ -1178,7 +1214,7 @@ function overlay(el){
 /* ================= Modales ================= */
 function modal(html, size, keep){
   const ov = document.createElement("div");
-  ov.className = "ov" + (/\bpop\b/.test(size || "") ? " popup" : "");
+  ov.className = "ov" + (/\bpop\b/.test(size || "") ? " popup" : "") + (/\bpick\b/.test(size || "") ? " pick" : "");
   ov.innerHTML = `<div class="md ${size || ""}">${html}</div>`;
   overlay(ov);
   ov.addEventListener("click", e => { if (e.target.closest("[data-close]")) ov.close(); else if (e.target === ov && !keep) ov.close(); });
@@ -1306,7 +1342,7 @@ function openForm(id, tipo, cliente){
       </section>
 
       <section class="step" data-step="1" hidden>
-        <div class="fsec"><div class="f" id="f-marca"><select class="inp" id="in-etiq" aria-label="Marca"><option value="">Elegir marca</option>${marcas.map(t => `<option ${F.etiqueta === t ? "selected" : ""}>${esc(t)}</option>`).join("")}</select><span class="msg"></span></div></div>
+        <div class="fsec"><div class="f" id="f-marca"><button type="button" class="pbtn big ${F.etiqueta ? "on" : ""}" id="in-etiq"><span>${esc(F.etiqueta || "Elegir marca")}</span>${I("chev")}</button><span class="msg"></span></div></div>
         <div class="fsec"><div class="f" id="f-items"><span id="itcount" hidden></span><div class="itemsbox" id="items"></div><span class="msg"></span></div></div>
       </section>
 
@@ -1395,7 +1431,7 @@ function openForm(id, tipo, cliente){
   F._checkTel = () => parsePhone(inTel.value, inPais.value);
 
   $("#in-tema", ov).oninput = e => { F.tema = e.target.value; clearErr("f-tema"); };
-  $("#in-etiq", ov).onchange = e => { F.etiqueta = e.target.value; clearErr("f-marca"); };
+  $("#in-etiq", ov).onclick = elegirMarca;
   $("#in-nota", ov).oninput = e => F.nota = e.target.value;
   $("#in-mon", ov).onchange = e => { F.moneda = e.target.value; renderTotals(); };
   $("#in-precio", ov).oninput = e => { F.precio = e.target.value; clearErr("f-precio"); renderTotals(); };
@@ -1476,65 +1512,80 @@ function pasoOK(i, mostrar){
 }
 function clearErr(id){ const el = F && F._ov && $("#" + id, F._ov); if (!el) return; el.classList.remove("err"); const m = el.querySelector(".msg"); if (m && m.classList.contains("bad") && m.id !== "tel-msg") { m.textContent = ""; m.className = "msg"; } }
 
-/* ---- Lista del pedido: cada fila se arma con listas desplegables ---- */
+/* ---- Ventana de selección con opciones visuales ---- */
+function pickPopup({title, kind, options, sections, current, otro, onPick}){
+  // kind: "text" | "color" | "talla"
+  const btn = o => kind === "color"
+    ? `<button type="button" class="pkc" data-v="${esc(o.v)}" aria-pressed="${o.v === current}"><i style="${swatchStyle(o.h)}"></i><span>${esc(o.v)}</span></button>`
+    : `<button type="button" class="pk ${kind === "talla" ? "sz" : ""}" data-v="${esc(o.v)}" aria-pressed="${o.v === current}">${esc(o.label || o.v)}</button>`;
+  const grid = list => `<div class="pkgrid ${kind}">${list.map(btn).join("")}</div>`;
+  const cuerpo = sections ? sections.map(s => `<div class="pksec">${esc(s.title)}</div>${grid(s.options)}`).join("") : grid(options);
+  const pop = modal(`<div class="mh"><h2>${esc(title)}</h2><button class="ib" data-close>${I("x")}</button></div>
+    <div class="mb">${cuerpo}
+      ${otro ? `<button type="button" class="${kind === "color" ? "pkc" : "pk"} otro" id="pkOtro">${kind === "color" ? `<i style="${swatchStyle("")}"></i><span>Otro</span>` : "Otro…"}</button>
+      <div class="pkotro" id="pkOtroBox" hidden><input class="inp" id="pkOtroIn" placeholder="Escribe cuál"><button type="button" class="btn primary" id="pkOtroOk">Usar</button></div>` : ""}
+    </div>`, "sm pop pick");
+  pop.querySelector(".mb").onclick = e => {
+    const b = e.target.closest("[data-v]"); if (b) { pop.close(); onPick(b.dataset.v); return; }
+    if (e.target.closest("#pkOtro")) { $("#pkOtroBox", pop).hidden = false; $("#pkOtro", pop).hidden = true; $("#pkOtroIn", pop).focus(); }
+  };
+  if (otro) {
+    const ok = () => { const v = $("#pkOtroIn", pop).value.trim(); if (!v) return; pop.close(); onPick(v); };
+    $("#pkOtroOk", pop).onclick = ok;
+    $("#pkOtroIn", pop).onkeydown = e => { if (e.key === "Enter") { e.preventDefault(); ok(); } };
+  }
+}
+
+/* ---- Lista del pedido: cada fila con botones que abren la ventana de opciones ---- */
 const blankItem = prev => ({prenda: prev ? prev.prenda : "", color: prev ? prev.color : "", horma: prev ? prev.horma : "", talla:"", cant:1, nombre:"", numero:""});
 const itemVacio = i => !i.prenda && !i.color && !i.talla;
-function selOpts(list, cur, ph, otro){
-  const has = !cur || list.includes(cur);
-  return `<option value="">${ph}</option>${list.map(v => `<option ${v === cur ? "selected" : ""}>${esc(v)}</option>`).join("")}${!has ? `<option selected>${esc(cur)}</option>` : ""}${otro ? `<option value="__otro">Otro…</option>` : ""}`;
-}
 function renderItems(){
-  const ov = F._ov, c = cfg().cat, isP = F.tipo === "personalizado";
-  const prendas = (isP ? c.prendasPers : c.prendasSub).filter(p => p !== "Otro");
-  const colores = c.colores.filter(x => isP ? x[1] !== "full" : true);
+  const ov = F._ov, c = cfg().cat;
   const box = $("#items", ov), n = F.items.filter(i => !itemVacio(i)).reduce((s, i) => s + (Number(i.cant) || 1), 0);
   $("#itcount", ov).textContent = n ? `${n} pieza${n > 1 ? "s" : ""}` : "";
-  const tallaOpts = cur => { const all = [...c.tallasAdulto, ...c.tallasNino]; return `<option value="">Talla</option><optgroup label="Adulto">${c.tallasAdulto.map(t => `<option ${t === cur ? "selected" : ""}>${esc(t)}</option>`).join("")}</optgroup><optgroup label="Niño">${c.tallasNino.map(t => `<option ${t === cur ? "selected" : ""}>${esc(t)}</option>`).join("")}</optgroup>${cur && !all.includes(cur) ? `<option selected>${esc(cur)}</option>` : ""}`; };
-  box.innerHTML = F.items.map((it, i) => {
-    const hex = (colores.find(x => x[0] === it.color) || [])[1];
-    const campo = (fld, html) => it["_otro_" + fld]
-      ? `<div class="isel-o" data-err="${fld}"><input class="inp" data-otro="${fld}" placeholder="¿Cuál ${fld === "prenda" ? "prenda" : "color"}?" value="${esc(it[fld])}"><button type="button" class="ib2" data-cancelotro="${fld}" title="Volver a la lista">${I("x")}</button></div>`
-      : html;
-    return `<div class="irow3" data-i="${i}">
+  const hexOf = name => (c.colores.find(x => x[0] === name) || [])[1] || "";
+  const pb = (f, val, ph, extra = "") => `<button type="button" class="pbtn ${val ? "on" : ""}" data-pick="${f}" data-err="${f}">${extra}<span>${esc(val || ph)}</span>${I("chev")}</button>`;
+  box.innerHTML = F.items.map((it, i) => `<div class="irow3" data-i="${i}">
       <div class="r1">
-        ${campo("prenda", `<select class="inp" data-fld="prenda" data-err="prenda">${selOpts(prendas, it.prenda, isP ? "Prenda" : "Producto", true)}</select>`)}
-        ${campo("color", `<div class="csel" data-err="color"><i style="${swatchStyle(hex || "")}"></i><select class="inp" data-fld="color">${selOpts(colores.map(x => x[0]), it.color, "Color", true)}</select></div>`)}
-        <select class="inp" data-fld="horma">${selOpts(c.hormas, it.horma, "Horma")}</select>
+        ${pb("prenda", it.prenda, F.tipo === "personalizado" ? "Prenda" : "Producto")}
+        ${pb("color", it.color, "Color", `<i class="sw0" style="${swatchStyle(hexOf(it.color))}"></i>`)}
+        ${pb("horma", it.horma, "Horma")}
       </div>
       <div class="r2">
-        <select class="inp tl" data-fld="talla" data-err="talla">${tallaOpts(it.talla)}</select>
-        ${it.cant === 1 ? `<input class="inp nm" data-fld="nombre" placeholder="Nombre" value="${esc(it.nombre || "")}"><input class="inp nu" data-fld="numero" placeholder="N°" value="${esc(it.numero || "")}">`
-          : `<button type="button" class="lk nmlink" data-split="${i}">Nombre a cada una</button>`}
+        ${it.cant === 1 ? `<input class="inp nm" data-fld="nombre" placeholder="Nombre" value="${esc(it.nombre || "")}">` : `<button type="button" class="lk nmlink" data-split="${i}">Nombre a cada una</button>`}
+        ${pb("talla", it.talla, "Talla")}
         <div class="qty">${it.cant === 1 ? `<button type="button" class="del" data-del title="Quitar">${I("trash")}</button>` : `<button type="button" data-q="-1">−</button>`}<span>${it.cant}</span><button type="button" data-q="1">+</button></div>
       </div>
-    </div>`;
-  }).join("") + `<button type="button" class="addrow" id="addItem">${I("plus")}Agregar otra prenda</button>`;
+    </div>`).join("") + `<button type="button" class="addrow" id="addItem">${I("plus")}Agregar otra prenda</button>`;
   box.onclick = e => {
-    if (e.target.closest("#addItem")) { const prev = [...F.items].reverse().find(x => !itemVacio(x)); F.items.push(blankItem(prev)); renderItems(); const rows = box.querySelectorAll(".irow3"); const last = rows[rows.length - 1]; last.scrollIntoView({behavior:"smooth", block:"center"}); const t = last.querySelector('[data-fld="talla"]'); setTimeout(() => (prev ? t : last.querySelector("select")).focus(), 250); return; }
+    if (e.target.closest("#addItem")) { const prev = [...F.items].reverse().find(x => !itemVacio(x)); F.items.push(blankItem(prev)); renderItems(); const rows = box.querySelectorAll(".irow3"); rows[rows.length - 1].scrollIntoView({behavior:"smooth", block:"center"}); return; }
     const row = e.target.closest("[data-i]"); if (!row) return;
     const n = Number(row.dataset.i), it = F.items[n], t = e.target.closest("button"); if (!t) return;
+    if (t.dataset.pick) return elegir(it, t.dataset.pick);
     if (t.dataset.q) { it.cant = Math.max(1, it.cant + Number(t.dataset.q)); if (it.cant > 1) { it.nombre = ""; it.numero = ""; } renderItems(); renderTotals(); }
     if (t.hasAttribute("data-del")) { F.items.splice(n, 1); if (!F.items.length) F.items.push(blankItem()); renderItems(); renderTotals(); }
     if (t.dataset.split !== undefined) { const cp = Array.from({length:it.cant}, () => Object.assign({}, it, {cant:1, nombre:"", numero:""})); F.items.splice(n, 1, ...cp); renderItems(); renderTotals(); }
-    if (t.dataset.cancelotro) { const f = t.dataset.cancelotro; it["_otro_" + f] = false; it[f] = ""; renderItems(); }
   };
-  box.onchange = e => {
-    const row = e.target.closest("[data-i]"); if (!row) return;
-    const it = F.items[Number(row.dataset.i)], f = e.target.dataset.fld; if (!f) return;
-    if (e.target.value === "__otro") { it["_otro_" + f] = true; it[f] = ""; renderItems(); box.querySelector(`[data-i="${row.dataset.i}"] [data-otro="${f}"]`)?.focus(); return; }
-    it[f] = e.target.value;
-    e.target.closest("[data-err]")?.classList.remove("bad");
-    if (f === "color") renderItems();
-    clearErr("f-items"); renderTotals();
-    const cnt = F.items.filter(i => !itemVacio(i)).reduce((s, i) => s + (Number(i.cant) || 1), 0);
-    $("#itcount", F._ov).textContent = cnt ? `${cnt} pieza${cnt > 1 ? "s" : ""}` : "";
-  };
-  box.oninput = e => {
-    const row = e.target.closest("[data-i]"); if (!row) return;
-    const it = F.items[Number(row.dataset.i)];
-    if (e.target.dataset.otro) { it[e.target.dataset.otro] = e.target.value; e.target.closest("[data-err]")?.classList.remove("bad"); return; }
-    if (e.target.dataset.fld === "nombre" || e.target.dataset.fld === "numero") it[e.target.dataset.fld] = e.target.value;
-  };
+  box.oninput = e => { const row = e.target.closest("[data-i]"); if (row && e.target.dataset.fld === "nombre") F.items[Number(row.dataset.i)].nombre = e.target.value; };
+}
+function elegir(it, f){
+  const c = cfg().cat, isP = F.tipo === "personalizado";
+  const set = v => { it[f] = v; clearErr("f-items"); renderItems(); renderTotals(); };
+  if (f === "prenda") pickPopup({title: isP ? "Prenda" : "Producto", kind:"text", current:it.prenda, otro:true, onPick:set,
+    options:(isP ? c.prendasPers : c.prendasSub).filter(p => p !== "Otro").map(v => ({v}))});
+  if (f === "color") pickPopup({title:"Color", kind:"color", current:it.color, otro:true, onPick:set,
+    options:c.colores.filter(x => isP ? x[1] !== "full" : true).map(([v, h]) => ({v, h}))});
+  if (f === "horma") pickPopup({title:"Horma", kind:"text", current:it.horma, onPick:v => set(v === "__none" ? "" : v),
+    options:[...c.hormas.map(v => ({v})), {v:"__none", label:"Sin horma"}]});
+  if (f === "talla") pickPopup({title:"Talla", kind:"talla", current:it.talla, onPick:set,
+    sections:[{title:"Niño", options:c.tallasNino.map(v => ({v}))}, {title:"Adulto", options:c.tallasAdulto.map(v => ({v}))}]});
+}
+function elegirMarca(){
+  const c = cfg().cat;
+  pickPopup({title:"Marca", kind:"text", current:F.etiqueta, options:c.marcas.map(v => ({v})), onPick:v => {
+    F.etiqueta = v; clearErr("f-marca");
+    const b = $("#in-etiq", F._ov); b.classList.add("on"); b.querySelector("span").textContent = v;
+  }});
 }
 function marcarFilas(){
   const box = $("#items", F._ov);
