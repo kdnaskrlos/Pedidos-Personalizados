@@ -433,6 +433,10 @@ table.mx{border-collapse:collapse;width:100%;font-size:13px}
   .thalf b{font-size:21px}
   .ov.popup{padding:16px;align-items:center}
   .ov.popup .md{height:auto;max-height:100%;border-radius:16px;border:1px solid var(--line)}
+  .toolbar .seg{display:grid;grid-template-columns:repeat(5,minmax(0,1fr));width:100%}
+  .toolbar .seg button{padding:8px 2px;font-size:11.5px;white-space:nowrap;border-left:0}
+  .toolbar .seg button+button{border-left:1px solid var(--line)}
+  .toolbar .search{min-width:0;max-width:none;width:100%}
   .ov{padding:0}
   .md{border-radius:0;height:100%;max-width:none;border:0}
   .mh,.mf{border-radius:0}
@@ -456,7 +460,7 @@ import { initializeApp, deleteApp } from "https://www.gstatic.com/firebasejs/10.
 import { getAuth, onAuthStateChanged, signInWithEmailAndPassword, createUserWithEmailAndPassword, signOut, updatePassword, reauthenticateWithCredential, EmailAuthProvider } from "https://www.gstatic.com/firebasejs/10.12.2/firebase-auth.js";
 import { initializeFirestore, getFirestore, persistentLocalCache, persistentMultipleTabManager, doc, collection, query, where, onSnapshot, getDoc, setDoc, updateDoc, deleteDoc, writeBatch } from "https://www.gstatic.com/firebasejs/10.12.2/firebase-firestore.js";
 
-const VERSION = "v2.7";
+const VERSION = "v2.8";
 /* ================= Utilidades ================= */
 const $ = (s, r = document) => r.querySelector(s);
 const esc = s => String(s ?? "").replace(/[&<>"']/g, c => ({"&":"&amp;","<":"&lt;",">":"&gt;",'"':"&quot;","'":"&#39;"}[c]));
@@ -480,6 +484,7 @@ function money(v, mon){
 }
 function toast(msg, bad){ document.querySelectorAll(".toast").forEach(x => x.remove()); const t = document.createElement("div"); t.className = "toast" + (bad ? " bad" : ""); t.textContent = msg; document.body.appendChild(t); setTimeout(() => t.remove(), bad ? 4500 : 2500); }
 const P = {
+  home:'<path d="M3 10.5 12 3l9 7.5V20a1 1 0 0 1-1 1h-5v-6H9v6H4a1 1 0 0 1-1-1z"/>',
   list:'<path d="M9 5h11M9 12h11M9 19h11M4 5h.01M4 12h.01M4 19h.01"/>',
   bell:'<path d="M6 8a6 6 0 1 1 12 0c0 7 3 9 3 9H3s3-2 3-9"/><path d="M10.3 21a1.94 1.94 0 0 0 3.4 0"/>',
   users:'<path d="M16 21v-2a4 4 0 0 0-4-4H6a4 4 0 0 0-4 4v2"/><circle cx="9" cy="7" r="4"/><path d="M22 21v-2a4 4 0 0 0-3-3.87M16 3.13a4 4 0 0 1 0 7.75"/>',
@@ -579,7 +584,7 @@ const S = {
   app:null, auth:null, db:null,
   sistema:undefined, me:null, uid:null,
   pedidos:{}, clientes:{}, usuarios:{}, cfgRaw:null,
-  online:navigator.onLine, view:"pedidos", tab:"personalizado", filtro:"pendientes", q:"",
+  online:navigator.onLine, view:"resumen", tab:"personalizado", filtro:"pendientes", q:"",
   unsubs:[], installEvt:null
 };
 const cfg = () => {
@@ -614,7 +619,7 @@ function boot(){
   try { S.db = initializeFirestore(S.app, {localCache: persistentLocalCache({tabManager: persistentMultipleTabManager()})}); }
   catch(e) { S.db = getFirestore(S.app); }
   onSnapshot(doc(S.db, "sistema/estado"), s => { S.sistema = s.exists() ? s.data() : null; route(); }, e => { console.warn(e); gateMsg("alert", "No se pudo conectar", "Revisa tu conexión a internet. Si eres el administrador, verifica que publicaste las reglas de Firestore (GUIA.md, paso 4)."); });
-  onAuthStateChanged(S.auth, u => { stopSubs(); S.view = "pedidos"; S.viewPushed = false; S.q = ""; S.filtro = "pendientes"; S.uid = u ? u.uid : null; S.me = null; if (u) startMe(); route(); });
+  onAuthStateChanged(S.auth, u => { stopSubs(); S.view = "resumen"; S.viewPushed = false; S.q = ""; S.filtro = "pendientes"; S.uid = u ? u.uid : null; S.me = null; if (u) startMe(); route(); });
   addEventListener("online", () => { S.online = true; render(); });
   addEventListener("offline", () => { S.online = false; render(); });
   addEventListener("beforeinstallprompt", e => { e.preventDefault(); S.installEvt = e; render(); });
@@ -763,10 +768,10 @@ function doRender(){
   $("#app").innerHTML = `
   <aside class="side">
     <div class="logo">${I("shirt")}</div>
-    ${nav("pedidos","list","Pedidos")}
+    ${nav("resumen","home","Resumen")}
     <button class="nav new" data-act="nuevo"><span class="ring">${I("plus")}</span>Nuevo</button>
     ${nav("avisos","bell","Avisos", nAv)}
-    ${nav("clientes","users","Clientes")}
+    ${nav("pedidos","list","Pedidos")}
     ${pr.admin ? nav("equipo","shield","Equipo") + nav("ajustes","sliders","Ajustes") : ""}
     <div class="grow"></div>
     <button class="theme" id="themeBtn" title="Cambiar tema">${I("sun","sun")}${I("moon","moon")}</button>
@@ -781,7 +786,7 @@ function doRender(){
       <button class="pill" id="meBtn">${I("user")}${esc(S.me.nombre || S.me.usuario)}${pr.admin ? " · Admin" : ""}</button>
     </div>
     <main class="main">
-      ${S.view === "avisos" ? viewAvisos(a) : S.view === "clientes" ? viewClientes() : S.view === "equipo" && pr.admin ? viewEquipo() : S.view === "ajustes" && pr.admin ? viewAjustes() : viewPedidos(a, pr)}
+      ${S.view === "avisos" ? viewAvisos(a) : S.view === "pedidos" ? viewPedidos(a, pr) : S.view === "equipo" && pr.admin ? viewEquipo() : S.view === "ajustes" && pr.admin ? viewAjustes() : viewResumen(a, pr)}
     </main>
   </div>`;
   scrollTo(0, sc);
@@ -808,12 +813,26 @@ function filtrar(tipo){
   l.sort((a, b) => f === "entregados" ? String(b.entregadoEn || "").localeCompare(a.entregadoEn || "") : key(a).localeCompare(key(b)));
   return l;
 }
+function viewResumen(a, pr){
+  const d = new Date(), h = d.getHours();
+  const tipos = ["personalizado","sublimacion"].filter(t => pr.ver[t]);
+  const tile = (c, ic, lb, v, sub, act) => `<button class="tile tint" style="--c:${c}" data-tile="${act}"><span class="bg">${I(ic)}</span><span class="lb"><span class="chip sm">${I(ic)}</span>${lb}</span><span class="v num">${v}</span><span class="sub">${sub}</span></button>`;
+  const pendTipo = t => pedidosList().filter(p => p.tipo === t && (p.estado || "pendiente") === "pendiente").length;
+  return `
+    <div class="hello"><h1>${h < 12 ? "Buenos días" : h < 19 ? "Buenas tardes" : "Buenas noches"}, <span>${esc((S.me.nombre || S.me.usuario).split(" ")[0])}</span></h1><span class="date">${I("cal")}${DIAS[d.getDay()]} ${d.getDate()} de ${MESES[d.getMonth()]} ${d.getFullYear()}</span></div>
+    <div class="tiles">
+      ${tile("var(--accent)","box","Pendientes", a.pend.length, "por producir", "pendientes")}
+      ${tile("var(--warn)","clock","Entregas pronto", a.proximos.length, `próximos ${cfg().dias} días`, "avisos")}
+      ${tile("var(--err)","alert","Vencidos", a.vencidos.length, a.vencidos.length ? "revisar hoy" : "todo al día", "avisos")}
+      ${tile("var(--t-info)","msg","Por avisar", a.avisar.length, "clientes con pedido listo", "avisar")}
+    </div>
+    ${tipos.length ? `<div class="sec">${I("list")}Pendientes por tipo</div>
+    <div class="tiles">${tipos.map(t => tile(TIPOS[t].c, TIPOS[t].icon, TIPOS[t].label, pendTipo(t), "ver pedidos", "tipo-" + t)).join("")}</div>` : ""}`;
+}
 function viewPedidos(a, pr){
   const tipos = ["personalizado","sublimacion"].filter(t => pr.ver[t]);
   if (!tipos.length) return `<div class="card"><p class="note">Todavía no tienes permiso para ver pedidos. Pídeselo al administrador.</p></div>`;
   if (!tipos.includes(S.tab)) S.tab = tipos[0];
-  const d = new Date(), h = d.getHours();
-  const tile = (c, ic, lb, v, sub, act) => `<button class="tile tint" style="--c:${c}" data-tile="${act}"><span class="bg">${I(ic)}</span><span class="lb"><span class="chip sm">${I(ic)}</span>${lb}</span><span class="v num">${v}</span><span class="sub">${sub}</span></button>`;
   const fl = [["pendientes","Pendientes"],["avisar","Por avisar"],["listos","Listos"],["entregados","Entregados"],["todos","Todos"]];
   const col = t => {
     const l = filtrar(t), T = TIPOS[t];
@@ -823,13 +842,7 @@ function viewPedidos(a, pr){
     </section>`;
   };
   return `
-    <div class="hello"><h1>${h < 12 ? "Buenos días" : h < 19 ? "Buenas tardes" : "Buenas noches"}, <span>${esc((S.me.nombre || S.me.usuario).split(" ")[0])}</span></h1><span class="date">${I("cal")}${DIAS[d.getDay()]} ${d.getDate()} de ${MESES[d.getMonth()]} ${d.getFullYear()}</span></div>
-    <div class="tiles">
-      ${tile("var(--accent)","box","Pendientes", a.pend.length, "por producir", "pendientes")}
-      ${tile("var(--warn)","clock","Entregas pronto", a.proximos.length, `próximos ${cfg().dias} días`, "avisos")}
-      ${tile("var(--err)","alert","Vencidos", a.vencidos.length, a.vencidos.length ? "revisar hoy" : "todo al día", "avisos")}
-      ${tile("var(--t-info)","msg","Por avisar", a.avisar.length, "clientes con pedido listo", "avisar")}
-    </div>
+    <div class="hello"><h1>Pedidos</h1><span class="date">${I("list")}${pedidosList().length} pedido${pedidosList().length === 1 ? "" : "s"} en total</span></div>
     <div class="toolbar">
       <label class="search">${I("search")}<input id="q" placeholder="Buscar cliente, código o nombre en la prenda…" value="${esc(S.q)}" autocomplete="off"></label>
       <div class="seg">${fl.map(([k, t]) => `<button data-filtro="${k}" aria-pressed="${S.filtro === k}">${t}</button>`).join("")}</div>
@@ -906,21 +919,6 @@ function notifyIfNeeded(a){
   } catch(e) {}
 }
 
-/* ---------- Clientes ---------- */
-function viewClientes(){
-  const by = {};
-  pedidosList().forEach(p => { const t = p.cliente && p.cliente.telefono; if (t) (by[t] = by[t] || []).push(p); });
-  let l = Object.keys(by).map(t => ({t, nombre:(S.clientes[t] && S.clientes[t].nombre) || by[t][0].cliente.nombre, peds:by[t]}));
-  if (S.q) { const q = norm(S.q), qd = S.q.replace(/\D/g, ""); l = l.filter(c => norm(c.nombre).includes(q) || (qd && c.t.includes(qd))); }
-  l.sort((a, b) => a.nombre.localeCompare(b.nombre));
-  return `<div class="hello"><h1>Clientes</h1><span class="date">${I("users")}${l.length} con pedidos visibles para ti</span></div>
-    <div class="card">
-      <p class="note">Se registran solos al guardar un pedido. En un pedido nuevo, al escribir el nombre, la app sugiere el número que ya está guardado.</p>
-      <label class="search" style="max-width:none">${I("search")}<input id="q" placeholder="Buscar cliente o número" value="${esc(S.q)}" autocomplete="off"></label>
-      <div>${l.length ? l.map(c => { const pe = c.peds.filter(p => (p.estado || "pendiente") === "pendiente").length; return `<div class="urow"><span class="av" style="--c:var(--accent)">${esc(c.nombre.slice(0,1).toUpperCase())}</span><div class="nm">${esc(c.nombre)}<small>${esc(prettyPhone(c.t))} · ${c.peds.length} pedido${c.peds.length > 1 ? "s" : ""}${pe ? ` · ${pe} pendiente${pe > 1 ? "s" : ""}` : ""}</small></div><a class="btn wa sm" href="https://wa.me/${esc(c.t)}" target="_blank" rel="noopener">${I("msg")}WhatsApp</a><button class="btn sm" data-buscar="${esc(c.t)}">${I("list")}Pedidos</button><button class="btn sm" data-nc="${esc(c.t)}">${I("plus")}Pedido</button></div>`; }).join("") : `<div class="empty">Aún no hay clientes.</div>`}</div>
-    </div>`;
-}
-
 /* ---------- Equipo (admin) ---------- */
 function viewEquipo(){
   const us = Object.entries(S.usuarios).sort((a, b) => (a[1].rol === "admin" ? -1 : 1) - (b[1].rol === "admin" ? -1 : 1) || String(a[1].nombre).localeCompare(b[1].nombre));
@@ -967,7 +965,7 @@ function bindMain(){
     if (!b) return;
     const d = b.dataset;
     if (d.view) { setView(d.view); return; }
-    if (d.tile) { if (d.tile === "avisos") setView("avisos"); else { S.filtro = d.tile; render(); } return; }
+    if (d.tile) { if (d.tile === "avisos") setView("avisos"); else if (d.tile.startsWith("tipo-")) { S.tab = d.tile.slice(5); S.filtro = "pendientes"; setView("pedidos"); } else { S.filtro = d.tile; setView("pedidos"); } return; }
     if (d.tab) { S.tab = d.tab; render(); return; }
     if (d.filtro) { S.filtro = d.filtro; render(); return; }
     if (d.act === "nuevo") return d.tipo ? openForm(null, d.tipo) : chooseTipo();
@@ -975,8 +973,6 @@ function bindMain(){
     if (d.avisar) { marcarAvisado(d.avisar); return; }
     if (d.ya) return marcarAvisado(d.ya);
     if (d.open) return openDetail(d.open);
-    if (d.buscar) { setView("pedidos"); S.filtro = "todos"; S.q = d.buscar; render(); return; }
-    if (d.nc) { const c = S.clientes[d.nc]; return chooseTipo({nombre:c ? c.nombre : "", telefono:d.nc}); }
     if (d.reset) return resetPin(d.reset);
     if (d.deluser) { const u = S.usuarios[d.deluser]; return confirmar(`¿Eliminar a ${u.nombre}?`, "No podrá entrar más. Sus pedidos se conservan.", "Eliminar", async () => { const bt = writeBatch(S.db); bt.delete(doc(S.db, "usuarios/" + d.deluser)); bt.delete(doc(S.db, "logins/" + u.usuario)); await bt.commit(); toast("Usuario eliminado"); }); }
   };
@@ -1116,11 +1112,11 @@ addEventListener("popstate", () => {
   if (NAV.ignore > 0) { NAV.ignore--; return; }
   const top = NAV.stack[NAV.stack.length - 1];
   if (top) { if (top.onBack) top.onBack(); else top.close(true); return; }
-  if (S.me && S.view !== "pedidos") { S.viewPushed = false; S.view = "pedidos"; S.q = ""; render(); scrollTo(0, 0); }
+  if (S.me && S.view !== "resumen") { S.viewPushed = false; S.view = "resumen"; S.q = ""; render(); scrollTo(0, 0); }
 });
 function setView(v){
   if (v === S.view) return;
-  if (v === "pedidos") { if (S.viewPushed) { S.viewPushed = false; navSilentBack(); } }
+  if (v === "resumen") { if (S.viewPushed) { S.viewPushed = false; navSilentBack(); } }
   else if (!S.viewPushed) { S.viewPushed = true; navPush(); }
   S.view = v; S.q = ""; render(); scrollTo(0, 0);
 }
