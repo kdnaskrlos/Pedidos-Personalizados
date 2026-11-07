@@ -6,10 +6,11 @@
 //  de Firestore (archivo firestore.rules).
 // ============================================================
 export const firebaseConfig = {
-  apiKey: "PEGA_AQUI_TU_API_KEY",
-  authDomain: "tu-proyecto.firebaseapp.com",
-  projectId: "tu-proyecto",
-  storageBucket: "tu-proyecto.appspot.com",
-  messagingSenderId: "000000000000",
-  appId: "1:000000000000:web:0000000000000000"
+    apiKey: "AIzaSyAcUiuIamzkzc3JDLLqWe4K2rsFi7A2WBw",
+    authDomain: "pedidos-personalizados-6610e.firebaseapp.com",
+    projectId: "pedidos-personalizados-6610e",
+    storageBucket: "pedidos-personalizados-6610e.firebasestorage.app",
+    messagingSenderId: "677258952289",
+    appId: "1:677258952289:web:9f463038eac890f47af420",
+    measurementId: "G-8VQR68BRMF"
 };
