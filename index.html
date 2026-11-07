@@ -567,7 +567,7 @@ import { initializeApp, deleteApp } from "https://www.gstatic.com/firebasejs/10.
 import { getAuth, onAuthStateChanged, signInWithEmailAndPassword, createUserWithEmailAndPassword, signOut, updatePassword, reauthenticateWithCredential, EmailAuthProvider } from "https://www.gstatic.com/firebasejs/10.12.2/firebase-auth.js";
 import { initializeFirestore, getFirestore, persistentLocalCache, persistentMultipleTabManager, doc, collection, query, where, onSnapshot, getDoc, setDoc, updateDoc, deleteDoc, writeBatch } from "https://www.gstatic.com/firebasejs/10.12.2/firebase-firestore.js";
 
-const VERSION = "v2.13";
+const VERSION = "v2.14";
 /* ================= Utilidades ================= */
 const $ = (s, r = document) => r.querySelector(s);
 const esc = s => String(s ?? "").replace(/[&<>"']/g, c => ({"&":"&amp;","<":"&lt;",">":"&gt;",'"':"&quot;","'":"&#39;"}[c]));
@@ -710,7 +710,7 @@ const cleanUser = s => norm(s).replace(/\s+/g, ".").replace(/[^a-z0-9._-]/g, "")
 function perm(){
   const m = S.me || {};
   const admin = m.rol === "admin";
-  return {admin, ajustes: admin || m.ajustes === true, ver:{personalizado: admin || m.verPersonalizado === true, sublimacion: admin || m.verSublimacion === true}, soloAsignados: !admin && !!m.soloAsignados, eliminar: admin || !!m.eliminar};
+  return {admin, ver:{personalizado: admin || m.verPersonalizado === true, sublimacion: admin || m.verSublimacion === true}, soloAsignados: !admin && !!m.soloAsignados, eliminar: admin || !!m.eliminar};
 }
 function nameOf(usuario){
   if (!usuario) return "—";
@@ -881,7 +881,6 @@ function doRender(){
     <button class="nav new" data-act="nuevo" aria-label="Nuevo pedido" title="Nuevo pedido"><span class="ring">${I("plus")}</span></button>
     ${nav("avisos","bell","Avisos", nAv)}
     ${pr.admin ? `<span class="d-only">${nav("equipo","shield","Equipo")}${nav("ajustes","sliders","Ajustes")}</span><button class="nav m-only" data-view="equipo" aria-current="${S.view === "equipo" || S.view === "ajustes"}">${I("shield")}Admin</button>`
-      : pr.ajustes ? `<span class="d-only">${nav("ajustes","sliders","Ajustes")}</span><button class="nav m-only" data-view="ajustes" aria-current="${S.view === "ajustes"}">${I("sliders")}Ajustes</button>`
       : `<button class="nav m-only" data-act="cuenta">${I("user")}Cuenta</button>`}
     <div class="grow"></div>
     <button class="theme" id="themeBtn" title="Cambiar tema">${I("sun","sun")}${I("moon","moon")}</button>
@@ -896,7 +895,7 @@ function doRender(){
       <button class="pill" id="meBtn">${I("user")}${esc(S.me.nombre || S.me.usuario)}${pr.admin ? " · Admin" : ""}</button>
     </div>
     <main class="main">
-      ${S.view === "avisos" ? viewAvisos(a) : S.view === "pedidos" ? viewPedidos(a, pr) : S.view === "equipo" && pr.admin ? viewEquipo() : S.view === "ajustes" && pr.ajustes ? viewAjustes() : viewResumen(a, pr)}
+      ${S.view === "avisos" ? viewAvisos(a) : S.view === "pedidos" ? viewPedidos(a, pr) : S.view === "equipo" && pr.admin ? viewEquipo() : S.view === "ajustes" && pr.admin ? viewAjustes() : viewResumen(a, pr)}
     </main>
   </div>`;
   scrollTo(0, sc);
@@ -1040,14 +1039,14 @@ function viewEquipo(){
       <div>${us.map(([uid, u]) => `<div class="urow"><span class="av" style="--c:${u.rol === "admin" ? "var(--accent)" : "var(--t-info)"}">${esc((u.nombre || u.usuario).slice(0,1).toUpperCase())}</span>
         <div class="nm">${esc(u.nombre)}<small>@${esc(u.usuario)} · ${u.rol === "admin" ? "Administrador" : u.activo ? "Activo" : "Desactivado"}</small></div>
         ${u.rol === "admin" ? (uid === S.uid ? `<button class="btn sm" data-act="mipin">${I("key")}Cambiar mi PIN</button>` : "") : `
-        ${tg(uid,"verPersonalizado","Personalizado",u.verPersonalizado)}${tg(uid,"verSublimacion","Sublimación",u.verSublimacion)}${tg(uid,"soloAsignados","Solo sus asignados",u.soloAsignados)}${tg(uid,"eliminar","Puede eliminar",u.eliminar)}${tg(uid,"ajustes","Ajustes",u.ajustes)}${tg(uid,"activo","Acceso",u.activo)}
+        ${tg(uid,"verPersonalizado","Personalizado",u.verPersonalizado)}${tg(uid,"verSublimacion","Sublimación",u.verSublimacion)}${tg(uid,"soloAsignados","Solo sus asignados",u.soloAsignados)}${tg(uid,"eliminar","Puede eliminar",u.eliminar)}${tg(uid,"activo","Acceso",u.activo)}
         <button class="btn sm" data-reset="${esc(uid)}">${I("key")}Nuevo PIN</button><button class="btn sm danger" data-deluser="${esc(uid)}">${I("trash")}</button>`}
       </div>`).join("")}</div>
     </div>`;
 }
 
 /* ---------- Ajustes (admin) ---------- */
-const adminTabs = () => !perm().admin ? "" : `<div class="seg m-tabs"><button data-view="equipo" aria-pressed="${S.view === "equipo"}">Equipo</button><button data-view="ajustes" aria-pressed="${S.view === "ajustes"}">Ajustes</button></div>`;
+const adminTabs = () => `<div class="seg m-tabs"><button data-view="equipo" aria-pressed="${S.view === "equipo"}">Equipo</button><button data-view="ajustes" aria-pressed="${S.view === "ajustes"}">Ajustes</button></div>`;
 function viewAjustes(){
   const c = cfg(), k = c.cat;
   const ta = (key, label) => `<div class="f"><label>${label}</label><textarea class="inp" data-cat="${key}" style="min-height:120px">${esc(k[key].join("\n"))}</textarea></div>`;
