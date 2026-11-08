@@ -560,6 +560,37 @@ table.mx{border-collapse:collapse;width:100%;font-size:13px}
 .ucard{gap:0;padding:12px 14px}
 .ucard.open{gap:12px}
 
+/* detalle del pedido (v2.20) */
+.dhead{align-items:flex-start;border-top:4px solid var(--c)}
+.dh{flex:1;min-width:0;display:flex;flex-direction:column;align-items:flex-start;gap:6px}
+.dh h2{font-size:20px;font-weight:800;white-space:nowrap;overflow:hidden;text-overflow:ellipsis;max-width:100%}
+.dwa{display:inline-flex;align-items:center;gap:6px;font-size:13px;font-weight:700;color:#15803d;background:#dcfce7;border:1px solid #bbf7d0;border-radius:99px;padding:4px 10px;text-decoration:none}
+:root[data-theme="dark"] .dwa{color:#86efac;background:#12311f;border-color:#1f4d31}
+.dwa svg.i{width:14px;height:14px}
+.dwhen{display:flex;align-items:center;gap:12px;border-radius:12px;padding:14px 16px;background:var(--surface-2);border:1px solid var(--line)}
+.dwhen.warn{background:color-mix(in srgb,var(--warn) 9%,var(--surface));border-color:color-mix(in srgb,var(--warn) 30%,var(--line))}
+.dwhen.err{background:color-mix(in srgb,var(--err) 8%,var(--surface));border-color:color-mix(in srgb,var(--err) 30%,var(--line))}
+.dwhen.ok{background:color-mix(in srgb,var(--ok) 9%,var(--surface));border-color:color-mix(in srgb,var(--ok) 30%,var(--line))}
+.dwhen.info{background:color-mix(in srgb,var(--t-info) 8%,var(--surface));border-color:color-mix(in srgb,var(--t-info) 28%,var(--line))}
+.dw-l{flex:1;min-width:0;display:flex;flex-direction:column;gap:2px}
+.dw-l small{font-size:12px;font-weight:600;color:var(--muted)}
+.dw-l b{font-size:18px;font-weight:800;line-height:1.2}
+.dw-r{display:flex;flex-direction:column;align-items:flex-end;gap:6px;flex:none}
+.dw-rel{font-size:14px;font-weight:800}
+.dwhen.warn .dw-rel{color:var(--warn)} .dwhen.err .dw-rel{color:var(--err)} .dwhen.ok .dw-rel{color:var(--ok)} .dwhen.info .dw-rel{color:var(--t-info)}
+.dw-urg{display:inline-flex;align-items:center;gap:4px;font-size:11.5px;font-weight:800;border-radius:6px;padding:3px 8px;background:var(--ink);color:var(--bg)}
+.dw-urg svg.i{width:12px;height:12px}
+.dwork{display:flex;flex-direction:column;gap:8px;padding:2px 2px 14px;border-bottom:1px solid var(--line)}
+.dw-tipo{display:inline-flex;align-items:center;gap:6px;font-size:12.5px;font-weight:700;color:var(--c)}
+.dw-tipo i{width:8px;height:8px;border-radius:50%;background:var(--c)}
+.dwork h3{margin:0;font-size:20px;font-weight:800;line-height:1.2}
+.dchips{display:flex;flex-wrap:wrap;gap:6px}
+.dchips span{font-size:12.5px;font-weight:700;border-radius:99px;padding:4px 10px;background:var(--surface-2);border:1px solid var(--line)}
+.dsec{display:flex;flex-direction:column;gap:10px;padding:2px 2px 14px;border-bottom:1px solid var(--line)}
+.dsec-h{display:flex;align-items:baseline;gap:8px}
+.dsec-h b{font-size:15px;font-weight:800}
+.dsec-h span{font-size:13px;color:var(--muted);font-weight:600}
+
 @media (max-width:1000px){
   .cols{grid-template-columns:minmax(0,1fr)}
   .tipotabs{display:flex}
@@ -646,7 +677,7 @@ import { initializeApp, deleteApp } from "https://www.gstatic.com/firebasejs/10.
 import { getAuth, onAuthStateChanged, signInWithEmailAndPassword, createUserWithEmailAndPassword, signOut, updatePassword, reauthenticateWithCredential, EmailAuthProvider } from "https://www.gstatic.com/firebasejs/10.12.2/firebase-auth.js";
 import { initializeFirestore, getFirestore, persistentLocalCache, persistentMultipleTabManager, doc, collection, query, where, onSnapshot, getDoc, setDoc, updateDoc, deleteDoc, writeBatch } from "https://www.gstatic.com/firebasejs/10.12.2/firebase-firestore.js";
 
-const VERSION = "v2.19";
+const VERSION = "v2.20";
 /* ================= Utilidades ================= */
 const $ = (s, r = document) => r.querySelector(s);
 const esc = s => String(s ?? "").replace(/[&<>"']/g, c => ({"&":"&amp;","<":"&lt;",">":"&gt;",'"':"&quot;","'":"&#39;"}[c]));
@@ -1857,20 +1888,30 @@ function openDetail(id){
   const p = S.pedidos[id]; if (!p) return;
   const T = TIPOS[p.tipo], t = totales(p), pr = perm(), est = p.estado || "pendiente";
   const ov = modal(`
-    <div class="mh"><span class="chip" style="--c:${T.c}">${I(T.icon)}</span><h2>${esc(p.cliente.nombre)}</h2><button class="ib" data-close>${I("x")}</button></div>
+    <div class="mh dhead" style="--c:${T.c}">
+      <div class="dh"><h2>${esc(p.cliente.nombre)}</h2><a class="dwa" href="https://wa.me/${esc(p.cliente.telefono)}" target="_blank" rel="noopener">${I("msg")}${esc(prettyPhone(p.cliente.telefono))}</a></div>
+      <button class="ib" data-close>${I("x")}</button>
+    </div>
     <div class="mb">
-      <div class="facts" style="--c:${T.c}">
-        <div><small>Entrega</small><b>${esc(fmtDate(p.fechaEntrega).slice(0, -5))}</b>${(() => { const d = dueShort(p); return d.t && est === "pendiente" ? `<span class="oc2-due ${d.c}">${esc(d.t)}</span>` : ""; })()}</div>
-        <div><small>Tipo</small><b>${T.label}</b></div>
-        <div><small>Estado</small><b>${est === "pendiente" ? "Pendiente" : est === "listo" ? (p.avisado ? "Listo, avisado" : "Listo") : "Entregado"}</b>${p.urgente ? `<span class="oc2-urg">Urgente</span>` : ""}</div>
+      ${(() => {
+        const fd = p.fechaEntrega ? parseYmd(p.fechaEntrega) : null;
+        const fecha = fd ? `${DIAS[fd.getDay()][0].toUpperCase() + DIAS[fd.getDay()].slice(1)} ${fd.getDate()} de ${MESES[fd.getMonth()]}` : "Sin fecha";
+        const d = dueShort(p);
+        return `<div class="dwhen ${d.c}">
+          <div class="dw-l"><small>Entrega</small><b>${esc(fecha)}</b></div>
+          <div class="dw-r">${d.t ? `<span class="dw-rel">${esc(d.t)}</span>` : ""}${p.urgente ? `<span class="dw-urg">${I("alert")}Urgente</span>` : ""}</div>
+        </div>`;
+      })()}
+      <div class="dwork" style="--c:${T.c}">
+        <span class="dw-tipo"><i></i>${T.label}</span>
+        <h3>${esc(p.tema || "Sin tema")}</h3>
+        ${[p.servicio, p.tipo === "personalizado" ? (p.prendaDe === "cliente" ? "Prenda del cliente" : p.prendaDe === "tienda" ? "Prenda de la tienda" : "") : ""].filter(Boolean).length
+          ? `<div class="dchips">${[p.servicio, p.tipo === "personalizado" ? (p.prendaDe === "cliente" ? "Prenda del cliente" : p.prendaDe === "tienda" ? "Prenda de la tienda" : "") : ""].filter(Boolean).map(x => `<span>${esc(x)}</span>`).join("")}</div>` : ""}
       </div>
-      <div class="fsec"><div class="sec">${I("user")}Cliente</div><dl class="kv"><dt>WhatsApp</dt><dd><a href="https://wa.me/${esc(p.cliente.telefono)}" target="_blank" rel="noopener" style="color:var(--t-wa)">${esc(prettyPhone(p.cliente.telefono))}</a></dd></dl></div>
-      <div class="fsec"><div class="sec">${I(T.icon)}Detalles</div><dl class="kv">
-        ${p.tema ? `<dt>Tema</dt><dd>${esc(p.tema)}</dd>` : ""}${p.servicio ? `<dt>Estampado</dt><dd>${esc(p.servicio)}</dd>` : ""}
-        ${p.tipo === "personalizado" ? `<dt>Prenda</dt><dd>${p.prendaDe === "cliente" ? "La trae el cliente" : "La pone la tienda"}</dd>` : ""}
-        <dt>Etiqueta</dt><dd>${esc(p.etiqueta || "—")}</dd></dl></div>
-      <div class="fsec"><div class="sec">${I("shirt")}Prendas <small>${t.piezas} piezas</small></div>
-        <ul class="il2">${(p.items || []).map(i => { const sub = [i.horma, i.etiqueta, i.nombre, i.numero ? "N° " + i.numero : ""].filter(Boolean); return `<li><span class="q num">${i.cant}</span><span class="d"><b>${esc(i.prenda)} ${esc(i.color)} ${esc(i.talla)}</b>${sub.length ? `<small>${sub.map(x => `<span>${esc(x)}</span>`).join("")}</small>` : ""}</span></li>`; }).join("")}</ul></div>
+      <div class="dsec">
+        <div class="dsec-h"><b>Prendas</b><span>${t.piezas} ${t.piezas === 1 ? "pieza" : "piezas"}</span></div>
+        <ul class="il2">${(p.items || []).map(i => { const sub = [i.horma, i.etiqueta, i.nombre, i.numero ? "N° " + i.numero : ""].filter(Boolean); return `<li><span class="q num">${i.cant}</span><span class="d"><b>${esc(i.prenda)} ${esc(i.color)} ${esc(i.talla)}</b>${sub.length ? `<small>${sub.map(x => `<span>${esc(x)}</span>`).join("")}</small>` : ""}</span></li>`; }).join("")}</ul>
+      </div>
       <div class="fsec"><div class="sec">${I("cash")}Pago</div><div class="totals t2"><div class="tot"><small>Precio unidad</small><b class="num">${esc(money(p.precio, p.moneda))}</b></div><div class="tot"><small>Total</small><b class="num">${esc(money(t.total, p.moneda))}</b></div><div class="tot"><small>Abono</small><b class="num">${esc(money(t.abono, p.moneda))}</b></div><div class="tot"><small>Saldo</small><b class="num" style="color:${t.saldo > 0 ? "var(--err)" : "var(--ok)"}">${esc(money(t.saldo, p.moneda))}</b></div></div>${p.motivoSinAbono ? `<p class="note"><b>Sin abono:</b> ${esc(p.motivoSinAbono)}</p>` : ""}</div>
       ${(p.imagenes || []).length ? `<div class="fsec"><div class="sec">${I("camera")}Referencias</div><div class="imgs">${p.imagenes.map(im => `<div class="imgbox"><img data-foto="${esc(im)}" alt=""></div>`).join("")}</div></div>` : ""}
       ${p.nota ? `<div class="fsec"><div class="sec">${I("note")}Nota</div><div class="notebox">${esc(p.nota)}</div></div>` : ""}
