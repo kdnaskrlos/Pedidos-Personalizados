@@ -831,6 +831,9 @@ body.fixedv{scrollbar-width:none}
 .revbar{max-width:520px;min-height:40px;border-radius:9px;padding:0 11px;gap:8px;font-size:14px;font-weight:600}
 .revbar svg.i{width:20px;height:20px}
 .rvcard{cursor:pointer}
+.rvcard .oc2-side{width:70px}
+.rvcard .oc2-side .oc2-img{width:66px;height:66px;border-radius:12px}
+.rvcard .oc2-noimg svg.i{width:26px;height:26px}
 .rvcard .rvw{display:inline-flex;align-items:center;gap:5px}
 .rvcard .rvw svg.i{width:13px;height:13px}
 .rvcard .rvc{margin-top:6px}
@@ -930,7 +933,7 @@ import { initializeApp, deleteApp } from "https://www.gstatic.com/firebasejs/10.
 import { getAuth, onAuthStateChanged, signInWithEmailAndPassword, createUserWithEmailAndPassword, signOut, updatePassword, reauthenticateWithCredential, EmailAuthProvider } from "https://www.gstatic.com/firebasejs/10.12.2/firebase-auth.js";
 import { initializeFirestore, getFirestore, persistentLocalCache, persistentMultipleTabManager, doc, collection, query, where, onSnapshot, getDoc, setDoc, updateDoc, deleteDoc, writeBatch, runTransaction } from "https://www.gstatic.com/firebasejs/10.12.2/firebase-firestore.js";
 
-const VERSION = "v2.80";
+const VERSION = "v2.81";
 /* ================= Utilidades ================= */
 const $ = (s, r = document) => r.querySelector(s);
 const esc = s => String(s ?? "").replace(/[&<>"']/g, c => ({"&":"&amp;","<":"&lt;",">":"&gt;",'"':"&quot;","'":"&#39;"}[c]));
