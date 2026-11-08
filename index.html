@@ -528,6 +528,30 @@ table.mx{border-collapse:collapse;width:100%;font-size:13px}
 .drow2{display:grid;grid-auto-flow:column;grid-auto-columns:1fr;gap:8px}
 .drow2 .btn{width:100%;min-height:44px}
 
+/* Equipo (v2.18) */
+.newu{align-self:flex-start;min-height:44px;padding:10px 18px}
+.ulist{display:grid;grid-template-columns:repeat(auto-fill,minmax(320px,1fr));gap:12px;align-items:start}
+.ucard{border:1px solid var(--line);border-radius:12px;background:var(--surface);padding:14px;display:flex;flex-direction:column;gap:12px}
+.ucard.off{opacity:.7}
+.uhead{display:flex;align-items:center;gap:12px}
+.un{flex:1;min-width:0;display:flex;flex-direction:column;line-height:1.25}
+.un b{font-size:15px;white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
+.un small{color:var(--muted);font-weight:600;font-size:12.5px}
+.urole{flex:none;font-size:11.5px;font-weight:800;border-radius:99px;padding:3px 9px;background:color-mix(in srgb,var(--t-info) 10%,var(--surface));color:var(--t-info)}
+.urole.a{background:var(--accent-soft);color:var(--accent)}
+.urole.x{background:color-mix(in srgb,var(--err) 10%,var(--surface));color:var(--err)}
+.uperm{display:flex;flex-direction:column;border:1px solid var(--line);border-radius:10px;overflow:hidden}
+.swr{display:flex;align-items:center;justify-content:space-between;gap:12px;padding:10px 12px;font-size:14px;font-weight:600;cursor:pointer}
+.swr+.swr{border-top:1px solid var(--line)}
+.swi{appearance:none;-webkit-appearance:none;width:42px;height:24px;border-radius:99px;background:var(--line);position:relative;flex:none;cursor:pointer;transition:background .15s;margin:0}
+.swi::after{content:"";position:absolute;top:3px;left:3px;width:18px;height:18px;border-radius:50%;background:#fff;box-shadow:0 1px 2px rgba(0,0,0,.25);transition:transform .15s}
+.swi:checked{background:var(--accent)}
+.swi:checked::after{transform:translateX(18px)}
+.swi:focus-visible{outline:2px solid var(--accent);outline-offset:2px}
+.uacts{display:grid;grid-template-columns:1fr 1fr;gap:8px}
+.uacts.one{grid-template-columns:1fr}
+.uacts .btn{width:100%;min-height:40px}
+
 @media (max-width:1000px){
   .cols{grid-template-columns:minmax(0,1fr)}
   .tipotabs{display:flex}
@@ -589,6 +613,8 @@ table.mx{border-collapse:collapse;width:100%;font-size:13px}
   .facts b{font-size:13px}
   .totals.t2{grid-template-columns:repeat(2,minmax(0,1fr))}
   .kv{grid-template-columns:96px 1fr}
+  .ulist{grid-template-columns:1fr}
+  .newu{align-self:stretch}
   .ov{padding:0}
   .md{border-radius:0;height:100%;max-width:none;border:0}
   .mh,.mf{border-radius:0}
@@ -612,7 +638,7 @@ import { initializeApp, deleteApp } from "https://www.gstatic.com/firebasejs/10.
 import { getAuth, onAuthStateChanged, signInWithEmailAndPassword, createUserWithEmailAndPassword, signOut, updatePassword, reauthenticateWithCredential, EmailAuthProvider } from "https://www.gstatic.com/firebasejs/10.12.2/firebase-auth.js";
 import { initializeFirestore, getFirestore, persistentLocalCache, persistentMultipleTabManager, doc, collection, query, where, onSnapshot, getDoc, setDoc, updateDoc, deleteDoc, writeBatch } from "https://www.gstatic.com/firebasejs/10.12.2/firebase-firestore.js";
 
-const VERSION = "v2.17";
+const VERSION = "v2.18";
 /* ================= Utilidades ================= */
 const $ = (s, r = document) => r.querySelector(s);
 const esc = s => String(s ?? "").replace(/[&<>"']/g, c => ({"&":"&amp;","<":"&lt;",">":"&gt;",'"':"&quot;","'":"&#39;"}[c]));
@@ -1084,17 +1110,27 @@ function notifyIfNeeded(a){
 /* ---------- Equipo (admin) ---------- */
 function viewEquipo(){
   const us = Object.entries(S.usuarios).sort((a, b) => (a[1].rol === "admin" ? -1 : 1) - (b[1].rol === "admin" ? -1 : 1) || String(a[1].nombre).localeCompare(b[1].nombre));
-  const tg = (uid, k, t, v) => `<label class="tg"><input type="checkbox" data-perm="${k}" data-uid="${esc(uid)}" ${v ? "checked" : ""}>${t}</label>`;
-  return `${adminTabs()}<div class="hello"><h1>Equipo</h1><span class="date">${I("shield")}${us.length} usuario${us.length === 1 ? "" : "s"}</span></div>
-    <div class="card"><div class="toolbar"><div class="sec">${I("users")}Usuarios</div><button class="btn primary" id="newUser">${I("plus")}Nuevo usuario</button></div>
-      <p class="note">Tú creas el usuario y su PIN. "Solo sus asignados" hace que la persona vea únicamente los pedidos que tú le asignes o que ella misma registre. Si un pedido tiene personas asignadas, solo ellas (y tú) lo ven.</p>
-      <div>${us.map(([uid, u]) => `<div class="urow"><span class="av" style="--c:${u.rol === "admin" ? "var(--accent)" : "var(--t-info)"}">${esc((u.nombre || u.usuario).slice(0,1).toUpperCase())}</span>
-        <div class="nm">${esc(u.nombre)}<small>@${esc(u.usuario)} · ${u.rol === "admin" ? "Administrador" : u.activo ? "Activo" : "Desactivado"}</small></div>
-        ${u.rol === "admin" ? (uid === S.uid ? `<button class="btn sm" data-act="mipin">${I("key")}Cambiar mi PIN</button>` : "") : `
-        ${tg(uid,"verPersonalizado","Personalizado",u.verPersonalizado)}${tg(uid,"verSublimacion","Sublimación",u.verSublimacion)}${tg(uid,"soloAsignados","Solo sus asignados",u.soloAsignados)}${tg(uid,"eliminar","Puede eliminar",u.eliminar)}${tg(uid,"activo","Acceso",u.activo)}
-        <button class="btn sm" data-reset="${esc(uid)}">${I("key")}Nuevo PIN</button><button class="btn sm danger" data-deluser="${esc(uid)}">${I("trash")}</button>`}
-      </div>`).join("")}</div>
+  const sw = (uid, k, t, v) => `<label class="swr"><span>${t}</span><input type="checkbox" class="swi" data-perm="${k}" data-uid="${esc(uid)}" ${v ? "checked" : ""}></label>`;
+  const card = ([uid, u]) => {
+    const admin = u.rol === "admin";
+    return `<div class="ucard ${!admin && !u.activo ? "off" : ""}">
+      <div class="uhead"><span class="av" style="--c:${admin ? "var(--accent)" : "var(--t-info)"}">${esc((u.nombre || u.usuario).slice(0, 1).toUpperCase())}</span>
+        <div class="un"><b>${esc(u.nombre)}</b><small>@${esc(u.usuario)}</small></div>
+        <span class="urole ${admin ? "a" : u.activo ? "" : "x"}">${admin ? "Administrador" : u.activo ? "Activo" : "Sin acceso"}</span></div>
+      ${admin ? (uid === S.uid ? `<div class="uacts one"><button class="btn" data-act="mipin">${I("key")}Cambiar mi PIN</button></div>` : "") : `
+      <div class="uperm">
+        ${sw(uid, "verPersonalizado", "Ve Personalizado", u.verPersonalizado)}
+        ${sw(uid, "verSublimacion", "Ve Sublimación", u.verSublimacion)}
+        ${sw(uid, "soloAsignados", "Solo sus asignados", u.soloAsignados)}
+        ${sw(uid, "eliminar", "Puede eliminar", u.eliminar)}
+        ${sw(uid, "activo", "Acceso a la app", u.activo)}
+      </div>
+      <div class="uacts"><button class="btn" data-reset="${esc(uid)}">${I("key")}Nuevo PIN</button><button class="btn danger" data-deluser="${esc(uid)}">${I("trash")}Eliminar</button></div>`}
     </div>`;
+  };
+  return `${adminTabs()}<div class="hello"><h1>Equipo</h1><span class="date">${us.length} usuario${us.length === 1 ? "" : "s"}</span></div>
+    <button class="btn primary newu" id="newUser">${I("plus")}Nuevo usuario</button>
+    <div class="ulist">${us.map(card).join("")}</div>`;
 }
 
 /* ---------- Ajustes (admin) ---------- */
