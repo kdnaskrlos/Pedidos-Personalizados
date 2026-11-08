@@ -173,7 +173,8 @@ textarea.inp{min-height:70px;resize:vertical;font-weight:500}
 .opt{border:1px solid var(--line);background:var(--surface);border-radius:9px;padding:7px 12px;font-weight:700;font-size:13px;color:var(--ink)}
 .opt:hover{border-color:var(--ink)}
 .opt[aria-pressed="true"]{border-color:var(--accent);background:var(--accent-soft);color:var(--accent)}
-.opt.deny[aria-pressed="true"]{border-color:var(--err);background:color-mix(in srgb,var(--err) 10%,var(--surface));color:var(--err)}
+.opt.deny[aria-pressed="true"]{border-color:#f6c0c0;background:#fdecec;color:var(--err)}
+:root[data-theme="dark"] .opt.deny[aria-pressed="true"]{border-color:color-mix(in srgb,var(--err) 35%,var(--line));background:color-mix(in srgb,var(--err) 15%,var(--surface))}
 .phone{display:flex;border:1px solid var(--line);border-radius:9px;overflow:hidden;background:var(--surface-2)}
 .phone select{border:0;border-right:1px solid var(--line);background-color:var(--surface);padding:0 8px;outline:0;max-width:118px;font-weight:700}
 .phone input{border:0;outline:0;background:none;padding:9px 11px;flex:1;min-width:0;font-size:16px;font-weight:700;letter-spacing:.02em}
@@ -933,7 +934,7 @@ import { initializeApp, deleteApp } from "https://www.gstatic.com/firebasejs/10.
 import { getAuth, onAuthStateChanged, signInWithEmailAndPassword, createUserWithEmailAndPassword, signOut, updatePassword, reauthenticateWithCredential, EmailAuthProvider } from "https://www.gstatic.com/firebasejs/10.12.2/firebase-auth.js";
 import { initializeFirestore, getFirestore, persistentLocalCache, persistentMultipleTabManager, doc, collection, query, where, onSnapshot, getDoc, setDoc, updateDoc, deleteDoc, writeBatch, runTransaction } from "https://www.gstatic.com/firebasejs/10.12.2/firebase-firestore.js";
 
-const VERSION = "v2.82";
+const VERSION = "v2.83";
 /* ================= Utilidades ================= */
 const $ = (s, r = document) => r.querySelector(s);
 const esc = s => String(s ?? "").replace(/[&<>"']/g, c => ({"&":"&amp;","<":"&lt;",">":"&gt;",'"':"&quot;","'":"&#39;"}[c]));
@@ -2143,7 +2144,7 @@ function openForm(id, tipo, cliente, borrador){
   $("#in-abono", ov).oninput = e => { F.abono = e.target.value; renderTotals(); };
   $("#in-motivo", ov).oninput = e => { F.motivoSinAbono = e.target.value; clearErr("f-motivo"); };
   ov.addEventListener("click", e => {
-    const b = e.target.closest("[data-servicio],[data-prendade],[data-urg],[data-asig]"); if (!b) return;
+    const b = e.target.closest("[data-servicio],[data-prendade],[data-urg],[data-deny]"); if (!b) return;
     const d = b.dataset, single = () => b.parentNode.querySelectorAll(".opt").forEach(x => x.setAttribute("aria-pressed", x === b));
     if (d.servicio !== undefined) { const k = F.servicios.indexOf(d.servicio); k >= 0 ? F.servicios.splice(k, 1) : F.servicios.push(d.servicio); F.servicios.sort((a, b) => c.cat.servicios.indexOf(a) - c.cat.servicios.indexOf(b)); F.servicio = F.servicios.join(", "); b.setAttribute("aria-pressed", k < 0); clearErr("f-servicio"); }
     if (d.prendade !== undefined) { F.prendaDe = d.prendade; single(); clearErr("f-prendade"); }
