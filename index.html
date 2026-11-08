@@ -905,7 +905,7 @@ import { initializeApp, deleteApp } from "https://www.gstatic.com/firebasejs/10.
 import { getAuth, onAuthStateChanged, signInWithEmailAndPassword, createUserWithEmailAndPassword, signOut, updatePassword, reauthenticateWithCredential, EmailAuthProvider } from "https://www.gstatic.com/firebasejs/10.12.2/firebase-auth.js";
 import { initializeFirestore, getFirestore, persistentLocalCache, persistentMultipleTabManager, doc, collection, query, where, onSnapshot, getDoc, setDoc, updateDoc, deleteDoc, writeBatch, runTransaction } from "https://www.gstatic.com/firebasejs/10.12.2/firebase-firestore.js";
 
-const VERSION = "v2.67";
+const VERSION = "v2.68";
 /* ================= Utilidades ================= */
 const $ = (s, r = document) => r.querySelector(s);
 const esc = s => String(s ?? "").replace(/[&<>"']/g, c => ({"&":"&amp;","<":"&lt;",">":"&gt;",'"':"&quot;","'":"&#39;"}[c]));
@@ -1895,6 +1895,15 @@ function openCalendar(current, onPick, opts = {}){
   draw();
 }
 
+// Mayúscula inicial mientras se escribe: en cada palabra (nombres) o solo en la primera (tema)
+const capPalabras = s => s.replace(/(^|[\s'-])(\p{Ll})/gu, (m, a, b) => a + b.toLocaleUpperCase("es"));
+const capPrimera = s => s.replace(/^(\s*)(\p{Ll})/u, (m, a, b) => a + b.toLocaleUpperCase("es"));
+function mayus(el, todas){
+  const v = el.value, n = todas ? capPalabras(v) : capPrimera(v);
+  if (n === v) return;
+  const a = el.selectionStart, b = el.selectionEnd; el.value = n;
+  try { el.setSelectionRange(a, b); } catch(e) {}
+}
 /* ================= Formulario de pedido (por pasos) ================= */
 let F = null;
 const PASOS = [["user","Cliente"],["shirt","Prendas"],["cal","Entrega"],["camera","Extras"]];
@@ -1986,6 +1995,7 @@ function openForm(id, tipo, cliente){
 
   // Cliente + autocompletado
   const inNom = $("#in-nombre", ov), acl = $("#acl", ov), inTel = $("#in-tel", ov), inPais = $("#in-pais", ov);
+  inNom.addEventListener("input", () => mayus(inNom, true));
   inNom.oninput = () => {
     F.cliente.nombre = inNom.value; clearErr("f-nombre");
     const q = norm(inNom.value.trim());
@@ -2024,7 +2034,7 @@ function openForm(id, tipo, cliente){
   if (inTel.value) checkTel();
   F._checkTel = () => parsePhone(inTel.value, inPais.value);
 
-  $("#in-tema", ov).oninput = e => { F.tema = e.target.value; clearErr("f-tema"); };
+  $("#in-tema", ov).oninput = e => { mayus(e.target, false); F.tema = e.target.value; clearErr("f-tema"); };
   $("#in-nota", ov).oninput = e => F.nota = e.target.value;
   $("#in-mon", ov).onchange = e => { F.moneda = e.target.value; renderTotals(); };
   $("#prl", ov).oninput = e => { const x = e.target.closest("[data-pr]"); if (!x) return; F.pr[x.dataset.pr] = x.value; x.classList.remove("bad"); if (!erroresPaso(2).some(z => z[0] === "f-precio")) clearErr("f-precio"); renderTotals(); };
