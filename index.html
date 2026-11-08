@@ -578,7 +578,9 @@ table.mx{border-collapse:collapse;width:100%;font-size:13px}
 .dw-r{display:flex;flex-direction:column;align-items:flex-end;gap:6px;flex:none}
 .dw-rel{font-size:14px;font-weight:800}
 .dwhen.warn .dw-rel{color:var(--warn)} .dwhen.err .dw-rel{color:var(--err)} .dwhen.ok .dw-rel{color:var(--ok)} .dwhen.info .dw-rel{color:var(--t-info)}
-.dw-urg{display:inline-flex;align-items:center;gap:4px;font-size:11.5px;font-weight:800;border-radius:6px;padding:3px 8px;background:var(--ink);color:var(--bg)}
+.dw-urg{display:inline-flex;align-items:center;gap:5px;font-size:12px;font-weight:800;border-radius:99px;padding:4px 10px;background:#ef1f1f;color:#fff;letter-spacing:.02em;box-shadow:0 0 0 3px color-mix(in srgb,#ef1f1f 22%,transparent);animation:urgp 1.6s ease-in-out 2}
+@keyframes urgp{50%{box-shadow:0 0 0 6px color-mix(in srgb,#ef1f1f 10%,transparent)}}
+@media (prefers-reduced-motion:reduce){.dw-urg{animation:none}}
 .dw-urg svg.i{width:12px;height:12px}
 .dwork{display:flex;flex-direction:column;gap:8px;padding:2px 2px 14px;border-bottom:1px solid var(--line)}
 .dw-tipo{display:inline-flex;align-items:center;gap:6px;font-size:12.5px;font-weight:700;color:var(--c)}
@@ -682,7 +684,7 @@ import { initializeApp, deleteApp } from "https://www.gstatic.com/firebasejs/10.
 import { getAuth, onAuthStateChanged, signInWithEmailAndPassword, createUserWithEmailAndPassword, signOut, updatePassword, reauthenticateWithCredential, EmailAuthProvider } from "https://www.gstatic.com/firebasejs/10.12.2/firebase-auth.js";
 import { initializeFirestore, getFirestore, persistentLocalCache, persistentMultipleTabManager, doc, collection, query, where, onSnapshot, getDoc, setDoc, updateDoc, deleteDoc, writeBatch } from "https://www.gstatic.com/firebasejs/10.12.2/firebase-firestore.js";
 
-const VERSION = "v2.23";
+const VERSION = "v2.24";
 /* ================= Utilidades ================= */
 const $ = (s, r = document) => r.querySelector(s);
 const esc = s => String(s ?? "").replace(/[&<>"']/g, c => ({"&":"&amp;","<":"&lt;",">":"&gt;",'"':"&quot;","'":"&#39;"}[c]));
@@ -1899,7 +1901,7 @@ function openDetail(id){
         const fd = p.fechaEntrega ? parseYmd(p.fechaEntrega) : null;
         const fecha = fd ? `${DIAS[fd.getDay()][0].toUpperCase() + DIAS[fd.getDay()].slice(1)} ${fd.getDate()} de ${MESES[fd.getMonth()]}` : "Sin fecha";
         const d = dueShort(p);
-        return `<div class="dwhen ${d.c}">
+        return `<div class="dwhen ${d.c || "warn"}">
           <div class="dw-l"><small>Entrega</small><b>${esc(fecha)}</b></div>
           <div class="dw-r">${d.t ? `<span class="dw-rel">${esc(d.t)}</span>` : ""}${p.urgente ? `<span class="dw-urg">${I("alert")}Urgente</span>` : ""}</div>
         </div>`;
