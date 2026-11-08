@@ -716,6 +716,10 @@ table.mx{border-collapse:collapse;width:100%;font-size:13px}
 .prrow .inp{text-align:right}
 .prrow .inp.bad{border-color:var(--err)}
 .prempty{padding:12px 14px;border:1px dashed var(--line);border-radius:12px;color:var(--muted);font-size:13.5px}
+/* v2.31 prendas como tarjetas */
+.irow3{background:var(--surface);border:1px solid var(--line);border-radius:16px;padding:12px;gap:8px;margin-bottom:12px;box-shadow:0 1px 2px rgba(16,24,40,.04),0 4px 14px rgba(16,24,40,.05)}
+.irow3 .pbtn,.irow3 .inp,.irow3 .qty{background:var(--surface-2)}
+.irow3 .qin{background:none}
 @media (max-width:1000px){
   .cols{grid-template-columns:minmax(0,1fr)}
   .tipotabs{display:flex}
@@ -804,7 +808,7 @@ import { initializeApp, deleteApp } from "https://www.gstatic.com/firebasejs/10.
 import { getAuth, onAuthStateChanged, signInWithEmailAndPassword, createUserWithEmailAndPassword, signOut, updatePassword, reauthenticateWithCredential, EmailAuthProvider } from "https://www.gstatic.com/firebasejs/10.12.2/firebase-auth.js";
 import { initializeFirestore, getFirestore, persistentLocalCache, persistentMultipleTabManager, doc, collection, query, where, onSnapshot, getDoc, setDoc, updateDoc, deleteDoc, writeBatch } from "https://www.gstatic.com/firebasejs/10.12.2/firebase-firestore.js";
 
-const VERSION = "v2.30";
+const VERSION = "v2.31";
 /* ================= Utilidades ================= */
 const $ = (s, r = document) => r.querySelector(s);
 const esc = s => String(s ?? "").replace(/[&<>"']/g, c => ({"&":"&amp;","<":"&lt;",">":"&gt;",'"':"&quot;","'":"&#39;"}[c]));
