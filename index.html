@@ -799,6 +799,20 @@ table.mx{border-collapse:collapse;width:100%;font-size:13px}
 .uacts .btn{width:auto;min-height:40px}
 .credf{display:flex;justify-content:flex-end}
 .credf .btn{width:auto}
+/* v2.65 Resumen fijo: todo cabe en la pantalla, sin desplazamiento */
+body.fixedv{overflow:hidden;overscroll-behavior:none}
+body.fixedv .shell{height:100vh;height:100dvh;min-height:0;display:flex;flex-direction:column;overflow:hidden;box-sizing:border-box}
+body.fixedv .main{flex:1;min-height:0;overflow:hidden}
+body.fixedv .tiles.t5{flex:1;min-height:0;grid-auto-rows:minmax(0,1fr);align-content:stretch}
+body.fixedv .tiles.t5 .tile{min-height:0}
+body.fixedv .appver{flex:none;margin:0}
+@media (max-width:1000px){
+  body.fixedv .main{padding-bottom:12px;gap:12px}
+  body.fixedv .tiles.t5{gap:10px;grid-template-rows:repeat(2,minmax(0,1fr)) minmax(0,.8fr)}
+  body.fixedv .tile{padding:12px 14px;gap:4px;justify-content:space-between}
+  body.fixedv .tile .v{font-size:clamp(22px,6vh,34px)}
+}
+@media (min-width:1001px){body.fixedv .tiles.t5{flex:0 1 auto;max-height:320px}}
 @media (max-width:1000px){.hello{padding-bottom:8px;margin-top:-6px}.hello h1{font-size:25px}}
 @media (max-width:1000px){.tiles.t5>:last-child{grid-column:1/-1}}
 @media (max-width:1000px){.pill.demo .m-pr{display:inline}}
@@ -892,7 +906,7 @@ import { initializeApp, deleteApp } from "https://www.gstatic.com/firebasejs/10.
 import { getAuth, onAuthStateChanged, signInWithEmailAndPassword, createUserWithEmailAndPassword, signOut, updatePassword, reauthenticateWithCredential, EmailAuthProvider } from "https://www.gstatic.com/firebasejs/10.12.2/firebase-auth.js";
 import { initializeFirestore, getFirestore, persistentLocalCache, persistentMultipleTabManager, doc, collection, query, where, onSnapshot, getDoc, setDoc, updateDoc, deleteDoc, writeBatch, runTransaction } from "https://www.gstatic.com/firebasejs/10.12.2/firebase-firestore.js";
 
-const VERSION = "v2.64";
+const VERSION = "v2.65";
 /* ================= Utilidades ================= */
 const $ = (s, r = document) => r.querySelector(s);
 const esc = s => String(s ?? "").replace(/[&<>"']/g, c => ({"&":"&amp;","<":"&lt;",">":"&gt;",'"':"&quot;","'":"&#39;"}[c]));
@@ -1226,6 +1240,7 @@ function alertas(){
 let renderQ = false;
 function render(){ if (renderQ) return; renderQ = true; requestAnimationFrame(() => { renderQ = false; doRender(); }); }
 function doRender(){
+  document.body.classList.toggle("fixedv", S.view === "resumen");
   if (S.view !== "equipo") S.uOpen = null; // al salir de Equipo, los usuarios vuelven a verse compactos
   if (!S.me || !S.me.activo) return;
   const pr = perm(), a = alertas(), c = cfg();
