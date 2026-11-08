@@ -905,7 +905,7 @@ import { initializeApp, deleteApp } from "https://www.gstatic.com/firebasejs/10.
 import { getAuth, onAuthStateChanged, signInWithEmailAndPassword, createUserWithEmailAndPassword, signOut, updatePassword, reauthenticateWithCredential, EmailAuthProvider } from "https://www.gstatic.com/firebasejs/10.12.2/firebase-auth.js";
 import { initializeFirestore, getFirestore, persistentLocalCache, persistentMultipleTabManager, doc, collection, query, where, onSnapshot, getDoc, setDoc, updateDoc, deleteDoc, writeBatch, runTransaction } from "https://www.gstatic.com/firebasejs/10.12.2/firebase-firestore.js";
 
-const VERSION = "v2.68";
+const VERSION = "v2.69";
 /* ================= Utilidades ================= */
 const $ = (s, r = document) => r.querySelector(s);
 const esc = s => String(s ?? "").replace(/[&<>"']/g, c => ({"&":"&amp;","<":"&lt;",">":"&gt;",'"':"&quot;","'":"&#39;"}[c]));
@@ -1896,7 +1896,9 @@ function openCalendar(current, onPick, opts = {}){
 }
 
 // Mayúscula inicial mientras se escribe: en cada palabra (nombres) o solo en la primera (tema)
-const capPalabras = s => s.replace(/(^|[\s'-])(\p{Ll})/gu, (m, a, b) => a + b.toLocaleUpperCase("es"));
+const CONECT = ["de","del","la","las","los","y","e","da","das","do","dos","di","van","von","el"];
+const capPalabras = s => s.replace(/(^|[\s'-])(\p{Ll})/gu, (m, a, b) => a + b.toLocaleUpperCase("es"))
+  .replace(/(\s)(\p{Lu}\p{Ll}*)(?=\s|$)/gu, (m, a, w) => CONECT.includes(w.toLocaleLowerCase("es")) ? a + w.toLocaleLowerCase("es") : m);
 const capPrimera = s => s.replace(/^(\s*)(\p{Ll})/u, (m, a, b) => a + b.toLocaleUpperCase("es"));
 function mayus(el, todas){
   const v = el.value, n = todas ? capPalabras(v) : capPrimera(v);
