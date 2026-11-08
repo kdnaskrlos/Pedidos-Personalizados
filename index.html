@@ -822,6 +822,11 @@ body.fixedv{scrollbar-width:none}
 .rvempty{display:flex;align-items:center;gap:8px}
 #rvb{display:flex;flex-direction:column;gap:10px}
 .rvf{justify-content:space-between}
+.pcur{display:flex;align-items:center;gap:12px;padding:12px 14px;border:1px solid var(--line);border-left:4px solid var(--c);border-radius:14px;background:var(--surface)}
+.pcur .chip{flex:none;color:var(--c);background:color-mix(in srgb,var(--c) 12%,var(--surface))}
+.pcur div{display:flex;flex-direction:column;min-width:0}
+.pcur b{font-size:15.5px}
+.pcur small{color:var(--muted);font-size:13px;white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
 @media (max-width:1000px){.hello{padding-bottom:8px;margin-top:-6px}.hello h1{font-size:25px}}
 @media (max-width:1000px){.tiles.t5>:last-child{grid-column:1/-1}}
 @media (max-width:1000px){.pill.demo .m-pr{display:inline}}
@@ -915,7 +920,7 @@ import { initializeApp, deleteApp } from "https://www.gstatic.com/firebasejs/10.
 import { getAuth, onAuthStateChanged, signInWithEmailAndPassword, createUserWithEmailAndPassword, signOut, updatePassword, reauthenticateWithCredential, EmailAuthProvider } from "https://www.gstatic.com/firebasejs/10.12.2/firebase-auth.js";
 import { initializeFirestore, getFirestore, persistentLocalCache, persistentMultipleTabManager, doc, collection, query, where, onSnapshot, getDoc, setDoc, updateDoc, deleteDoc, writeBatch, runTransaction } from "https://www.gstatic.com/firebasejs/10.12.2/firebase-firestore.js";
 
-const VERSION = "v2.76";
+const VERSION = "v2.77";
 /* ================= Utilidades ================= */
 const $ = (s, r = document) => r.querySelector(s);
 const esc = s => String(s ?? "").replace(/[&<>"']/g, c => ({"&":"&amp;","<":"&lt;",">":"&gt;",'"':"&quot;","'":"&#39;"}[c]));
@@ -1882,8 +1887,8 @@ function nuevoPedido(tipo){
   const d = leerBorrador();
   if (!d || !perm().ver[d.F.tipo]) return tipo ? openForm(null, tipo) : chooseTipo();
   const q = d.F, quien = (q.cliente && q.cliente.nombre) || "Sin nombre";
-  const ov = modal(`<div class="mh"><h2>Pedido en curso</h2><button class="ib" data-close>${I("x")}</button></div>
-    <div class="mb"><p class="note">Tienes un pedido sin terminar: <b>${esc(TIPOS[q.tipo].label)}</b> · ${esc(quien)}${q.tema ? " · " + esc(q.tema) : ""}. ¿Quieres continuarlo?</p></div>
+  const ov = modal(`<div class="mh"><h2>¿Continuar pedido?</h2><button class="ib" data-close>${I("x")}</button></div>
+    <div class="mb"><div class="pcur" style="--c:${TIPOS[q.tipo].c}"><span class="chip">${I(TIPOS[q.tipo].icon)}</span><div><b>${esc(quien)}</b><small>${esc(TIPOS[q.tipo].label)}${q.tema ? " · " + esc(q.tema) : ""}</small></div></div></div>
     <div class="mf"><button class="btn" id="dcan">Cancelar</button><button class="btn primary" id="dok">${I("check")}Continuar</button></div>`, "sm pop");
   $("#dok", ov).onclick = () => { ov.close(); openForm(null, q.tipo, null, q); };
   $("#dcan", ov).onclick = () => { ov.close(); borrarBorrador(); chooseTipo(); };
