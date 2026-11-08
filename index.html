@@ -836,7 +836,7 @@ import { initializeApp, deleteApp } from "https://www.gstatic.com/firebasejs/10.
 import { getAuth, onAuthStateChanged, signInWithEmailAndPassword, createUserWithEmailAndPassword, signOut, updatePassword, reauthenticateWithCredential, EmailAuthProvider } from "https://www.gstatic.com/firebasejs/10.12.2/firebase-auth.js";
 import { initializeFirestore, getFirestore, persistentLocalCache, persistentMultipleTabManager, doc, collection, query, where, onSnapshot, getDoc, setDoc, updateDoc, deleteDoc, writeBatch, runTransaction } from "https://www.gstatic.com/firebasejs/10.12.2/firebase-firestore.js";
 
-const VERSION = "v2.45";
+const VERSION = "v2.46";
 /* ================= Utilidades ================= */
 const $ = (s, r = document) => r.querySelector(s);
 const esc = s => String(s ?? "").replace(/[&<>"']/g, c => ({"&":"&amp;","<":"&lt;",">":"&gt;",'"':"&quot;","'":"&#39;"}[c]));
@@ -911,6 +911,7 @@ const DEF = {
     prendasSub: ["Franela","Chemise","Suéter","Camisa deportiva","Short deportivo","Uniforme completo","Traje de baño","Licra","Franelilla","Otro"],
     colores: [["Fullprint","full"],["Blanco","#ffffff"],["Negro","#111111"],["Gris claro","#cfd2d6"],["Gris oscuro","#4b5055"],["Azul rey","#1d4ed8"],["Azul marino","#1e2a4a"],["Azul cielo","#7cc4f0"],["Rojo","#d92b2b"],["Vinotinto","#6d1a2a"],["Verde","#1f8a4c"],["Verde manzana","#8cc63f"],["Amarillo","#f5c518"],["Naranja","#f07c1b"],["Rosado","#f4a6c1"],["Morado","#6b3fa0"],["Beige","#e6d3b3"]],
     hormas: ["Caballero","Dama","Niño","Unisex","Oversize"],
+    hormasSub: ["Caballero","Dama","Niño","Unisex"],
     marcas: ["AS","Etanol","Comic Shop","Serfe"],
     tallasNino: ["2","4","6","8","10","12","14","16"],
     tallasAdulto: ["XS","S","M","L","XL","2XL","3XL","4XL"]
@@ -1483,7 +1484,7 @@ function viewEquipo(){
 
 /* ---------- Ajustes (admin) ---------- */
 const adminTabs = () => `<div class="seg m-tabs"><button data-view="ajustes" aria-pressed="${S.view === "ajustes"}">Ajustes</button><button data-view="equipo" aria-pressed="${S.view === "equipo"}">Equipo</button></div>`;
-const LISTAS = [["servicios","Tipos de estampado"],["prendasPers","Prendas de Personalizado"],["prendasSub","Productos de Sublimación"],["colores","Colores"],["hormas","Hormas"],["marcas","Etiquetas"],["tallasNino","Tallas de niño"],["tallasAdulto","Tallas de adulto"]];
+const LISTAS = [["servicios","Tipos de estampado"],["prendasPers","Prendas de Personalizado"],["prendasSub","Productos de Sublimación"],["colores","Colores"],["hormas","Hormas de Personalizado"],["hormasSub","Hormas de Sublimación"],["marcas","Etiquetas"],["tallasNino","Tallas de niño"],["tallasAdulto","Tallas de adulto"]];
 function listaHTML([k, label]){
   const items = cfg().cat[k] || [], open = S.lopen === k;
   const chip = (v, i) => k === "colores"
@@ -2106,7 +2107,7 @@ function elegir(it, f){
   if (f === "color") pickPopup({title:"Color", kind:"color", current:it.color, otro:true, onPick:set,
     options:c.colores.filter(x => isP ? x[1] !== "full" : true).map(([v, h]) => ({v, h}))});
   if (f === "horma") pickPopup({title:"Horma", kind:"text", current:it.horma, onPick:v => set(v === "__none" ? "" : v),
-    options:[...c.hormas.map(v => ({v})), {v:"__none", label:"Sin horma"}]});
+    options:[...(isP ? c.hormas : c.hormasSub).map(v => ({v})), {v:"__none", label:"Sin horma"}]});
   if (f === "numero") return numPad(it.numero, v => { it.numero = v; renderItems(); });
   if (f === "etiqueta") pickPopup({title:"Etiqueta", kind:"text", current:it.etiqueta, onPick:set, options:c.marcas.map(v => ({v}))});
   if (f === "talla") pickPopup({title:"Talla", kind:"talla", current:it.talla, onPick:set,
