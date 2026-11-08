@@ -741,6 +741,10 @@ table.mx{border-collapse:collapse;width:100%;font-size:13px}
 :root[data-theme="dark"] .oc2-due.err,:root[data-theme="dark"] .aday.err,:root[data-theme="dark"] .tag.c.err{color:#facc15;background:#3a3008;border-color:#5c4b0c}
 /* v2.42 campos inhabilitados (Sublimación completa) */
 .pbtn.off{opacity:.45;cursor:not-allowed;pointer-events:none}
+/* v2.45 detalle: cliente y WhatsApp más grandes */
+.pdwho b{font-size:19px}
+.pdwa{min-height:52px;font-size:16.5px;gap:10px}
+.pdwa svg.i{width:20px;height:20px}
 @media (max-width:1000px){.pill.demo .m-pr{display:inline}}
 .pill.demo.on{border-style:solid;border-color:#f59e0b;background:#fff4dc;color:#b45309}
 [data-theme="dark"] .pill.demo.on{background:#3a2a0a;color:#fbbf24}
@@ -832,7 +836,7 @@ import { initializeApp, deleteApp } from "https://www.gstatic.com/firebasejs/10.
 import { getAuth, onAuthStateChanged, signInWithEmailAndPassword, createUserWithEmailAndPassword, signOut, updatePassword, reauthenticateWithCredential, EmailAuthProvider } from "https://www.gstatic.com/firebasejs/10.12.2/firebase-auth.js";
 import { initializeFirestore, getFirestore, persistentLocalCache, persistentMultipleTabManager, doc, collection, query, where, onSnapshot, getDoc, setDoc, updateDoc, deleteDoc, writeBatch, runTransaction } from "https://www.gstatic.com/firebasejs/10.12.2/firebase-firestore.js";
 
-const VERSION = "v2.44";
+const VERSION = "v2.45";
 /* ================= Utilidades ================= */
 const $ = (s, r = document) => r.querySelector(s);
 const esc = s => String(s ?? "").replace(/[&<>"']/g, c => ({"&":"&amp;","<":"&lt;",">":"&gt;",'"':"&quot;","'":"&#39;"}[c]));
