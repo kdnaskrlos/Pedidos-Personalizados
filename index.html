@@ -786,7 +786,7 @@ table.mx{border-collapse:collapse;width:100%;font-size:13px}
 :root[data-theme="dark"] .btn.listo.crema{background:#12311f;border-color:#1f4d31;color:#86efac}
 /* v2.62 deshacer y botón Listo del calendario */
 .toast{z-index:300}
-.toast.undo{display:flex;align-items:center;justify-content:space-between;gap:14px;padding:8px 8px 8px 16px;overflow:hidden;width:min(92vw,440px)}
+.toast.undo{display:flex;align-items:center;justify-content:space-between;gap:14px;padding:8px 8px 8px 16px;overflow:hidden;width:auto;min-width:200px;max-width:92vw}
 .toast.undo button{display:inline-flex;align-items:center;gap:6px;border:0;border-radius:9px;padding:7px 12px;font:inherit;font-weight:800;background:color-mix(in srgb,var(--bg) 16%,transparent);color:#86efac;cursor:pointer;white-space:nowrap}
 :root[data-theme="dark"] .toast.undo button{color:var(--t-wa);background:color-mix(in srgb,var(--ink) 10%,transparent)}
 .toast.undo button svg.i{width:15px;height:15px}
@@ -905,7 +905,7 @@ import { initializeApp, deleteApp } from "https://www.gstatic.com/firebasejs/10.
 import { getAuth, onAuthStateChanged, signInWithEmailAndPassword, createUserWithEmailAndPassword, signOut, updatePassword, reauthenticateWithCredential, EmailAuthProvider } from "https://www.gstatic.com/firebasejs/10.12.2/firebase-auth.js";
 import { initializeFirestore, getFirestore, persistentLocalCache, persistentMultipleTabManager, doc, collection, query, where, onSnapshot, getDoc, setDoc, updateDoc, deleteDoc, writeBatch, runTransaction } from "https://www.gstatic.com/firebasejs/10.12.2/firebase-firestore.js";
 
-const VERSION = "v2.66";
+const VERSION = "v2.67";
 /* ================= Utilidades ================= */
 const $ = (s, r = document) => r.querySelector(s);
 const esc = s => String(s ?? "").replace(/[&<>"']/g, c => ({"&":"&amp;","<":"&lt;",">":"&gt;",'"':"&quot;","'":"&#39;"}[c]));
@@ -1465,12 +1465,12 @@ function toggleDemo(){
   if (hayDemo()) {
     const ids = Object.values(S.pedidos).filter(p => p.demo).map(p => p._id);
     return confirmar("Quitar modo prueba", `Se borrarán los ${ids.length} pedidos de ejemplo. Tus pedidos reales no se tocan.`, "Quitar ejemplos", async () => {
-      const b = writeBatch(S.db); ids.forEach(id => b.delete(doc(S.db, "pedidos/" + id))); await b.commit(); toast("Modo prueba desactivado");
+      const b = writeBatch(S.db); ids.forEach(id => b.delete(doc(S.db, "pedidos/" + id))); await b.commit(); toast("Ejemplos quitados");
     });
   }
   const lst = demoPedidos();
   confirmar("Activar modo prueba", `Se agregarán ${lst.length} pedidos de ejemplo (urgentes, vencidos, próximos, por avisar, avisados y entregados). Para quitarlos, toca otra vez la píldora.`, "Cargar ejemplos", async () => {
-    const b = writeBatch(S.db); lst.forEach(p => b.set(doc(collection(S.db, "pedidos")), p)); await b.commit(); toast("Pedidos de ejemplo cargados");
+    const b = writeBatch(S.db); lst.forEach(p => b.set(doc(collection(S.db, "pedidos")), p)); await b.commit(); toast("Pedidos cargados");
   });
 }
 function cardHTML(p){
@@ -1615,13 +1615,13 @@ function bindMain(){
     if (d.act === "cuenta") return openCuenta();
     if (d.avisar) { marcarAvisado(d.avisar); return; }
     if (d.ya) return marcarAvisado(d.ya);
-    if (d.recordar) { const n = new Date().toISOString(); cambiar(d.recordar, {avisadoEn:n, recordadoEn:n, posponerHasta:""}, "Cliente recordado"); return; }
-    if (d.posponer) { const id = d.posponer; const man = new Date(); man.setDate(man.getDate() + 1); openCalendar(ymd(man), f => { if (daysUntil(f) <= 0) { toast("Elige una fecha a partir de mañana", true); return false; } cambiar(id, {posponerHasta:f}, `Pospuesto hasta el ${fmtDate(f)}`, "No se pudo posponer"); }, {confirmar:true}); return; }
-    if (d.entregar) { cambiar(d.entregar, {estado:"entregado", entregadoEn:new Date().toISOString()}, "Pedido entregado"); return; }
+    if (d.recordar) { const n = new Date().toISOString(); cambiar(d.recordar, {avisadoEn:n, recordadoEn:n, posponerHasta:""}, "Recordado"); return; }
+    if (d.posponer) { const id = d.posponer; const man = new Date(); man.setDate(man.getDate() + 1); openCalendar(ymd(man), f => { if (daysUntil(f) <= 0) { toast("Elige desde mañana", true); return false; } cambiar(id, {posponerHasta:f}, "Pospuesto", "Error al posponer"); }, {confirmar:true}); return; }
+    if (d.entregar) { cambiar(d.entregar, {estado:"entregado", entregadoEn:new Date().toISOString()}, "Entregado"); return; }
     if (d.open) return openDetail(d.open);
     if (d.lst) { S.lopen = S.lopen === d.lst ? null : d.lst; render(); return; }
-    if (d.lrm) { const [k, i] = d.lrm.split("|"); const cat = JSON.parse(JSON.stringify(cfg().cat)); if (cat[k].length <= 1) return toast("La lista necesita al menos una opción", true); cat[k].splice(Number(i), 1); return guardarListas(cat); }
-    if (d.ladd) { const k = d.ladd, v = ($("#lin").value || "").trim(); if (!v) return $("#lin").focus(); const cat = JSON.parse(JSON.stringify(cfg().cat)); const names = cat[k].map(x => norm(Array.isArray(x) ? x[0] : x)); if (names.includes(norm(v))) return toast("Esa opción ya existe", true); cat[k].push(k === "colores" ? [v, $("#lcol").value] : v); return guardarListas(cat); }
+    if (d.lrm) { const [k, i] = d.lrm.split("|"); const cat = JSON.parse(JSON.stringify(cfg().cat)); if (cat[k].length <= 1) return toast("Mínimo una opción", true); cat[k].splice(Number(i), 1); return guardarListas(cat); }
+    if (d.ladd) { const k = d.ladd, v = ($("#lin").value || "").trim(); if (!v) return $("#lin").focus(); const cat = JSON.parse(JSON.stringify(cfg().cat)); const names = cat[k].map(x => norm(Array.isArray(x) ? x[0] : x)); if (names.includes(norm(v))) return toast("Ya existe", true); cat[k].push(k === "colores" ? [v, $("#lcol").value] : v); return guardarListas(cat); }
     if (d.utog) { S.uOpen = S.uOpen === d.utog ? null : d.utog; render(); return; }
     if (d.reset) return resetPin(d.reset);
     if (d.deluser) { const u = S.usuarios[d.deluser]; return confirmar(`¿Eliminar a ${u.nombre}?`, "No podrá entrar más. Sus pedidos se conservan.", "Eliminar", async () => { const bt = writeBatch(S.db); bt.delete(doc(S.db, "usuarios/" + d.deluser)); bt.delete(doc(S.db, "logins/" + u.usuario)); await bt.commit(); toast("Usuario eliminado"); }); }
@@ -1632,11 +1632,11 @@ function bindMain(){
   $("#meBtn").onclick = openCuenta;
   if ($("#demoBtn")) $("#demoBtn").onclick = toggleDemo;
   if ($("#instBtn")) $("#instBtn").onclick = async () => { S.installEvt.prompt(); await S.installEvt.userChoice; S.installEvt = null; render(); };
-  if ($("#notifBtn")) $("#notifBtn").onclick = async () => { const r = await Notification.requestPermission(); toast(r === "granted" ? "Notificaciones activadas" : "No se activaron las notificaciones", r !== "granted"); render(); };
+  if ($("#notifBtn")) $("#notifBtn").onclick = async () => { const r = await Notification.requestPermission(); toast(r === "granted" ? "Notificaciones activas" : "Notificaciones no activadas", r !== "granted"); render(); };
   if ($("#newUser")) $("#newUser").onclick = nuevoUsuario;
   app.querySelectorAll("[data-perm]").forEach(ch => ch.onchange = async () => {
-    try { await updateDoc(doc(S.db, "usuarios/" + ch.dataset.uid), {[ch.dataset.perm]: ch.checked}); toast("Permiso actualizado"); }
-    catch(e) { toast("No se pudo guardar el permiso", true); ch.checked = !ch.checked; }
+    try { await updateDoc(doc(S.db, "usuarios/" + ch.dataset.uid), {[ch.dataset.perm]: ch.checked}); toast("Permiso guardado"); }
+    catch(e) { toast("Error al guardar", true); ch.checked = !ch.checked; }
   });
   // Ajustes: conservar lo escrito y el tamaño de los cuadros de mensaje
   const campos = {cDias:"dias", cDiasRet:"diasRetiro", cPl:"plantilla", cPlR:"plantillaRetiro"};
@@ -1650,14 +1650,14 @@ function bindMain(){
   const lin = $("#lin"); if (lin) lin.onkeydown = e => { if (e.key === "Enter") { e.preventDefault(); $("[data-ladd]").click(); } };
   if ($("#cSave")) {
     $("#cSave").onclick = saveCfg;
-    $("#cReset").onclick = () => confirmar("¿Restaurar las listas originales?", "Se perderán las opciones que agregaste o quitaste.", "Restaurar", async () => { const r = Object.assign({}, S.cfgRaw || {}); delete r.cat; await setDoc(doc(S.db, "config/ajustes"), r); toast("Listas restauradas"); });
+    $("#cReset").onclick = () => confirmar("¿Restaurar las listas originales?", "Se perderán las opciones que agregaste o quitaste.", "Restaurar", async () => { const r = Object.assign({}, S.cfgRaw || {}); delete r.cat; await setDoc(doc(S.db, "config/ajustes"), r); toast("Restaurado"); });
   }
   loadFotos(app);
 }
 async function saveCfg(){
   const c0 = cfg().cat, cat = Object.assign({}, c0, {colores: c0.colores.map(x => ({n:x[0], h:x[1] || ""}))});
   S.cdraft = null;
-  try { await setDoc(doc(S.db, "config/ajustes"), {negocio:DEF.negocio, dias:Number($("#cDias").value), plantilla:$("#cPl").value.trim() || DEF.plantilla, diasRetiro:Number($("#cDiasRet").value), plantillaRetiro:$("#cPlR").value.trim() || DEF.plantillaRetiro, cat}); toast("Ajustes guardados"); }
+  try { await setDoc(doc(S.db, "config/ajustes"), {negocio:DEF.negocio, dias:Number($("#cDias").value), plantilla:$("#cPl").value.trim() || DEF.plantilla, diasRetiro:Number($("#cDiasRet").value), plantillaRetiro:$("#cPlR").value.trim() || DEF.plantillaRetiro, cat}); toast("Guardado"); }
   catch(e) { console.warn(e); toast("No se pudieron guardar los ajustes: " + (e.code || e.message), true); }
 }
 
@@ -1679,7 +1679,7 @@ function showCred(nombre, u, pin){
   const ov = modal(`<div class="mh"><h2>Datos de acceso</h2><button class="ib" data-close>${I("x")}</button></div>
     <div class="mb"><p class="note">Envíale estos datos a ${esc(nombre)}. El PIN no se vuelve a mostrar: si lo pierde, generas uno nuevo.</p><div class="cred">${esc(t)}</div></div>
     <div class="mf credf"><button class="btn primary" id="cs">${I("share")}Compartir</button><button class="btn" id="cc">${I("copy")}Copiar</button><button class="btn" data-close>Listo</button></div>`, "sm");
-  $("#cc", ov).onclick = async () => { try { await navigator.clipboard.writeText(t); toast("Copiado: pégalo en WhatsApp"); } catch(e) { toast("No se pudo copiar", true); } };
+  $("#cc", ov).onclick = async () => { try { await navigator.clipboard.writeText(t); toast("Copiado"); } catch(e) { toast("Error al copiar", true); } };
   $("#cs", ov).onclick = async () => {
     // En el celular abre el menú de compartir (WhatsApp, Telegram…); si no está disponible, abre WhatsApp con el texto
     if (navigator.share) { try { await navigator.share({title:"Acceso a la app de pedidos", text:t}); return; } catch(e) { if (e && e.name === "AbortError") return; } }
@@ -1814,7 +1814,7 @@ function confirmar(title, text, okTxt, fn){
 }
 function chooseTipo(cliente){
   const pr = perm(), tipos = ["personalizado","sublimacion"].filter(t => pr.ver[t]);
-  if (!tipos.length) return toast("No tienes permiso para crear pedidos", true);
+  if (!tipos.length) return toast("Sin permiso", true);
   if (tipos.length === 1) return openForm(null, tipos[0], cliente);
   const info = {
     personalizado: "DTF · Vinilo textil · Sublimación sencilla · Estampado en prenda del cliente",
@@ -2253,11 +2253,11 @@ function renderImgs(){
 }
 async function addFiles(files){
   for (const f of Array.from(files)) {
-    if (!/^image\//.test(f.type)) { toast("Solo se pueden adjuntar imágenes", true); continue; }
+    if (!/^image\//.test(f.type)) { toast("Solo imágenes", true); continue; }
     const tmp = {preview:URL.createObjectURL(f), subiendo:true};
     F.imagenes.push(tmp); renderImgs();
     try { tmp.id = await subirFoto(f); delete tmp.subiendo; }
-    catch(e) { console.warn(e); tmp.subiendo = false; tmp.error = true; toast("No se pudo subir una imagen", true); }
+    catch(e) { console.warn(e); tmp.subiendo = false; tmp.error = true; toast("Error al subir imagen", true); }
     if (F && F._ov) renderImgs();
   }
 }
@@ -2271,7 +2271,7 @@ async function saveForm(ov, orig){
     marcarErrores(todos[primero]);
     const lista = todos.flatMap((e, i) => e.map(([, m]) => `${PASOS[i][1]}: ${m}`));
     $("#errsum", ov).innerHTML = `<div class="errsum">No se puede guardar todavía. Falta completar:<ul>${lista.map(e => `<li>${esc(e)}</li>`).join("")}</ul></div>`;
-    toast("Faltan datos obligatorios", true);
+    toast("Faltan datos", true);
     return;
   }
   const tel = F._checkTel(), isP = F.tipo === "personalizado";
@@ -2309,7 +2309,7 @@ async function saveForm(ov, orig){
     S.tab = F.tipo;
     ov.close(); F = null;
     setView("pedidos"); render();
-    toast(orig ? "Cambios guardados" : "Pedido guardado");
+    toast("Guardado");
   } catch(e) { console.warn(e); btn.disabled = false; toast("No se pudo guardar: " + (e.code === "permission-denied" ? "no tienes permiso" : "revisa tu conexión"), true); }
 }
 
@@ -2394,14 +2394,14 @@ function openDetail(id){
   const on = (s, fn) => { const b = $(s, ov); if (b) b.onclick = fn; };
   on("#d-edit", () => { ov.close(); openForm(id); });
   on("#d-listo", async () => {
-    if (!await cambiar(id, {estado:"listo", listoEn:new Date().toISOString(), listoPor:S.me.usuario, avisado:false}, "Pedido marcado como listo")) return;
+    if (!await cambiar(id, {estado:"listo", listoEn:new Date().toISOString(), listoPor:S.me.usuario, avisado:false}, "Listo")) return;
     ov.close();
     popupListo(Object.assign({}, p, {estado:"listo"}));
   });
   on("#d-wa", () => { marcarAvisado(id); ov.close(); });
-  on("#d-rec", () => { const n = new Date().toISOString(); cambiar(id, {avisadoEn:n, recordadoEn:n, posponerHasta:""}, "Cliente recordado"); ov.close(); });
-  on("#d-ent", () => upd({estado:"entregado", entregadoEn:new Date().toISOString()}, "Pedido entregado"));
-  on("#d-reab", () => upd({estado:"pendiente", avisado:false}, "Pedido reabierto"));
+  on("#d-rec", () => { const n = new Date().toISOString(); cambiar(id, {avisadoEn:n, recordadoEn:n, posponerHasta:""}, "Recordado"); ov.close(); });
+  on("#d-ent", () => upd({estado:"entregado", entregadoEn:new Date().toISOString()}, "Entregado"));
+  on("#d-reab", () => upd({estado:"pendiente", avisado:false}, "Reabierto"));
   on("#d-del", () => confirmar(`¿Eliminar el pedido ${p.codigo}?`, "Podrás deshacerlo durante unos segundos.", "Eliminar", async () => { ov.close(); borrarPedido(p); }));
 }
 function popupListo(p){
@@ -2418,7 +2418,7 @@ function popupListo(p){
   $("#pw", pop).onclick = () => { marcarAvisado(p._id); pop.close(); };
 }
 async function marcarAvisado(id){
-  cambiar(id, {avisado:true, avisadoEn:new Date().toISOString(), avisadoPor:S.me.usuario}, "Marcado como avisado", "No se pudo marcar como avisado");
+  cambiar(id, {avisado:true, avisadoEn:new Date().toISOString(), avisadoPor:S.me.usuario}, "Avisado", "Error al guardar");
 }
 /* ===== Deshacer ===== */
 function toastUndo(msg, onUndo, ms = 7000, onEnd){
@@ -2429,11 +2429,11 @@ function toastUndo(msg, onUndo, ms = 7000, onEnd){
   let done = false;
   const fin = () => { if (done) return; done = true; t.remove(); onEnd && onEnd(); };
   const tm = setTimeout(fin, ms);
-  t.querySelector("button").onclick = async () => { if (done) return; done = true; clearTimeout(tm); t.remove(); try { await onUndo(); toast("Acción deshecha"); } catch(e) { toast("No se pudo deshacer", true); } };
+  t.querySelector("button").onclick = async () => { if (done) return; done = true; clearTimeout(tm); t.remove(); try { await onUndo(); toast("Deshecho"); } catch(e) { toast("Error al deshacer", true); } };
   return fin;
 }
 // Cambia campos de un pedido y ofrece deshacer (vuelve a poner los valores anteriores)
-async function cambiar(id, data, msg, errMsg = "No se pudo actualizar el pedido"){
+async function cambiar(id, data, msg, errMsg = "Error al guardar"){
   const p = S.pedidos[id] || {}, prev = {};
   Object.keys(data).forEach(k => prev[k] = p[k] === undefined ? null : p[k]);
   try { await updateDoc(doc(S.db, "pedidos/" + id), data); }
@@ -2445,9 +2445,9 @@ async function cambiar(id, data, msg, errMsg = "No se pudo actualizar el pedido"
 const BORRAR = {};
 function borrarPedido(p){
   const id = p._id;
-  const real = () => { if (!BORRAR[id]) return; delete BORRAR[id]; deleteDoc(doc(S.db, "pedidos/" + id)).then(() => { for (const im of (p.imagenes || [])) deleteDoc(doc(S.db, "fotos/" + im)).catch(() => {}); }).catch(() => { toast("No se pudo eliminar el pedido", true); S.remerge && S.remerge(); }); };
+  const real = () => { if (!BORRAR[id]) return; delete BORRAR[id]; deleteDoc(doc(S.db, "pedidos/" + id)).then(() => { for (const im of (p.imagenes || [])) deleteDoc(doc(S.db, "fotos/" + im)).catch(() => {}); }).catch(() => { toast("Error al eliminar", true); S.remerge && S.remerge(); }); };
   BORRAR[id] = real; S.remerge && S.remerge();
-  toastUndo(`Pedido ${p.codigo || ""} eliminado`, async () => { delete BORRAR[id]; S.remerge && S.remerge(); }, 7000, real);
+  toastUndo("Eliminado", async () => { delete BORRAR[id]; S.remerge && S.remerge(); }, 7000, real);
 }
 addEventListener("pagehide", () => Object.values(BORRAR).forEach(f => f()));
 document.addEventListener("visibilitychange", () => { if (document.visibilityState === "hidden") Object.values(BORRAR).forEach(f => f()); });
