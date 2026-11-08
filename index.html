@@ -488,11 +488,52 @@ table.mx{border-collapse:collapse;width:100%;font-size:13px}
 .pk.np.ok{background:var(--accent);border-color:var(--accent);color:var(--accent-ink)}
 .pk.np.ok svg.i{width:24px;height:24px}
 
+/* tarjeta de pedido compacta (v2.17) */
+.oc2{display:flex;gap:12px;align-items:center;background:var(--surface);border:1px solid var(--line);border-left:3px solid var(--c);border-radius:12px;padding:10px 12px;cursor:pointer;min-width:0}
+.oc2:hover{border-color:color-mix(in srgb,var(--c) 45%,var(--line));border-left-color:var(--c)}
+.oc2-img{width:44px;height:44px;border-radius:9px;object-fit:cover;background:var(--surface-2);flex:none}
+.oc2-main{flex:1;min-width:0;display:flex;flex-direction:column;gap:3px}
+.oc2-top{display:flex;align-items:center;gap:6px;min-width:0}
+.oc2-name{font-size:15px;font-weight:800;flex:1;min-width:0;white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
+.oc2-due{flex:none;font-size:11.5px;font-weight:800;border-radius:99px;padding:2px 8px;background:var(--surface-2);color:var(--muted)}
+.oc2-due.warn{color:var(--warn);background:color-mix(in srgb,var(--warn) 12%,var(--surface))}
+.oc2-due.err{color:var(--err);background:color-mix(in srgb,var(--err) 10%,var(--surface))}
+.oc2-due.ok{color:var(--ok);background:color-mix(in srgb,var(--ok) 12%,var(--surface))}
+.oc2-due.info{color:var(--t-info);background:color-mix(in srgb,var(--t-info) 10%,var(--surface))}
+.oc2-urg{flex:none;font-size:10.5px;font-weight:800;border-radius:6px;padding:2px 6px;background:var(--ink);color:var(--bg);text-transform:uppercase;letter-spacing:.04em}
+.oc2-items{font-size:13px;color:var(--ink);white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
+.oc2-meta{display:flex;gap:12px;align-items:center;font-size:12px;color:var(--muted);font-weight:600;min-width:0;overflow:hidden}
+.oc2-meta span{white-space:nowrap}
+.oc2-meta svg.i{width:12px;height:12px}
+.oc2-meta .saldo{color:var(--ink)}
+.oc2-meta .pag{color:var(--ok)}
+.col{gap:8px}
+/* detalle del pedido (v2.17) */
+.mb>*{flex-shrink:0}
+.facts{display:grid;grid-template-columns:repeat(3,minmax(0,1fr));border:1px solid var(--line);border-radius:12px;background:var(--surface);overflow:hidden}
+.facts>div{display:flex;flex-direction:column;align-items:flex-start;gap:3px;padding:12px;min-width:0}
+.facts>div+div{border-left:1px solid var(--line)}
+.facts small{font-size:11.5px;color:var(--muted);font-weight:600}
+.facts b{font-size:14px;font-weight:800;line-height:1.25}
+.kv{grid-template-columns:110px 1fr;gap:10px 12px}
+.il2{list-style:none;margin:0;padding:0;display:flex;flex-direction:column}
+.il2 li{display:flex;gap:12px;align-items:flex-start;padding:10px 0;border-bottom:1px solid var(--line)}
+.il2 li:last-child{border-bottom:0;padding-bottom:0}
+.il2 li:first-child{padding-top:0}
+.il2 .q{flex:none;min-width:28px;height:28px;border-radius:8px;background:var(--surface-2);display:grid;place-items:center;font-weight:800;font-size:13px}
+.il2 .d{display:flex;flex-direction:column;gap:2px;min-width:0}
+.il2 .d b{font-size:14px}
+.il2 .d small{display:flex;flex-wrap:wrap;gap:2px 10px;font-size:12.5px;color:var(--muted);font-weight:500}
+.totals.t2{grid-template-columns:repeat(2,minmax(0,1fr))}
+.drow2{display:grid;grid-auto-flow:column;grid-auto-columns:1fr;gap:8px}
+.drow2 .btn{width:100%;min-height:44px}
+
 @media (max-width:1000px){
   .cols{grid-template-columns:minmax(0,1fr)}
   .tipotabs{display:flex}
   .cols .col.off{display:none}
   .colhead .add{display:none}
+  .tipotabs~.cols .colhead{display:none}
 }
 @media (max-width:760px){
   .side{inset:auto 0 0 0;width:auto;height:auto;flex-direction:row;justify-content:space-around;padding:6px max(4px,env(safe-area-inset-right,0px)) calc(6px + env(safe-area-inset-bottom,0px)) max(4px,env(safe-area-inset-left,0px));border-right:0;border-top:1px solid var(--line)}
@@ -544,6 +585,10 @@ table.mx{border-collapse:collapse;width:100%;font-size:13px}
   .m-tabs button{padding:9px}
   .irow3 .tl{width:82px}
   .ov.popup.pick .md{max-height:86%}
+  .facts>div{padding:10px}
+  .facts b{font-size:13px}
+  .totals.t2{grid-template-columns:repeat(2,minmax(0,1fr))}
+  .kv{grid-template-columns:96px 1fr}
   .ov{padding:0}
   .md{border-radius:0;height:100%;max-width:none;border:0}
   .mh,.mf{border-radius:0}
@@ -567,7 +612,7 @@ import { initializeApp, deleteApp } from "https://www.gstatic.com/firebasejs/10.
 import { getAuth, onAuthStateChanged, signInWithEmailAndPassword, createUserWithEmailAndPassword, signOut, updatePassword, reauthenticateWithCredential, EmailAuthProvider } from "https://www.gstatic.com/firebasejs/10.12.2/firebase-auth.js";
 import { initializeFirestore, getFirestore, persistentLocalCache, persistentMultipleTabManager, doc, collection, query, where, onSnapshot, getDoc, setDoc, updateDoc, deleteDoc, writeBatch } from "https://www.gstatic.com/firebasejs/10.12.2/firebase-firestore.js";
 
-const VERSION = "v2.16";
+const VERSION = "v2.17";
 /* ================= Utilidades ================= */
 const $ = (s, r = document) => r.querySelector(s);
 const esc = s => String(s ?? "").replace(/[&<>"']/g, c => ({"&":"&amp;","<":"&lt;",">":"&gt;",'"':"&quot;","'":"&#39;"}[c]));
@@ -979,16 +1024,23 @@ function totales(p){
   const total = piezas * num(p.precio);
   return {piezas, total, abono:num(p.abono), saldo:Math.max(0, total - num(p.abono))};
 }
+function dueShort(p){
+  if (p.estado === "entregado") return {t:"Entregado", c:"ok"};
+  if (p.estado === "listo") return p.avisado ? {t:"Avisado", c:"ok"} : {t:"Por avisar", c:"info"};
+  if (!p.fechaEntrega) return {t:"", c:""};
+  const n = daysUntil(p.fechaEntrega), d = cfg().dias;
+  return {t: n < 0 ? `Vencido ${-n} d` : n === 0 ? "Hoy" : n === 1 ? "Mañana" : `En ${n} días`, c: n < 0 ? "err" : n <= d ? "warn" : ""};
+}
 function cardHTML(p){
-  const T = TIPOS[p.tipo], t = totales(p), g = grupos(p), im = (p.imagenes || [])[0];
-  return `<div class="oc" role="button" tabindex="0" style="--c:${T.c}" data-open="${esc(p._id)}">
-    <span class="tx">
-      <span class="r1"><span class="code">${esc(p.codigo)}</span>${p.urgente ? `<span class="tag urg">URGENTE</span>` : ""}${p.servicio ? `<span class="tag c">${esc(p.servicio)}</span>` : ""}</span>
-      <div class="nm">${esc(p.cliente && p.cliente.nombre)}</div>
-      <div class="ln">${g.slice(0, 3).map(x => `<div>${esc(x)}</div>`).join("")}${g.length > 3 ? `<div>+ ${g.length - 3} más…</div>` : ""}</div>
-      <span class="mt">${dueTag(p)}<span class="tag">${I("shirt")}${t.piezas} pz</span>${t.saldo > 0 ? `<span class="tag">${I("cash")}Saldo ${esc(money(t.saldo, p.moneda))}</span>` : `<span class="tag c ok">${I("cash")}Pagado</span>`}${(p.asignados || []).length ? `<span class="tag">${I("lock")}${p.asignados.length}</span>` : ""}</span>
-    </span>
-    ${im ? `<img class="thumb" data-foto="${esc(im)}" alt="">` : ""}
+  const T = TIPOS[p.tipo], t = totales(p), im = (p.imagenes || [])[0], due = dueShort(p);
+  const items = (p.items || []).map(i => `${i.prenda} ${i.color} ${i.talla}${i.cant > 1 ? " ×" + i.cant : ""}`).join(", ");
+  return `<div class="oc2" role="button" tabindex="0" style="--c:${T.c}" data-open="${esc(p._id)}">
+    ${im ? `<img class="oc2-img" data-foto="${esc(im)}" alt="">` : ""}
+    <div class="oc2-main">
+      <div class="oc2-top"><b class="oc2-name">${esc(p.cliente && p.cliente.nombre)}</b>${p.urgente ? `<span class="oc2-urg">Urgente</span>` : ""}${due.t ? `<span class="oc2-due ${due.c}">${esc(due.t)}</span>` : ""}</div>
+      <div class="oc2-items">${esc(items)}</div>
+      <div class="oc2-meta">${p.servicio ? `<span>${esc(p.servicio)}</span>` : ""}<span>${t.piezas} pz</span>${t.saldo > 0 ? `<span class="saldo">Saldo ${esc(money(t.saldo, p.moneda))}</span>` : `<span class="pag">Pagado</span>`}${(p.asignados || []).length ? `<span>${I("lock")}</span>` : ""}</div>
+    </div>
   </div>`;
 }
 
@@ -1758,25 +1810,28 @@ function openDetail(id){
   const p = S.pedidos[id]; if (!p) return;
   const T = TIPOS[p.tipo], t = totales(p), pr = perm(), est = p.estado || "pendiente";
   const ov = modal(`
-    <div class="mh"><span class="chip" style="--c:${T.c}">${I(T.icon)}</span><h2>${esc(p.codigo)} · ${esc(p.cliente.nombre)}</h2><button class="ib" data-close>${I("x")}</button></div>
+    <div class="mh"><span class="chip" style="--c:${T.c}">${I(T.icon)}</span><h2>${esc(p.cliente.nombre)}</h2><button class="ib" data-close>${I("x")}</button></div>
     <div class="mb">
-      <div class="oc" style="--c:${T.c};cursor:default;flex-wrap:wrap;gap:6px"><span class="tag c">${T.label}</span>${dueTag(p)}${p.urgente ? `<span class="tag urg">URGENTE</span>` : ""}</div>
-      <div class="fsec"><div class="sec">${I("user")}Cliente</div><dl class="kv"><dt>Nombre</dt><dd>${esc(p.cliente.nombre)}</dd><dt>WhatsApp</dt><dd><a href="https://wa.me/${esc(p.cliente.telefono)}" target="_blank" rel="noopener" style="color:var(--t-wa)">${esc(prettyPhone(p.cliente.telefono))}</a></dd></dl></div>
+      <div class="facts" style="--c:${T.c}">
+        <div><small>Entrega</small><b>${esc(fmtDate(p.fechaEntrega).slice(0, -5))}</b>${(() => { const d = dueShort(p); return d.t && est === "pendiente" ? `<span class="oc2-due ${d.c}">${esc(d.t)}</span>` : ""; })()}</div>
+        <div><small>Tipo</small><b>${T.label}</b></div>
+        <div><small>Estado</small><b>${est === "pendiente" ? "Pendiente" : est === "listo" ? (p.avisado ? "Listo, avisado" : "Listo") : "Entregado"}</b>${p.urgente ? `<span class="oc2-urg">Urgente</span>` : ""}</div>
+      </div>
+      <div class="fsec"><div class="sec">${I("user")}Cliente</div><dl class="kv"><dt>WhatsApp</dt><dd><a href="https://wa.me/${esc(p.cliente.telefono)}" target="_blank" rel="noopener" style="color:var(--t-wa)">${esc(prettyPhone(p.cliente.telefono))}</a></dd></dl></div>
       <div class="fsec"><div class="sec">${I(T.icon)}Detalles</div><dl class="kv">
-        ${p.tema ? `<dt>Tema</dt><dd>${esc(p.tema)}</dd>` : ""}${p.servicio ? `<dt>Tipo de estampado</dt><dd>${esc(p.servicio)}</dd>` : ""}
+        ${p.tema ? `<dt>Tema</dt><dd>${esc(p.tema)}</dd>` : ""}${p.servicio ? `<dt>Estampado</dt><dd>${esc(p.servicio)}</dd>` : ""}
         ${p.tipo === "personalizado" ? `<dt>Prenda</dt><dd>${p.prendaDe === "cliente" ? "La trae el cliente" : "La pone la tienda"}</dd>` : ""}
         <dt>Etiqueta</dt><dd>${esc(p.etiqueta || "—")}</dd></dl></div>
       <div class="fsec"><div class="sec">${I("shirt")}Prendas <small>${t.piezas} piezas</small></div>
-        <ul class="il">${(p.items || []).map(i => `<li><span class="q">${i.cant}×</span><span><b>${esc(i.prenda)} ${esc(i.color)} ${esc(i.talla)}</b>${i.nombre ? ` — ${esc(i.nombre)}` : ""}${i.numero ? ` <b>#${esc(i.numero)}</b>` : ""}${[i.horma, i.etiqueta].filter(Boolean).length ? ` <span class="note" style="display:inline">· ${esc([i.horma, i.etiqueta].filter(Boolean).join(" · "))}</span>` : ""}</span></li>`).join("")}</ul></div>
-      <div class="fsec"><div class="sec">${I("cash")}Pago</div><div class="totals"><div class="tot"><small>Precio unidad</small><b class="num">${esc(money(p.precio, p.moneda))}</b></div><div class="tot"><small>Total</small><b class="num">${esc(money(t.total, p.moneda))}</b></div><div class="tot"><small>Abono</small><b class="num">${esc(money(t.abono, p.moneda))}</b></div><div class="tot"><small>Saldo</small><b class="num" style="color:${t.saldo > 0 ? "var(--err)" : "var(--ok)"}">${esc(money(t.saldo, p.moneda))}</b></div></div>${p.motivoSinAbono ? `<p class="note"><b>Sin abono:</b> ${esc(p.motivoSinAbono)}</p>` : ""}</div>
+        <ul class="il2">${(p.items || []).map(i => { const sub = [i.horma, i.etiqueta, i.nombre, i.numero ? "N° " + i.numero : ""].filter(Boolean); return `<li><span class="q num">${i.cant}</span><span class="d"><b>${esc(i.prenda)} ${esc(i.color)} ${esc(i.talla)}</b>${sub.length ? `<small>${sub.map(x => `<span>${esc(x)}</span>`).join("")}</small>` : ""}</span></li>`; }).join("")}</ul></div>
+      <div class="fsec"><div class="sec">${I("cash")}Pago</div><div class="totals t2"><div class="tot"><small>Precio unidad</small><b class="num">${esc(money(p.precio, p.moneda))}</b></div><div class="tot"><small>Total</small><b class="num">${esc(money(t.total, p.moneda))}</b></div><div class="tot"><small>Abono</small><b class="num">${esc(money(t.abono, p.moneda))}</b></div><div class="tot"><small>Saldo</small><b class="num" style="color:${t.saldo > 0 ? "var(--err)" : "var(--ok)"}">${esc(money(t.saldo, p.moneda))}</b></div></div>${p.motivoSinAbono ? `<p class="note"><b>Sin abono:</b> ${esc(p.motivoSinAbono)}</p>` : ""}</div>
       ${(p.imagenes || []).length ? `<div class="fsec"><div class="sec">${I("camera")}Referencias</div><div class="imgs">${p.imagenes.map(im => `<div class="imgbox"><img data-foto="${esc(im)}" alt=""></div>`).join("")}</div></div>` : ""}
       ${p.nota ? `<div class="fsec"><div class="sec">${I("note")}Nota</div><div class="notebox">${esc(p.nota)}</div></div>` : ""}
       <p class="hist">Registrado: ${fmtDT(p.creadoEn)} por ${esc(nameOf(p.creadoPor))}${p.editadoEn ? `<br>Última edición: ${fmtDT(p.editadoEn)} por ${esc(nameOf(p.editadoPor))}` : ""}${p.listoEn ? `<br>Completado: ${fmtDT(p.listoEn)}` : ""}${p.avisadoEn ? `<br>Cliente avisado: ${fmtDT(p.avisadoEn)}` : ""}${p.entregadoEn ? `<br>Entregado: ${fmtDT(p.entregadoEn)}` : ""}${(p.asignados || []).length ? `<br>Visible solo para: ${esc(p.asignados.map(nameOf).join(", "))}` : ""}</p>
     </div>
     <div class="mf dfoot">
-      <div class="drow">
+      <div class="drow2">
         ${est !== "pendiente" ? `<button class="btn" id="d-reab">${I("undo")}Reabrir</button>` : ""}
-        <span style="flex:1"></span>
         ${pr.eliminar ? `<button class="btn danger" id="d-del">${I("trash")}Eliminar</button>` : ""}
         <button class="btn" id="d-edit">${I("edit")}Editar</button>
       </div>
