@@ -1,6 +1,6 @@
 // Permite instalar la app y abrirla aunque la conexión sea lenta.
 // Los pedidos NO se guardan aquí: los maneja Firebase (con su propia caché sin conexión).
-const CACHE = "pedidos-v80";
+const CACHE = "pedidos-v81";
 const SHELL = ["./", "./index.html", "./config.js", "./manifest.webmanifest", "./icono-192.png", "./icono-512.png"];
 self.addEventListener("install", e => { e.waitUntil(caches.open(CACHE).then(c => c.addAll(SHELL)).then(() => self.skipWaiting())); });
 self.addEventListener("activate", e => { e.waitUntil(caches.keys().then(ks => Promise.all(ks.filter(k => k !== CACHE).map(k => caches.delete(k)))).then(() => self.clients.claim())); });

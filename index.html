@@ -827,6 +827,16 @@ body.fixedv{scrollbar-width:none}
 .pcur div{display:flex;flex-direction:column;min-width:0}
 .pcur b{font-size:15.5px}
 .pcur small{color:var(--muted);font-size:13px;white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
+/* v2.80 barra de cambios igual a la búsqueda; tarjetas como las de Pedidos */
+.revbar{max-width:520px;min-height:40px;border-radius:9px;padding:0 11px;gap:8px;font-size:14px;font-weight:600}
+.revbar svg.i{width:20px;height:20px}
+.rvcard{cursor:pointer}
+.rvcard .rvw{display:inline-flex;align-items:center;gap:5px}
+.rvcard .rvw svg.i{width:13px;height:13px}
+.rvcard .rvc{margin-top:6px}
+.rvok{flex:none;margin-left:auto;width:30px;height:30px;border-radius:99px;display:grid;place-items:center;border:1px solid #bbf7d0;background:#dcfce7;color:#15803d;cursor:pointer;padding:0}
+.rvok svg.i{width:16px;height:16px;stroke-width:2.6}
+:root[data-theme="dark"] .rvok{background:#12311f;border-color:#1f4d31;color:#86efac}
 @media (max-width:1000px){.hello{padding-bottom:8px;margin-top:-6px}.hello h1{font-size:25px}}
 @media (max-width:1000px){.tiles.t5>:last-child{grid-column:1/-1}}
 @media (max-width:1000px){.pill.demo .m-pr{display:inline}}
@@ -920,7 +930,7 @@ import { initializeApp, deleteApp } from "https://www.gstatic.com/firebasejs/10.
 import { getAuth, onAuthStateChanged, signInWithEmailAndPassword, createUserWithEmailAndPassword, signOut, updatePassword, reauthenticateWithCredential, EmailAuthProvider } from "https://www.gstatic.com/firebasejs/10.12.2/firebase-auth.js";
 import { initializeFirestore, getFirestore, persistentLocalCache, persistentMultipleTabManager, doc, collection, query, where, onSnapshot, getDoc, setDoc, updateDoc, deleteDoc, writeBatch, runTransaction } from "https://www.gstatic.com/firebasejs/10.12.2/firebase-firestore.js";
 
-const VERSION = "v2.79";
+const VERSION = "v2.80";
 /* ================= Utilidades ================= */
 const $ = (s, r = document) => r.querySelector(s);
 const esc = s => String(s ?? "").replace(/[&<>"']/g, c => ({"&":"&amp;","<":"&lt;",">":"&gt;",'"':"&quot;","'":"&#39;"}[c]));
@@ -1329,20 +1339,23 @@ const revisarList = () => pedidosList().filter(p => p.revisar).sort((a, b) => St
 function openRevisar(){
   if (!perm().admin) return;
   const ov = modal(`<div class="mh"><h2>Cambios del equipo</h2><button class="ib" data-close>${I("x")}</button></div><div class="mb" id="rvb"></div><div class="mf rvf"><button class="btn" id="rvall">Descartar todas</button><button class="btn primary" data-close>Cerrar</button></div>`, "rvmd");
-  const draw = () => {
+  let draw = () => {
     const l = revisarList();
     $("#rvall", ov).disabled = !l.length;
-    $("#rvb", ov).innerHTML = l.length ? l.map(p => `<div class="rvit" style="--c:${TIPOS[p.tipo].c}">
-        <div class="rvh"><span class="rvcode">${esc(p.codigo || "")}</span><b>${esc(p.cliente && p.cliente.nombre)}</b></div>
-        <div class="rvt">${esc(p.tema || "Sin nombre de diseño")}</div>
-        <div class="rvw">${I("edit")}${esc(nameOf(p.revisarPor))} · ${esc(fmtDT(p.revisarEn))}</div>
-        <div class="rvc">${(p.revisarCambios || []).map(c => `<span>${esc(c)}</span>`).join("")}</div>
-        <div class="rva"><button class="btn sm" data-rvdel="${esc(p._id)}">Descartar</button><button class="btn sm primary" data-rvver="${esc(p._id)}">Ver pedido</button></div>
-      </div>`).join("") : `<p class="note rvempty">${I("check")}No hay cambios pendientes por revisar.</p>`;
+    $("#rvb", ov).innerHTML = l.length ? l.map(p => { const T = TIPOS[p.tipo], im = (p.imagenes || [])[0]; return `<div class="oc2 rvcard" role="button" tabindex="0" style="--c:${T.c}" data-rvver="${esc(p._id)}">
+        <div class="oc2-side"><span class="oc2-code">${esc(p.codigo || "")}</span>${im ? `<img class="oc2-img" data-foto="${esc(im)}" alt="">` : `<span class="oc2-img oc2-noimg">${I(T.icon)}</span>`}</div>
+        <div class="oc2-main">
+          <div class="oc2-top"><b class="oc2-name">${esc(p.cliente && p.cliente.nombre)}</b><button type="button" class="rvok" data-rvdel="${esc(p._id)}" title="Descartar" aria-label="Descartar">${I("check")}</button></div>
+          <div class="oc2-items">${esc(p.tema || "Sin nombre de diseño")}</div>
+          <div class="oc2-meta"><span class="rvw">${I("edit")}${esc(nameOf(p.revisarPor))} · ${esc(fmtDT(p.revisarEn))}</span></div>
+          <div class="rvc">${(p.revisarCambios || []).map(c => `<span>${esc(c)}</span>`).join("")}</div>
+        </div>
+      </div>`; }).join("") : `<p class="note rvempty">${I("check")}No hay cambios pendientes por revisar.</p>`;
   };
+  const draw0 = draw; draw = () => { draw0(); loadFotos($("#rvb", ov)); };
   draw(); const t = setInterval(() => { if (!document.body.contains(ov)) return clearInterval(t); draw(); }, 1500);
   ov.addEventListener("click", e => {
-    const v = e.target.closest("[data-rvver]"), x = e.target.closest("[data-rvdel]");
+    const x = e.target.closest("[data-rvdel]"), v = !x && e.target.closest("[data-rvver]");
     if (v) openDetail(v.dataset.rvver);
     if (x) { cambiar(x.dataset.rvdel, {revisar:false}, "Descartado").then(draw); }
   });
