@@ -827,7 +827,7 @@ import { initializeApp, deleteApp } from "https://www.gstatic.com/firebasejs/10.
 import { getAuth, onAuthStateChanged, signInWithEmailAndPassword, createUserWithEmailAndPassword, signOut, updatePassword, reauthenticateWithCredential, EmailAuthProvider } from "https://www.gstatic.com/firebasejs/10.12.2/firebase-auth.js";
 import { initializeFirestore, getFirestore, persistentLocalCache, persistentMultipleTabManager, doc, collection, query, where, onSnapshot, getDoc, setDoc, updateDoc, deleteDoc, writeBatch, runTransaction } from "https://www.gstatic.com/firebasejs/10.12.2/firebase-firestore.js";
 
-const VERSION = "v2.36";
+const VERSION = "v2.37";
 /* ================= Utilidades ================= */
 const $ = (s, r = document) => r.querySelector(s);
 const esc = s => String(s ?? "").replace(/[&<>"']/g, c => ({"&":"&amp;","<":"&lt;",">":"&gt;",'"':"&quot;","'":"&#39;"}[c]));
@@ -1244,15 +1244,16 @@ function grupos(p){
   return Object.entries(g).map(([k, t]) => `${k}: ${Object.entries(t).map(([s, n]) => `${s}×${n}`).join(", ")}`);
 }
 function servsDe(p){ return Array.isArray(p.servicios) ? [...p.servicios] : p.servicio ? String(p.servicio).split(", ").filter(Boolean) : []; }
+const prKey = i => i.prenda ? (i.horma ? `${i.prenda} · ${i.horma}` : i.prenda) : "";
 function precioDe(p, prenda){
   if (p.pr) return num(p.pr[prenda]);
-  if (Array.isArray(p.precios)) { const x = p.precios.find(z => z.n === prenda); if (x) return num(x.v); }
+  if (Array.isArray(p.precios)) { const x = p.precios.find(z => z.n === prenda) || p.precios.find(z => z.n === String(prenda).split(" · ")[0]); if (x) return num(x.v); }
   return num(p.precio);
 }
-function prendasDe(p){ const g = {}; (p.items || []).forEach(i => { if (i.prenda) g[i.prenda] = (g[i.prenda] || 0) + (Number(i.cant) || 1); }); return g; }
+function prendasDe(p){ const g = {}; (p.items || []).forEach(i => { const k = prKey(i); if (k) g[k] = (g[k] || 0) + (Number(i.cant) || 1); }); return g; }
 function totales(p){
   const piezas = (p.items || []).reduce((s, i) => s + (Number(i.cant) || 1), 0);
-  const total = (p.items || []).reduce((s, i) => s + (Number(i.cant) || 1) * precioDe(p, i.prenda), 0);
+  const total = (p.items || []).reduce((s, i) => s + (Number(i.cant) || 1) * precioDe(p, prKey(i)), 0);
   return {piezas, total, abono:num(p.abono), saldo:Math.max(0, total - num(p.abono))};
 }
 function dueShort(p){
@@ -1787,7 +1788,7 @@ function openForm(id, tipo, cliente){
   F.items = (F.items || []).map(i => Object.assign({etiqueta: F.etiqueta || ""}, i));
   F.imagenes = (F.imagenes || []).map(id => ({id}));
   F.servicios = servsDe(F);
-  F.pr = {}; (F.items || []).forEach(i => { if (i.prenda && F.pr[i.prenda] === undefined) { const v = precioDe(F, i.prenda); F.pr[i.prenda] = v ? String(v) : ""; } });
+  { const pr = {}; delete F.pr; (F.items || []).forEach(i => { const k = prKey(i); if (k && pr[k] === undefined) { const v = precioDe(F, k); pr[k] = v ? String(v) : ""; } }); F.pr = pr; }
   F.step = 0; F.visto = [true, false, false, false];
   const marcas = c.cat.marcas.includes(F.etiqueta) || !F.etiqueta ? c.cat.marcas : [...c.cat.marcas, F.etiqueta];
   const empleados = Object.values(S.usuarios).filter(u => u.activo && u.rol !== "admin");
@@ -2110,7 +2111,7 @@ function renderPrecios(){
   const box = $("#prl", F._ov); if (!box) return;
   const g = prendasDe(F), ks = Object.keys(g);
   ks.forEach(k => { if (F.pr[k] === undefined) F.pr[k] = ""; });
-  box.innerHTML = ks.length ? ks.map(k => `<div class="prrow"><span class="prn"><b>${esc(k)}</b><small>${g[k]} pieza${g[k] === 1 ? "" : "s"}</small></span><input class="inp num${F._prShow && !(num(F.pr[k]) > 0) ? " bad" : ""}" data-pr="${esc(k)}" inputmode="decimal" placeholder="0" value="${esc(F.pr[k])}"></div>`).join("") : `<div class="prempty">Agrega prendas en el paso anterior</div>`;
+  box.innerHTML = ks.length ? ks.map(k => `<div class="prrow"><span class="prn"><b>${esc(k.split(" · ")[0])}</b><small>${k.includes(" · ") ? esc(k.split(" · ").slice(1).join(" · ")) + " · " : ""}${g[k]} pieza${g[k] === 1 ? "" : "s"}</small></span><input class="inp num${F._prShow && !(num(F.pr[k]) > 0) ? " bad" : ""}" data-pr="${esc(k)}" inputmode="decimal" placeholder="0" value="${esc(F.pr[k])}"></div>`).join("") : `<div class="prempty">Agrega prendas en el paso anterior</div>`;
 }
 function renderTotals(){
   const t = totales(F), ab = num(F.abono);
@@ -2233,7 +2234,7 @@ function openDetail(id){
         ${extra.length ? `<div class="pdextra">${extra.map(x => `<span>${esc(x)}</span>`).join("")}</div>` : ""}
         <hr>
         <div class="pdrow"><span class="pdlbl">PRENDAS</span><span class="pdmut">${t.piezas} ${t.piezas === 1 ? "pieza" : "piezas"}</span></div>
-        <ul class="pdit">${(p.items || []).map(i => { const sub = [i.horma, i.etiqueta, i.nombre, i.numero ? "N° " + i.numero : ""].filter(Boolean); return `<li><span class="q num">${i.cant}</span><span class="d"><b>${esc(i.prenda)} ${esc(i.color.toLowerCase())} · ${esc(i.talla)}</b>${sub.length ? `<small>${esc(sub.join(" · "))}</small>` : ""}</span><span class="pr num">${esc(money((Number(i.cant) || 1) * precioDe(p, i.prenda), p.moneda))}</span></li>`; }).join("")}</ul>
+        <ul class="pdit">${(p.items || []).map(i => { const sub = [i.horma, i.etiqueta, i.nombre, i.numero ? "N° " + i.numero : ""].filter(Boolean); return `<li><span class="q num">${i.cant}</span><span class="d"><b>${esc(i.prenda)} ${esc(i.color.toLowerCase())} · ${esc(i.talla)}</b>${sub.length ? `<small>${esc(sub.join(" · "))}</small>` : ""}</span><span class="pr num">${esc(money((Number(i.cant) || 1) * precioDe(p, prKey(i)), p.moneda))}</span></li>`; }).join("")}</ul>
       </div>
       <div class="pdcard">
         <div class="pdrow"><span class="pdlbl ic">${I("cash")}PAGO</span></div>
