@@ -802,6 +802,26 @@ table.mx{border-collapse:collapse;width:100%;font-size:13px}
 html:has(body.fixedv){scrollbar-width:none}
 html:has(body.fixedv)::-webkit-scrollbar,body.fixedv::-webkit-scrollbar{display:none;width:0;height:0}
 body.fixedv{scrollbar-width:none}
+/* v2.74 cambios del equipo */
+@media (min-width:1001px){.tiles.t6{grid-template-columns:repeat(3,minmax(0,1fr))}}
+.revbar{display:flex;align-items:center;gap:8px;width:100%;border:1px solid color-mix(in srgb,#db2777 25%,var(--line));background:color-mix(in srgb,#db2777 7%,var(--surface));color:var(--ink);border-radius:12px;padding:8px 12px;font:inherit;font-size:13.5px;cursor:pointer;text-align:left}
+.revbar svg.i{width:16px;height:16px;color:#db2777;flex:none}
+.revbar span{flex:1;min-width:0;white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
+.revbar em{font-style:normal;font-weight:800;color:#db2777}
+.rvit{border:1px solid var(--line);border-left:4px solid var(--c);border-radius:14px;padding:12px 14px;background:var(--surface);display:flex;flex-direction:column;gap:4px}
+.rvh{display:flex;align-items:baseline;gap:8px}
+.rvcode{font-size:11px;font-weight:800;color:var(--muted)}
+.rvh b{font-size:15.5px}
+.rvt{font-weight:600;font-size:14px}
+.rvw{display:flex;align-items:center;gap:6px;color:var(--muted);font-size:12.5px}
+.rvw svg.i{width:13px;height:13px}
+.rvc{display:flex;flex-wrap:wrap;gap:6px;margin-top:4px}
+.rvc span{font-size:11.5px;font-weight:800;border-radius:99px;padding:2px 9px;background:color-mix(in srgb,#db2777 10%,var(--surface));color:#be185d;border:1px solid color-mix(in srgb,#db2777 25%,var(--line))}
+:root[data-theme="dark"] .rvc span{color:#f472b6}
+.rva{display:flex;justify-content:flex-end;gap:8px;margin-top:6px}
+.rvempty{display:flex;align-items:center;gap:8px}
+#rvb{display:flex;flex-direction:column;gap:10px}
+.rvf{justify-content:space-between}
 @media (max-width:1000px){.hello{padding-bottom:8px;margin-top:-6px}.hello h1{font-size:25px}}
 @media (max-width:1000px){.tiles.t5>:last-child{grid-column:1/-1}}
 @media (max-width:1000px){.pill.demo .m-pr{display:inline}}
@@ -895,7 +915,7 @@ import { initializeApp, deleteApp } from "https://www.gstatic.com/firebasejs/10.
 import { getAuth, onAuthStateChanged, signInWithEmailAndPassword, createUserWithEmailAndPassword, signOut, updatePassword, reauthenticateWithCredential, EmailAuthProvider } from "https://www.gstatic.com/firebasejs/10.12.2/firebase-auth.js";
 import { initializeFirestore, getFirestore, persistentLocalCache, persistentMultipleTabManager, doc, collection, query, where, onSnapshot, getDoc, setDoc, updateDoc, deleteDoc, writeBatch, runTransaction } from "https://www.gstatic.com/firebasejs/10.12.2/firebase-firestore.js";
 
-const VERSION = "v2.73";
+const VERSION = "v2.75";
 /* ================= Utilidades ================= */
 const $ = (s, r = document) => r.querySelector(s);
 const esc = s => String(s ?? "").replace(/[&<>"']/g, c => ({"&":"&amp;","<":"&lt;",">":"&gt;",'"':"&quot;","'":"&#39;"}[c]));
@@ -1232,7 +1252,8 @@ let renderQ = false;
 function render(){ if (renderQ) return; renderQ = true; requestAnimationFrame(() => { renderQ = false; doRender(); }); }
 function doRender(){
   document.body.classList.toggle("fixedv", S.view === "resumen");
-  if (S.view !== "equipo") S.uOpen = null; // al salir de Equipo, los usuarios vuelven a verse compactos
+  if (S.view !== "equipo") S.uOpen = null;
+  if (S.view !== "ajustes") S.lopen = null; // al salir de Ajustes, las opciones vuelven a verse contraídas // al salir de Equipo, los usuarios vuelven a verse compactos
   if (!S.me || !S.me.activo) return;
   const pr = perm(), a = alertas(), c = cfg();
   const nAv = a.vencidos.length + a.proximos.length + a.avisar.length + a.retiro.length;
@@ -1263,6 +1284,7 @@ function doRender(){
       <button class="pill" id="meBtn">${I("user")}${esc(S.me.nombre || S.me.usuario)}${pr.admin ? " · Admin" : ""}</button>
     </div>
     <main class="main">
+      ${pr.admin && revisarList().length ? `<button class="revbar" data-act="revisar">${I("edit")}<span><b>${revisarList().length}</b> pedido${revisarList().length === 1 ? "" : "s"} editado${revisarList().length === 1 ? "" : "s"} por el equipo</span><em>Ver</em></button>` : ""}
       ${S.view === "avisos" ? viewAvisos(a) : S.view === "pedidos" ? viewPedidos(a, pr) : S.view === "equipo" && pr.admin ? viewEquipo() : S.view === "ajustes" && pr.admin ? viewAjustes() : viewResumen(a, pr)}
     </main>
   </div>`;
@@ -1297,6 +1319,35 @@ function filtrar(tipo){
   l.sort((a, b) => f === "entregados" ? String(b.entregadoEn || "").localeCompare(a.entregadoEn || "") : key(a).localeCompare(key(b)));
   return l;
 }
+/* ===== Cambios del equipo (solo administrador) ===== */
+const revisarList = () => pedidosList().filter(p => p.revisar).sort((a, b) => String(b.revisarEn).localeCompare(String(a.revisarEn)));
+function openRevisar(){
+  if (!perm().admin) return;
+  const ov = modal(`<div class="mh"><h2>Cambios del equipo</h2><button class="ib" data-close>${I("x")}</button></div><div class="mb" id="rvb"></div><div class="mf rvf"><button class="btn" id="rvall">Descartar todas</button><button class="btn primary" data-close>Cerrar</button></div>`, "rvmd");
+  const draw = () => {
+    const l = revisarList();
+    $("#rvall", ov).disabled = !l.length;
+    $("#rvb", ov).innerHTML = l.length ? l.map(p => `<div class="rvit" style="--c:${TIPOS[p.tipo].c}">
+        <div class="rvh"><span class="rvcode">${esc(p.codigo || "")}</span><b>${esc(p.cliente && p.cliente.nombre)}</b></div>
+        <div class="rvt">${esc(p.tema || "Sin nombre de diseño")}</div>
+        <div class="rvw">${I("edit")}${esc(nameOf(p.revisarPor))} · ${esc(fmtDT(p.revisarEn))}</div>
+        <div class="rvc">${(p.revisarCambios || []).map(c => `<span>${esc(c)}</span>`).join("")}</div>
+        <div class="rva"><button class="btn sm" data-rvdel="${esc(p._id)}">Descartar</button><button class="btn sm primary" data-rvver="${esc(p._id)}">Ver pedido</button></div>
+      </div>`).join("") : `<p class="note rvempty">${I("check")}No hay cambios pendientes por revisar.</p>`;
+  };
+  draw(); const t = setInterval(() => { if (!document.body.contains(ov)) return clearInterval(t); draw(); }, 1500);
+  ov.addEventListener("click", e => {
+    const v = e.target.closest("[data-rvver]"), x = e.target.closest("[data-rvdel]");
+    if (v) openDetail(v.dataset.rvver);
+    if (x) { cambiar(x.dataset.rvdel, {revisar:false}, "Descartado").then(draw); }
+  });
+  $("#rvall", ov).onclick = async () => {
+    const l = revisarList(); if (!l.length) return;
+    const b = writeBatch(S.db); l.forEach(p => b.update(doc(S.db, "pedidos/" + p._id), {revisar:false})); await b.commit();
+    toastUndo("Descartadas", async () => { const u = writeBatch(S.db); l.forEach(p => u.update(doc(S.db, "pedidos/" + p._id), {revisar:true})); await u.commit(); });
+    draw();
+  };
+}
 function viewResumen(a, pr){
   const d = new Date(), h = d.getHours();
   const tipos = ["personalizado","sublimacion"].filter(t => pr.ver[t]);
@@ -1304,12 +1355,13 @@ function viewResumen(a, pr){
   const pendTipo = t => pedidosList().filter(p => p.tipo === t && (p.estado || "pendiente") === "pendiente").length;
   return `
     <div class="hello greet"><h1>${h < 12 ? "Buenos días" : h < 19 ? "Buenas tardes" : "Buenas noches"}, <span>${esc((S.me.nombre || S.me.usuario).split(" ")[0])}</span></h1><span class="date">${I("cal")}${DIAS[d.getDay()]} ${d.getDate()} de ${MESES[d.getMonth()]} ${d.getFullYear()}</span></div>
-    <div class="tiles t5">
+    <div class="tiles ${pr.admin ? "t6" : "t5"}">
       ${tile("var(--accent)","box","Pendientes", a.pend.length, "por producir", "pendientes")}
       ${tile("var(--soon)","clock","Entregas pronto", a.proximos.length, `próximos ${cfg().dias} días`, "avisos")}
       ${tile("var(--err)","alert","Vencidos", a.vencidos.length, a.vencidos.length ? "revisar hoy" : "todo al día", "avisos")}
       ${tile("var(--t-info)","msg","Por avisar", a.avisar.length, "clientes con pedido listo", "avisar")}
       ${(() => { const n = pedidosList().filter(p => p.estado === "listo" && p.avisado).length; return tile("var(--t-violet)","bag","Sin retirar", n, n === 1 ? "cliente avisado que no ha retirado" : "clientes avisados que no han retirado", "retirar"); })()}
+      ${pr.admin ? (() => { const n = revisarList().length; return tile("var(--t-pink, #db2777)","edit","Cambios", n, n ? (n === 1 ? "pedido editado por el equipo" : "pedidos editados por el equipo") : "sin cambios por revisar", "revisar"); })() : ""}
     </div>
     <p class="appver">${esc(cfg().negocio)} · Pedidos · versión ${VERSION}</p>`;
 }
@@ -1581,13 +1633,17 @@ function viewAjustes(){
         <div class="f"><label>Avisar entregas con anticipación de</label><select class="inp" id="cDias">${[0,1,2,3,4,5,7,10,14].map(n => `<option value="${n}" ${n == c.dias ? "selected" : ""}>${n === 0 ? "Solo el mismo día" : n + " día" + (n > 1 ? "s" : "")}</option>`).join("")}</select></div>
         <div class="f"><label>Avisar si un pedido avisado no se retira en</label><select class="inp" id="cDiasRet">${[1,2,3,4,5,7,10,15,30].map(n => `<option value="${n}" ${n == c.diasRetiro ? "selected" : ""}>${n} día${n > 1 ? "s" : ""}</option>`).join("")}</select></div>
       </div>
-      <div class="f"><label>Mensaje de WhatsApp cuando el pedido está listo</label><textarea class="inp" id="cPl" rows="4">${esc(c.plantilla)}</textarea></div>
-      <div class="f"><label>Mensaje de WhatsApp para recordar el retiro</label><textarea class="inp" id="cPlR" rows="3">${esc(c.plantillaRetiro)}</textarea><span class="msg mut">Puedes usar: {cliente} {negocio} {codigo} {resumen} {saldo} {total} {fecha}</span></div>
       <button class="btn primary" id="cSave" style="align-self:flex-end">${I("check")}Guardar</button>
     </div>
     <div class="sec">${I("list")}Opciones de los pedidos</div>
     <div class="lists2">${LISTAS.map(listaHTML).join("")}
       <button class="btn listo crema" id="cReset">${I("undo")}Restaurar opciones originales</button>
+    </div>
+    <div class="card">
+      <div class="sec">${I("msg")}Mensajes de WhatsApp</div>
+      <div class="f"><label>Mensaje de WhatsApp cuando el pedido está listo</label><textarea class="inp" id="cPl" rows="4">${esc(c.plantilla)}</textarea></div>
+      <div class="f"><label>Mensaje de WhatsApp para recordar el retiro</label><textarea class="inp" id="cPlR" rows="3">${esc(c.plantillaRetiro)}</textarea><span class="msg mut">Puedes usar: {cliente} {negocio} {codigo} {resumen} {saldo} {total} {fecha}</span></div>
+      <button class="btn primary" id="cSave2" style="align-self:flex-end">${I("check")}Guardar</button>
     </div>`;
 }
 
@@ -1603,6 +1659,7 @@ function bindMain(){
     if (d.tab) { S.tab = d.tab; render(); return; }
     if (d.filtro) { S.filtro = d.filtro; autoTab(); render(); return; }
     if (d.act === "nuevo") return nuevoPedido(d.tipo);
+    if (d.act === "revisar" || d.tile === "revisar") return openRevisar();
     if (d.act === "mipin") return cambiarMiPin();
     if (d.act === "cuenta") return openCuenta();
     if (d.avisar) { marcarAvisado(d.avisar); return; }
@@ -1641,7 +1698,7 @@ function bindMain(){
   });
   const lin = $("#lin"); if (lin) lin.onkeydown = e => { if (e.key === "Enter") { e.preventDefault(); $("[data-ladd]").click(); } };
   if ($("#cSave")) {
-    $("#cSave").onclick = saveCfg;
+    $("#cSave").onclick = saveCfg; if ($("#cSave2")) $("#cSave2").onclick = saveCfg;
     $("#cReset").onclick = () => confirmar("¿Restaurar las listas originales?", "Se perderán las opciones que agregaste o quitaste.", "Restaurar", async () => { const r = Object.assign({}, S.cfgRaw || {}); delete r.cat; await setDoc(doc(S.db, "config/ajustes"), r); toast("Restaurado"); });
   }
   loadFotos(app);
@@ -2216,12 +2273,13 @@ function renderItems(){
     if (f === "nombre") it.nombre = e.target.value;
     if (e.target.hasAttribute("data-cant")) { e.target.value = e.target.value.replace(/\D/g, "").slice(0, 4); const n = parseInt(e.target.value) || 0; if (n > 0) { it.cant = n; renderTotals(); } }
   };
-  box.onfocusin = e => { if (e.target.hasAttribute("data-cant")) setTimeout(() => e.target.select(), 0); };
-  box.onchange = box.onfocusout = e => {
+  const onIn = e => { if (e.target.hasAttribute("data-cant")) { e.target.placeholder = e.target.value || "1"; e.target.value = ""; } };
+  const onOut = e => {
     if (!e.target.hasAttribute("data-cant")) return;
     const row = e.target.closest("[data-i]"), it = F.items[Number(row.dataset.i)];
-    it.cant = Math.max(1, parseInt(e.target.value) || 1); renderItems(); renderTotals();
+    it.cant = Math.max(1, parseInt(e.target.value) || Number(it.cant) || 1); renderItems(); renderTotals();
   };
+  if (!box._qbound) { box._qbound = true; box.addEventListener("focusin", onIn); box.addEventListener("focusout", onOut); }
 }
 function elegir(it, f){
   const c = cfg().cat, isP = F.tipo === "personalizado";
@@ -2334,6 +2392,15 @@ async function saveForm(ov, orig){
       const pueden = Object.values(S.usuarios).filter(u => u.activo && (u.rol === "admin" || (u[tipoK] === true && !u.soloAsignados)) && !den.includes(u.usuario)).map(u => u.usuario);
       data.publico = false; data.lectores = [...new Set([creador, S.me.usuario, ...pueden])];
     }
+  }
+  if (orig && !pr.admin) {
+    // Avisar al administrador qué cambió un empleado
+    const J = x => JSON.stringify(x === undefined ? null : x);
+    const campos = [["Cliente", o => [o.cliente && o.cliente.nombre, o.cliente && o.cliente.telefono]], ["Diseño", o => o.tema], ["Estampado", o => o.servicio], ["Quién pone la prenda", o => o.prendaDe],
+      ["Prendas", o => (o.items || []).map(i => [i.etiqueta, i.prenda, i.color, i.horma, i.talla, Number(i.cant) || 1, i.nombre || "", i.numero || ""])], ["Fecha de entrega", o => o.fechaEntrega],
+      ["Precios", o => (o.items || []).map(i => precioDe(o, prKey(i)))], ["Pago", o => [num(o.abono), o.moneda]], ["Urgente", o => !!o.urgente], ["Referencias", o => o.imagenes || []], ["Nota", o => (o.nota || "").trim()]];
+    const cambios = campos.filter(([, f]) => J(f(orig)) !== J(f(data))).map(([n]) => n);
+    if (cambios.length) Object.assign(data, {revisar:true, revisarCambios:[...new Set([...(orig.revisar ? orig.revisarCambios || [] : []), ...cambios])], revisarPor:S.me.usuario, revisarEn:now});
   }
   const btn = $("#save", ov); btn.disabled = true;
   try {
