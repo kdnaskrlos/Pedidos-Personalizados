@@ -552,6 +552,14 @@ table.mx{border-collapse:collapse;width:100%;font-size:13px}
 .uacts.one{grid-template-columns:1fr}
 .uacts .btn{width:100%;min-height:40px}
 
+/* tarjeta de usuario plegable (v2.19) */
+.uhead{cursor:pointer;border-radius:8px}
+.uchev{flex:none;color:var(--muted);display:grid;place-items:center;transition:transform .15s}
+.uchev svg.i{width:18px;height:18px}
+.ucard.open .uchev{transform:rotate(180deg)}
+.ucard{gap:0;padding:12px 14px}
+.ucard.open{gap:12px}
+
 @media (max-width:1000px){
   .cols{grid-template-columns:minmax(0,1fr)}
   .tipotabs{display:flex}
@@ -599,7 +607,7 @@ table.mx{border-collapse:collapse;width:100%;font-size:13px}
   .thalf b{font-size:21px}
   .ov.popup{padding:16px;align-items:center}
   .ov.popup .md{height:auto;max-height:100%;border-radius:16px;border:1px solid var(--line)}
-  .toolbar .seg{display:grid;grid-template-columns:repeat(5,minmax(0,1fr));width:100%}
+  .toolbar .seg{display:grid;grid-template-columns:repeat(4,minmax(0,1fr));width:100%}
   .toolbar .seg button{padding:8px 2px;font-size:11.5px;white-space:nowrap;border-left:0}
   .toolbar .seg button+button{border-left:1px solid var(--line)}
   .toolbar .search{min-width:0;max-width:none;width:100%}
@@ -638,7 +646,7 @@ import { initializeApp, deleteApp } from "https://www.gstatic.com/firebasejs/10.
 import { getAuth, onAuthStateChanged, signInWithEmailAndPassword, createUserWithEmailAndPassword, signOut, updatePassword, reauthenticateWithCredential, EmailAuthProvider } from "https://www.gstatic.com/firebasejs/10.12.2/firebase-auth.js";
 import { initializeFirestore, getFirestore, persistentLocalCache, persistentMultipleTabManager, doc, collection, query, where, onSnapshot, getDoc, setDoc, updateDoc, deleteDoc, writeBatch } from "https://www.gstatic.com/firebasejs/10.12.2/firebase-firestore.js";
 
-const VERSION = "v2.18";
+const VERSION = "v2.19";
 /* ================= Utilidades ================= */
 const $ = (s, r = document) => r.querySelector(s);
 const esc = s => String(s ?? "").replace(/[&<>"']/g, c => ({"&":"&amp;","<":"&lt;",">":"&gt;",'"':"&quot;","'":"&#39;"}[c]));
@@ -951,7 +959,7 @@ function doRender(){
     ${nav("pedidos","list","Pedidos")}
     <button class="nav new" data-act="nuevo" aria-label="Nuevo pedido" title="Nuevo pedido"><span class="ring">${I("plus")}</span></button>
     ${nav("avisos","bell","Avisos", nAv)}
-    ${pr.admin ? `<span class="d-only">${nav("equipo","shield","Equipo")}${nav("ajustes","sliders","Ajustes")}</span><button class="nav m-only" data-view="equipo" aria-current="${S.view === "equipo" || S.view === "ajustes"}">${I("shield")}Admin</button>`
+    ${pr.admin ? `<span class="d-only">${nav("ajustes","sliders","Ajustes")}${nav("equipo","shield","Equipo")}</span><button class="nav m-only" data-view="equipo" aria-current="${S.view === "equipo" || S.view === "ajustes"}">${I("shield")}Admin</button>`
       : `<button class="nav m-only" data-act="cuenta">${I("user")}Cuenta</button>`}
     <div class="grow"></div>
     <button class="theme" id="themeBtn" title="Cambiar tema">${I("sun","sun")}${I("moon","moon")}</button>
@@ -1011,10 +1019,11 @@ function viewResumen(a, pr){
     <p class="appver">${esc(cfg().negocio)} · Pedidos · versión ${VERSION}</p>`;
 }
 function viewPedidos(a, pr){
+  if (S.filtro === "todos") S.filtro = "pendientes";
   const tipos = ["personalizado","sublimacion"].filter(t => pr.ver[t]);
   if (!tipos.length) return `<div class="card"><p class="note">Todavía no tienes permiso para ver pedidos. Pídeselo al administrador.</p></div>`;
   if (!tipos.includes(S.tab)) S.tab = tipos[0];
-  const fl = [["pendientes","Pendientes"],["avisar","Por avisar"],["listos","Listos"],["entregados","Entregados"],["todos","Todos"]];
+  const fl = [["pendientes","Pendientes"],["avisar","Por avisar"],["listos","Listos"],["entregados","Entregados"]];
   const col = t => {
     const l = filtrar(t), T = TIPOS[t];
     return `<section class="col ${S.tab === t ? "" : "off"}" style="--c:${T.c}">
@@ -1079,7 +1088,7 @@ function avisoRow(p, modo){
     ? `<a class="aw" href="${esc(waLink(p))}" target="_blank" rel="noopener" data-avisar="${esc(p._id)}" title="Avisar por WhatsApp">${I("msg")}</a><button class="ac2" data-ya="${esc(p._id)}" title="Ya le avisé">${I("check")}</button>`
     : `<span class="aday ${n < 0 ? "err" : "warn"}">${cuando}</span>`;
   return `<div class="arow" style="--c:${T.c}" data-open="${esc(p._id)}" role="button" tabindex="0">
-    <div class="atx"><b>${esc(p.cliente.nombre)}</b><small>${esc(p.codigo)} · ${t.piezas} pz · ${fmtDate(p.fechaEntrega).slice(0, -5)}${t.saldo > 0 ? ` · Saldo ${esc(money(t.saldo, p.moneda))}` : ""}</small></div>
+    <div class="atx"><b>${esc(p.cliente.nombre)}</b><small>${t.piezas} pz · ${fmtDate(p.fechaEntrega).slice(0, -5)}${t.saldo > 0 ? ` · Saldo ${esc(money(t.saldo, p.moneda))}` : ""}</small></div>
     ${right}
   </div>`;
 }
@@ -1113,11 +1122,12 @@ function viewEquipo(){
   const sw = (uid, k, t, v) => `<label class="swr"><span>${t}</span><input type="checkbox" class="swi" data-perm="${k}" data-uid="${esc(uid)}" ${v ? "checked" : ""}></label>`;
   const card = ([uid, u]) => {
     const admin = u.rol === "admin";
-    return `<div class="ucard ${!admin && !u.activo ? "off" : ""}">
-      <div class="uhead"><span class="av" style="--c:${admin ? "var(--accent)" : "var(--t-info)"}">${esc((u.nombre || u.usuario).slice(0, 1).toUpperCase())}</span>
+    const open = S.uOpen === uid;
+    return `<div class="ucard ${!admin && !u.activo ? "off" : ""} ${open ? "open" : ""}">
+      <div class="uhead" data-utog="${esc(uid)}" role="button" tabindex="0" aria-expanded="${open}"><span class="av" style="--c:${admin ? "var(--accent)" : "var(--t-info)"}">${esc((u.nombre || u.usuario).slice(0, 1).toUpperCase())}</span>
         <div class="un"><b>${esc(u.nombre)}</b><small>@${esc(u.usuario)}</small></div>
-        <span class="urole ${admin ? "a" : u.activo ? "" : "x"}">${admin ? "Administrador" : u.activo ? "Activo" : "Sin acceso"}</span></div>
-      ${admin ? (uid === S.uid ? `<div class="uacts one"><button class="btn" data-act="mipin">${I("key")}Cambiar mi PIN</button></div>` : "") : `
+        <span class="urole ${admin ? "a" : u.activo ? "" : "x"}">${admin ? "Administrador" : u.activo ? "Activo" : "Sin acceso"}</span><span class="uchev">${I("chev")}</span></div>
+      ${!open ? "" : admin ? (uid === S.uid ? `<div class="uacts one"><button class="btn" data-act="mipin">${I("key")}Cambiar mi PIN</button></div>` : "") : `
       <div class="uperm">
         ${sw(uid, "verPersonalizado", "Ve Personalizado", u.verPersonalizado)}
         ${sw(uid, "verSublimacion", "Ve Sublimación", u.verSublimacion)}
@@ -1134,7 +1144,7 @@ function viewEquipo(){
 }
 
 /* ---------- Ajustes (admin) ---------- */
-const adminTabs = () => `<div class="seg m-tabs"><button data-view="equipo" aria-pressed="${S.view === "equipo"}">Equipo</button><button data-view="ajustes" aria-pressed="${S.view === "ajustes"}">Ajustes</button></div>`;
+const adminTabs = () => `<div class="seg m-tabs"><button data-view="ajustes" aria-pressed="${S.view === "ajustes"}">Ajustes</button><button data-view="equipo" aria-pressed="${S.view === "equipo"}">Equipo</button></div>`;
 function viewAjustes(){
   const c = cfg(), k = c.cat;
   const ta = (key, label) => `<div class="f"><label>${label}</label><textarea class="inp" data-cat="${key}" style="min-height:120px">${esc(k[key].join("\n"))}</textarea></div>`;
@@ -1160,7 +1170,7 @@ function viewAjustes(){
 function bindMain(){
   const app = $("#app");
   app.onclick = e => {
-    const b = e.target.closest("[data-view],[data-tab],[data-filtro],[data-act],[data-open],[data-avisar],[data-ya],[data-buscar],[data-nc],[data-tile],[data-reset],[data-deluser]");
+    const b = e.target.closest("[data-view],[data-tab],[data-filtro],[data-act],[data-open],[data-avisar],[data-ya],[data-buscar],[data-nc],[data-tile],[data-reset],[data-deluser],[data-utog]");
     if (!b) return;
     const d = b.dataset;
     if (d.view) { setView(d.view); return; }
@@ -1173,6 +1183,7 @@ function bindMain(){
     if (d.avisar) { marcarAvisado(d.avisar); return; }
     if (d.ya) return marcarAvisado(d.ya);
     if (d.open) return openDetail(d.open);
+    if (d.utog) { S.uOpen = S.uOpen === d.utog ? null : d.utog; render(); return; }
     if (d.reset) return resetPin(d.reset);
     if (d.deluser) { const u = S.usuarios[d.deluser]; return confirmar(`¿Eliminar a ${u.nombre}?`, "No podrá entrar más. Sus pedidos se conservan.", "Eliminar", async () => { const bt = writeBatch(S.db); bt.delete(doc(S.db, "usuarios/" + d.deluser)); bt.delete(doc(S.db, "logins/" + u.usuario)); await bt.commit(); toast("Usuario eliminado"); }); }
   };
