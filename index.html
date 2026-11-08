@@ -736,6 +736,10 @@ table.mx{border-collapse:collapse;width:100%;font-size:13px}
 @media (prefers-reduced-motion:reduce){.oc2-urg{animation:none}}
 .pill.demo{border-style:dashed;color:var(--muted)}
 .pill.demo .m-pr{display:none}
+/* v2.39 píldora Urgente única: sencilla, crema, color llamativo */
+.urgp{flex:none;display:inline-flex;align-items:center;gap:4px;font-size:11.5px;font-weight:800;line-height:1.35;border-radius:99px;padding:2px 8px;background:#ffe9e2;color:#e8290b;white-space:nowrap}
+.urgp svg.i{width:12px;height:12px;stroke-width:2.6}
+:root[data-theme="dark"] .urgp{background:#3f1a10;color:#ff7b5a}
 @media (max-width:1000px){.pill.demo .m-pr{display:inline}}
 .pill.demo.on{border-style:solid;border-color:#f59e0b;background:#fff4dc;color:#b45309}
 [data-theme="dark"] .pill.demo.on{background:#3a2a0a;color:#fbbf24}
@@ -827,7 +831,7 @@ import { initializeApp, deleteApp } from "https://www.gstatic.com/firebasejs/10.
 import { getAuth, onAuthStateChanged, signInWithEmailAndPassword, createUserWithEmailAndPassword, signOut, updatePassword, reauthenticateWithCredential, EmailAuthProvider } from "https://www.gstatic.com/firebasejs/10.12.2/firebase-auth.js";
 import { initializeFirestore, getFirestore, persistentLocalCache, persistentMultipleTabManager, doc, collection, query, where, onSnapshot, getDoc, setDoc, updateDoc, deleteDoc, writeBatch, runTransaction } from "https://www.gstatic.com/firebasejs/10.12.2/firebase-firestore.js";
 
-const VERSION = "v2.38";
+const VERSION = "v2.39";
 /* ================= Utilidades ================= */
 const $ = (s, r = document) => r.querySelector(s);
 const esc = s => String(s ?? "").replace(/[&<>"']/g, c => ({"&":"&amp;","<":"&lt;",">":"&gt;",'"':"&quot;","'":"&#39;"}[c]));
@@ -1389,7 +1393,7 @@ function cardHTML(p){
   return `<div class="oc2" role="button" tabindex="0" style="--c:${T.c}" data-open="${esc(p._id)}">
     <div class="oc2-side"><span class="oc2-code">${esc(p.codigo || "")}</span>${im ? `<img class="oc2-img" data-foto="${esc(im)}" alt="">` : `<span class="oc2-img oc2-noimg">${I(T.icon)}</span>`}</div>
     <div class="oc2-main">
-      <div class="oc2-top"><b class="oc2-name">${esc(p.cliente && p.cliente.nombre)}</b>${p.urgente ? `<span class="oc2-urg">${I("alert")}Urgente</span>` : ""}${due.t ? `<span class="oc2-due ${due.c}">${esc(due.t)}</span>` : ""}</div>
+      <div class="oc2-top"><b class="oc2-name">${esc(p.cliente && p.cliente.nombre)}</b>${p.urgente ? `<span class="urgp">${I("alert")}Urgente</span>` : ""}${due.t ? `<span class="oc2-due ${due.c}">${esc(due.t)}</span>` : ""}</div>
       <div class="oc2-items">${esc(p.tema || "Sin nombre de diseño")}</div>
       <div class="oc2-meta">${p.servicio ? `<span class="sv">${esc(p.servicio)}</span>` : ""}<span>${t.piezas} pz</span>${(p.asignados || []).length ? `<span>${I("lock")}</span>` : ""}${t.saldo > 0 ? `<span class="saldo">Saldo ${esc(money(t.saldo, p.moneda))}</span>` : `<span class="pag">Pagado</span>`}</div>
     </div>
@@ -2248,7 +2252,7 @@ function openDetail(id){
     <div class="mb pdb">
       <div class="pdcard pddate ${due.c || "warn"}">
         <div class="pdcal"><small>${fd ? MESES[fd.getMonth()].slice(0, 3).toUpperCase() : "--"}</small><b>${fd ? fd.getDate() : "?"}</b></div>
-        <div class="pdd"><small>Fecha de entrega</small><b>${esc(fecha)}</b>${due.t || p.urgente ? `<span class="pdrl">${due.t ? `<span class="pdrel">${esc(due.t)}</span>` : ""}${p.urgente ? `<span class="dw-urg">${I("alert")}Urgente</span>` : ""}</span>` : ""}</div>
+        <div class="pdd"><small>Fecha de entrega</small><b>${esc(fecha)}</b>${due.t || p.urgente ? `<span class="pdrl">${due.t ? `<span class="pdrel">${esc(due.t)}</span>` : ""}${p.urgente ? `<span class="urgp">${I("alert")}Urgente</span>` : ""}</span>` : ""}</div>
       </div>
       <div class="pdcard pdcli">
         <div class="pdwho"><span class="pdav">${esc(ini)}</span><b>${esc(p.cliente.nombre)}</b></div>
