@@ -817,8 +817,8 @@ table.mx{border-collapse:collapse;width:100%;font-size:13px}
   .thalf b{font-size:21px}
   .ov.popup{padding:16px;align-items:center}
   .ov.popup .md{height:auto;max-height:100%;border-radius:16px;border:1px solid var(--line)}
-  .toolbar .seg{display:grid;grid-template-columns:repeat(5,minmax(0,1fr));width:100%}
-  .toolbar .seg button{padding:8px 1px;font-size:11px;letter-spacing:-.01em;white-space:nowrap;border-left:0}
+  .toolbar .seg{display:grid;grid-template-columns:repeat(4,minmax(0,1fr));width:100%}
+  .toolbar .seg button{padding:8px 2px;font-size:11.5px;white-space:nowrap;border-left:0}
   .toolbar .seg button+button{border-left:1px solid var(--line)}
   .toolbar .search{min-width:0;max-width:none;width:100%}
   .d-only{display:none}
@@ -856,7 +856,7 @@ import { initializeApp, deleteApp } from "https://www.gstatic.com/firebasejs/10.
 import { getAuth, onAuthStateChanged, signInWithEmailAndPassword, createUserWithEmailAndPassword, signOut, updatePassword, reauthenticateWithCredential, EmailAuthProvider } from "https://www.gstatic.com/firebasejs/10.12.2/firebase-auth.js";
 import { initializeFirestore, getFirestore, persistentLocalCache, persistentMultipleTabManager, doc, collection, query, where, onSnapshot, getDoc, setDoc, updateDoc, deleteDoc, writeBatch, runTransaction } from "https://www.gstatic.com/firebasejs/10.12.2/firebase-firestore.js";
 
-const VERSION = "v2.53";
+const VERSION = "v2.54";
 /* ================= Utilidades ================= */
 const $ = (s, r = document) => r.querySelector(s);
 const esc = s => String(s ?? "").replace(/[&<>"']/g, c => ({"&":"&amp;","<":"&lt;",">":"&gt;",'"':"&quot;","'":"&#39;"}[c]));
@@ -1264,11 +1264,11 @@ function viewResumen(a, pr){
     <p class="appver">${esc(cfg().negocio)} · Pedidos · versión ${VERSION}</p>`;
 }
 function viewPedidos(a, pr){
-  if (S.filtro === "todos") S.filtro = "pendientes";
+  if (S.filtro === "todos" || S.filtro === "listos") S.filtro = "pendientes";
   const tipos = ["personalizado","sublimacion"].filter(t => pr.ver[t]);
   if (!tipos.length) return `<div class="card"><p class="note">Todavía no tienes permiso para ver pedidos. Pídeselo al administrador.</p></div>`;
   if (!tipos.includes(S.tab)) S.tab = tipos[0];
-  const fl = [["pendientes","Pendientes"],["listos","Listos"],["avisar","Por avisar"],["retirar","Sin retirar"],["entregados","Entregados"]];
+  const fl = [["pendientes","Pendientes"],["avisar","Por avisar"],["retirar","Sin retirar"],["entregados","Entregados"]];
   const col = t => {
     const l = filtrar(t), T = TIPOS[t];
     return `<section class="col ${S.tab === t ? "" : "off"}" style="--c:${T.c}">
