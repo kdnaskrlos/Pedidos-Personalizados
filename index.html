@@ -671,7 +671,7 @@ table.mx{border-collapse:collapse;width:100%;font-size:13px}
 .pdwho{display:flex;align-items:center;gap:12px}
 .pdav{width:44px;height:44px;border-radius:50%;display:grid;place-items:center;font-weight:800;font-size:14px;background:var(--accent-soft);color:var(--accent);flex:none}
 .pdwho b{font-size:17px;font-weight:600}
-.pdwa{display:flex;align-items:center;gap:8px;min-height:46px;border-radius:10px;padding:0 14px;background:#dcf5e3;border:1px solid #b8e6c6;color:#15803d;font-weight:800;font-size:14px;text-decoration:none}
+.pdwa{display:flex;align-items:center;justify-content:center;gap:8px;min-height:46px;border-radius:10px;padding:0 14px;background:#dcf5e3;border:1px solid #b8e6c6;color:#15803d;font-weight:800;font-size:14px;text-decoration:none}
 :root[data-theme="dark"] .pdwa{background:#12311f;border-color:#1f4d31;color:#86efac}
 .pdwa svg.i{width:16px;height:16px}
 .pdlbl{font-size:12px;font-weight:800;letter-spacing:.05em;color:var(--muted);display:flex;align-items:center;gap:8px}
@@ -740,6 +740,14 @@ table.mx{border-collapse:collapse;width:100%;font-size:13px}
 .urgp{flex:none;display:inline-flex;align-items:center;gap:4px;font-size:11.5px;font-weight:800;line-height:1.35;border-radius:99px;padding:2px 8px;background:#ffe9e2;color:#e8290b;white-space:nowrap}
 .urgp svg.i{width:12px;height:12px;stroke-width:2.6}
 :root[data-theme="dark"] .urgp{background:#3f1a10;color:#ff7b5a}
+/* v2.40 Vencido en amarillo */
+.oc2-due.err,.aday.err,.tag.c.err{color:#a16207;background:#fff3bf;border-color:#fde68a}
+.pddate.err{background:#fff8d6;border-color:#f7e08a}
+.pddate.err .pdrel{color:#a16207}
+.pddate.err .pdcal small{color:#a16207}
+:root[data-theme="dark"] .oc2-due.err,:root[data-theme="dark"] .aday.err,:root[data-theme="dark"] .tag.c.err{color:#facc15;background:#3a3008;border-color:#5c4b0c}
+:root[data-theme="dark"] .pddate.err{background:#2e2709;border-color:#5c4b0c}
+:root[data-theme="dark"] .pddate.err .pdrel,:root[data-theme="dark"] .pddate.err .pdcal small{color:#facc15}
 @media (max-width:1000px){.pill.demo .m-pr{display:inline}}
 .pill.demo.on{border-style:solid;border-color:#f59e0b;background:#fff4dc;color:#b45309}
 [data-theme="dark"] .pill.demo.on{background:#3a2a0a;color:#fbbf24}
@@ -831,7 +839,7 @@ import { initializeApp, deleteApp } from "https://www.gstatic.com/firebasejs/10.
 import { getAuth, onAuthStateChanged, signInWithEmailAndPassword, createUserWithEmailAndPassword, signOut, updatePassword, reauthenticateWithCredential, EmailAuthProvider } from "https://www.gstatic.com/firebasejs/10.12.2/firebase-auth.js";
 import { initializeFirestore, getFirestore, persistentLocalCache, persistentMultipleTabManager, doc, collection, query, where, onSnapshot, getDoc, setDoc, updateDoc, deleteDoc, writeBatch, runTransaction } from "https://www.gstatic.com/firebasejs/10.12.2/firebase-firestore.js";
 
-const VERSION = "v2.39";
+const VERSION = "v2.40";
 /* ================= Utilidades ================= */
 const $ = (s, r = document) => r.querySelector(s);
 const esc = s => String(s ?? "").replace(/[&<>"']/g, c => ({"&":"&amp;","<":"&lt;",">":"&gt;",'"':"&quot;","'":"&#39;"}[c]));
