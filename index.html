@@ -639,6 +639,74 @@ table.mx{border-collapse:collapse;width:100%;font-size:13px}
 .lists2 .lst+.lst{border-top:1px solid var(--line)}
 .lists2 #cReset{min-height:48px;font-size:14px}
 
+/* detalle del pedido (v2.29, según diseño) */
+.md.pdmd{background:#f2f4f3}
+:root[data-theme="dark"] .md.pdmd{background:var(--bg)}
+.pdh{border-top:4px solid var(--accent);gap:12px;padding:12px 16px}
+.pdback{width:42px;height:42px;border-radius:10px;border:1px solid var(--line);background:var(--surface);display:grid;place-items:center;color:var(--ink);flex:none}
+.pdback svg.i{width:20px;height:20px}
+.pdt{flex:1;min-width:0;display:flex;flex-direction:column;line-height:1.2}
+.pdt small{font-size:11.5px;font-weight:700;color:var(--muted);letter-spacing:.04em;white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
+.pdt h2{font-size:17px;font-weight:800;letter-spacing:.01em;margin:0}
+.pdst{flex:none;font-size:12px;font-weight:700;border-radius:99px;padding:4px 11px;background:var(--accent-soft);color:var(--accent)}
+.pdst.listo{background:color-mix(in srgb,var(--t-info) 12%,var(--surface));color:var(--t-info)}
+.pdst.entregado{background:var(--surface-2);color:var(--muted)}
+.pdb{padding:16px;gap:14px}
+.pdcard{background:var(--surface);border:1px solid var(--line);border-radius:16px;padding:16px;display:flex;flex-direction:column;gap:12px}
+.pdcard hr{border:0;border-top:1px solid var(--line);margin:0}
+.pddate{flex-direction:row;align-items:center;gap:14px;background:#fff4e8;border-color:#fbd9b4}
+.pddate.err{background:#fdecec;border-color:#f6c0c0}
+.pddate.ok{background:#e9f7ee;border-color:#bfe6cc}
+.pddate.info{background:#ebf2fe;border-color:#c5d8fb}
+:root[data-theme="dark"] .pddate{background:color-mix(in srgb,var(--warn) 12%,var(--surface));border-color:color-mix(in srgb,var(--warn) 30%,var(--line))}
+.pdcal{width:50px;height:54px;flex:none;border-radius:10px;background:var(--surface);border:1px solid var(--line);display:flex;flex-direction:column;align-items:center;justify-content:center;line-height:1}
+.pdcal small{font-size:10px;font-weight:800;color:#c2410c;letter-spacing:.06em}
+.pdcal b{font-size:22px;font-weight:800;margin-top:3px}
+.pdd{flex:1;min-width:0;display:flex;flex-direction:column;gap:2px}
+.pdd small{font-size:12.5px;color:var(--ink-2,#374151);font-weight:500}
+.pdd b{font-size:17px;font-weight:800;line-height:1.2}
+.pdrel{font-size:12.5px;font-weight:800;color:#c2410c}
+.pddate.err .pdrel{color:var(--err)} .pddate.ok .pdrel{color:var(--ok)} .pddate.info .pdrel{color:var(--t-info)}
+.pddate .dw-urg{align-self:flex-start}
+.pdwho{display:flex;align-items:center;gap:12px}
+.pdav{width:44px;height:44px;border-radius:50%;display:grid;place-items:center;font-weight:800;font-size:14px;background:var(--accent-soft);color:var(--accent);flex:none}
+.pdwho b{font-size:17px;font-weight:600}
+.pdwa{display:flex;align-items:center;gap:8px;min-height:46px;border-radius:10px;padding:0 14px;background:#dcf5e3;border:1px solid #b8e6c6;color:#15803d;font-weight:800;font-size:14px;text-decoration:none}
+:root[data-theme="dark"] .pdwa{background:#12311f;border-color:#1f4d31;color:#86efac}
+.pdwa svg.i{width:16px;height:16px}
+.pdlbl{font-size:12px;font-weight:800;letter-spacing:.05em;color:var(--muted);display:flex;align-items:center;gap:8px}
+.pdlbl.ic{color:var(--ink)}
+.pdlbl.ic svg.i{width:18px;height:18px;color:var(--accent)}
+.pdextra{display:flex;flex-wrap:wrap;gap:6px;margin-top:-4px}
+.pdextra span{font-size:12px;font-weight:700;border-radius:99px;padding:3px 10px;background:var(--surface-2);color:var(--ink-2,#374151)}
+.pdrow{display:flex;align-items:center;justify-content:space-between;gap:10px}
+.pdmut{font-size:13px;color:var(--muted);margin:0}
+.pdit{list-style:none;margin:0;padding:0;display:flex;flex-direction:column;gap:12px}
+.pdit li{display:flex;align-items:center;gap:12px}
+.pdit .q{width:36px;height:36px;flex:none;border-radius:9px;background:var(--surface-2);display:grid;place-items:center;font-weight:800;font-size:15px}
+.pdit .d{flex:1;min-width:0;display:flex;flex-direction:column;line-height:1.25}
+.pdit .d b{font-size:15px;font-weight:700}
+.pdit .d small{font-size:12px;color:var(--muted)}
+.pdit .pr{flex:none;font-weight:800;font-size:14px}
+.pdtl{font-size:15px;font-weight:700}
+.pdtot{font-size:22px;font-weight:800}
+.pdpay{display:grid;grid-template-columns:1fr 1fr;gap:10px}
+.pdpay>div{border-radius:12px;padding:12px;display:flex;flex-direction:column;gap:3px;border:1px solid var(--line)}
+.pdpay small{font-size:11px;font-weight:800;letter-spacing:.06em;color:var(--muted)}
+.pdpay b{font-size:18px;font-weight:800}
+.pdpay .ab{background:var(--surface-2)} .pdpay .ab b{color:#15803d}
+.pdpay .sa{background:#fdecec;border-color:#f6c0c0} .pdpay .sa b{color:#c81e1e}
+.pdpay .sa.ok{background:#e9f7ee;border-color:#bfe6cc} .pdpay .sa.ok b{color:#15803d}
+:root[data-theme="dark"] .pdpay .sa{background:color-mix(in srgb,var(--err) 12%,var(--surface));border-color:color-mix(in srgb,var(--err) 30%,var(--line))} :root[data-theme="dark"] .pdpay .sa b{color:var(--err)}
+:root[data-theme="dark"] .pdpay .ab b{color:var(--ok)}
+.pdnote{white-space:pre-wrap;font-size:14px}
+.pdhist{padding:0 4px}
+.btn.pdlisto{width:100%;min-height:52px;font-size:16px;background:#137a4f;border-color:#137a4f;color:#fff;border-radius:12px}
+.btn.pdlisto:hover{filter:brightness(1.06)}
+.pdmd .drow2 .btn{min-height:48px;border-radius:12px;font-size:15px}
+
+.pdrl{display:flex;align-items:center;gap:8px;flex-wrap:wrap;margin-top:2px}
+.pdrl .dw-urg{padding:2px 9px;font-size:11.5px}
 @media (max-width:1000px){
   .cols{grid-template-columns:minmax(0,1fr)}
   .tipotabs{display:flex}
@@ -725,7 +793,7 @@ import { initializeApp, deleteApp } from "https://www.gstatic.com/firebasejs/10.
 import { getAuth, onAuthStateChanged, signInWithEmailAndPassword, createUserWithEmailAndPassword, signOut, updatePassword, reauthenticateWithCredential, EmailAuthProvider } from "https://www.gstatic.com/firebasejs/10.12.2/firebase-auth.js";
 import { initializeFirestore, getFirestore, persistentLocalCache, persistentMultipleTabManager, doc, collection, query, where, onSnapshot, getDoc, setDoc, updateDoc, deleteDoc, writeBatch } from "https://www.gstatic.com/firebasejs/10.12.2/firebase-firestore.js";
 
-const VERSION = "v2.28";
+const VERSION = "v2.29";
 /* ================= Utilidades ================= */
 const $ = (s, r = document) => r.querySelector(s);
 const esc = s => String(s ?? "").replace(/[&<>"']/g, c => ({"&":"&amp;","<":"&lt;",">":"&gt;",'"':"&quot;","'":"&#39;"}[c]));
@@ -750,6 +818,7 @@ function money(v, mon){
 function toast(msg, bad){ document.querySelectorAll(".toast").forEach(x => x.remove()); const t = document.createElement("div"); t.className = "toast" + (bad ? " bad" : ""); t.textContent = msg; document.body.appendChild(t); setTimeout(() => t.remove(), bad ? 4500 : 2500); }
 const P = {
   home:'<path d="M3 10.5 12 3l9 7.5V20a1 1 0 0 1-1 1h-5v-6H9v6H4a1 1 0 0 1-1-1z"/>',
+  back:'<path d="m15 18-6-6 6-6"/>',
   chev:'<path d="m6 9 6 6 6-6"/>',
   list:'<path d="M9 5h11M9 12h11M9 19h11M4 5h.01M4 12h.01M4 19h.01"/>',
   bell:'<path d="M6 8a6 6 0 1 1 12 0c0 7 3 9 3 9H3s3-2 3-9"/><path d="M10.3 21a1.94 1.94 0 0 0 3.4 0"/>',
@@ -1986,32 +2055,44 @@ function tallyTable(p){
 function openDetail(id){
   const p = S.pedidos[id]; if (!p) return;
   const T = TIPOS[p.tipo], t = totales(p), pr = perm(), est = p.estado || "pendiente";
+  const fd = p.fechaEntrega ? parseYmd(p.fechaEntrega) : null;
+  const fecha = fd ? `${DIAS[fd.getDay()][0].toUpperCase() + DIAS[fd.getDay()].slice(1)} ${fd.getDate()} de ${MESES[fd.getMonth()]}` : "Sin fecha";
+  const due = dueShort(p);
+  const estTxt = est === "pendiente" ? "En producción" : est === "listo" ? (p.avisado ? "Avisado" : "Listo") : "Entregado";
+  const ini = (p.cliente.nombre || "?").trim().split(/\s+/).slice(0, 2).map(w => w[0]).join("").toUpperCase();
+  const extra = [p.servicio, p.tipo === "personalizado" ? (p.prendaDe === "cliente" ? "Prenda del cliente" : p.prendaDe === "tienda" ? "Prenda de la tienda" : "") : ""].filter(Boolean);
   const ov = modal(`
-    <div class="mh dhead" style="--c:${T.c}"><span class="chip" style="--c:${T.c}">${I(T.icon)}</span><h2 class="up">${T.label.toUpperCase()}</h2><button class="ib" data-close>${I("x")}</button></div>
-    <div class="mb">
-      ${(() => {
-        const fd = p.fechaEntrega ? parseYmd(p.fechaEntrega) : null;
-        const fecha = fd ? `${DIAS[fd.getDay()][0].toUpperCase() + DIAS[fd.getDay()].slice(1)} ${fd.getDate()} de ${MESES[fd.getMonth()]}` : "Sin fecha";
-        const d = dueShort(p);
-        return `<div class="dwhen ${d.c || "warn"}">
-          <div class="dw-l"><small>Entrega</small><b>${esc(fecha)}</b></div>
-          <div class="dw-r">${d.t ? `<span class="dw-rel">${esc(d.t)}</span>` : ""}${p.urgente ? `<span class="dw-urg">${I("alert")}Urgente</span>` : ""}</div>
-        </div>`;
-      })()}
-      <div class="dcli"><b>${esc(p.cliente.nombre)}</b><a class="dwa" href="https://wa.me/${esc(p.cliente.telefono)}" target="_blank" rel="noopener">${I("msg")}${esc(prettyPhone(p.cliente.telefono))}</a></div>
-      <div class="dwork" style="--c:${T.c}">
-        <h3>${esc(p.tema || "Sin tema")}</h3>
-        ${[p.servicio, p.tipo === "personalizado" ? (p.prendaDe === "cliente" ? "Prenda del cliente" : p.prendaDe === "tienda" ? "Prenda de la tienda" : "") : ""].filter(Boolean).length
-          ? `<div class="dchips">${[p.servicio, p.tipo === "personalizado" ? (p.prendaDe === "cliente" ? "Prenda del cliente" : p.prendaDe === "tienda" ? "Prenda de la tienda" : "") : ""].filter(Boolean).map(x => `<span>${esc(x)}</span>`).join("")}</div>` : ""}
+    <div class="mh pdh" style="--c:${T.c}">
+      <button class="pdback" data-close aria-label="Volver">${I("back")}</button>
+      <div class="pdt"><small>PEDIDO ${esc(p.codigo || "")}</small><h2>${T.label.toUpperCase()}</h2></div>
+      <span class="pdst ${est}">${estTxt}</span>
+    </div>
+    <div class="mb pdb">
+      <div class="pdcard pddate ${due.c || "warn"}">
+        <div class="pdcal"><small>${fd ? MESES[fd.getMonth()].slice(0, 3).toUpperCase() : "--"}</small><b>${fd ? fd.getDate() : "?"}</b></div>
+        <div class="pdd"><small>Fecha de entrega</small><b>${esc(fecha)}</b>${due.t || p.urgente ? `<span class="pdrl">${due.t ? `<span class="pdrel">${esc(due.t)}</span>` : ""}${p.urgente ? `<span class="dw-urg">${I("alert")}Urgente</span>` : ""}</span>` : ""}</div>
       </div>
-      <div class="dsec">
-        <div class="dsec-h"><b>Prendas</b><span>${t.piezas} ${t.piezas === 1 ? "pieza" : "piezas"}</span></div>
-        <ul class="il2">${(p.items || []).map(i => { const sub = [i.horma, i.etiqueta, i.nombre, i.numero ? "N° " + i.numero : ""].filter(Boolean); return `<li><span class="q num">${i.cant}</span><span class="d"><b>${esc(i.prenda)} ${esc(i.color)} ${esc(i.talla)}</b>${sub.length ? `<small>${sub.map(x => `<span>${esc(x)}</span>`).join("")}</small>` : ""}</span></li>`; }).join("")}</ul>
+      <div class="pdcard pdcli">
+        <div class="pdwho"><span class="pdav">${esc(ini)}</span><b>${esc(p.cliente.nombre)}</b></div>
+        <a class="pdwa" href="https://wa.me/${esc(p.cliente.telefono)}" target="_blank" rel="noopener">${I("msg")}${esc(prettyPhone(p.cliente.telefono))}</a>
       </div>
-      <div class="fsec"><div class="sec">${I("cash")}Pago</div><div class="totals t2"><div class="tot"><small>Precio unidad</small><b class="num">${esc(money(p.precio, p.moneda))}</b></div><div class="tot"><small>Total</small><b class="num">${esc(money(t.total, p.moneda))}</b></div><div class="tot"><small>Abono</small><b class="num">${esc(money(t.abono, p.moneda))}</b></div><div class="tot"><small>Saldo</small><b class="num" style="color:${t.saldo > 0 ? "var(--err)" : "var(--ok)"}">${esc(money(t.saldo, p.moneda))}</b></div></div>${p.motivoSinAbono ? `<p class="note"><b>Sin abono:</b> ${esc(p.motivoSinAbono)}</p>` : ""}</div>
-      ${(p.imagenes || []).length ? `<div class="fsec"><div class="sec">${I("camera")}Referencias</div><div class="imgs">${p.imagenes.map(im => `<div class="imgbox"><img data-foto="${esc(im)}" alt=""></div>`).join("")}</div></div>` : ""}
-      ${p.nota ? `<div class="fsec"><div class="sec">${I("note")}Nota</div><div class="notebox">${esc(p.nota)}</div></div>` : ""}
-      <p class="hist">Registrado: ${fmtDT(p.creadoEn)} por ${esc(nameOf(p.creadoPor))}${p.editadoEn ? `<br>Última edición: ${fmtDT(p.editadoEn)} por ${esc(nameOf(p.editadoPor))}` : ""}${p.listoEn ? `<br>Completado: ${fmtDT(p.listoEn)}` : ""}${p.avisadoEn ? `<br>Cliente avisado: ${fmtDT(p.avisadoEn)}` : ""}${p.entregadoEn ? `<br>Entregado: ${fmtDT(p.entregadoEn)}` : ""}${(p.asignados || []).length ? `<br>Visible solo para: ${esc(p.asignados.map(nameOf).join(", "))}` : ""}</p>
+      <div class="pdcard">
+        <div class="pdlbl">DISEÑO: ${esc((p.tema || "Sin tema").toUpperCase())}</div>
+        ${extra.length ? `<div class="pdextra">${extra.map(x => `<span>${esc(x)}</span>`).join("")}</div>` : ""}
+        <hr>
+        <div class="pdrow"><span class="pdlbl">PRENDAS</span><span class="pdmut">${t.piezas} ${t.piezas === 1 ? "pieza" : "piezas"}</span></div>
+        <ul class="pdit">${(p.items || []).map(i => { const sub = [i.horma, i.etiqueta, i.nombre, i.numero ? "N° " + i.numero : ""].filter(Boolean); return `<li><span class="q num">${i.cant}</span><span class="d"><b>${esc(i.prenda)} ${esc(i.color.toLowerCase())} · ${esc(i.talla)}</b>${sub.length ? `<small>${esc(sub.join(" · "))}</small>` : ""}</span><span class="pr num">${esc(money((Number(i.cant) || 1) * num(p.precio), p.moneda))}</span></li>`; }).join("")}</ul>
+      </div>
+      <div class="pdcard">
+        <div class="pdrow"><span class="pdlbl ic">${I("cash")}PAGO</span></div>
+        <hr>
+        <div class="pdrow"><b class="pdtl">Total</b><b class="pdtot num">${esc(money(t.total, p.moneda))}</b></div>
+        <div class="pdpay"><div class="ab"><small>ABONO</small><b class="num">${esc(money(t.abono, p.moneda))}</b></div><div class="sa ${t.saldo > 0 ? "" : "ok"}"><small>SALDO</small><b class="num">${esc(money(t.saldo, p.moneda))}</b></div></div>
+        ${p.motivoSinAbono ? `<p class="pdmut"><b>Sin abono:</b> ${esc(p.motivoSinAbono)}</p>` : ""}
+      </div>
+      ${(p.imagenes || []).length ? `<div class="pdcard"><div class="pdlbl">REFERENCIAS</div><div class="imgs">${p.imagenes.map(im => `<div class="imgbox"><img data-foto="${esc(im)}" alt=""></div>`).join("")}</div></div>` : ""}
+      ${p.nota ? `<div class="pdcard"><div class="pdlbl">NOTA</div><div class="pdnote">${esc(p.nota)}</div></div>` : ""}
+      <p class="hist pdhist">Registrado: ${fmtDT(p.creadoEn)} por ${esc(nameOf(p.creadoPor))}${p.editadoEn ? `<br>Última edición: ${fmtDT(p.editadoEn)} por ${esc(nameOf(p.editadoPor))}` : ""}${p.listoEn ? `<br>Completado: ${fmtDT(p.listoEn)}` : ""}${p.avisadoEn ? `<br>Cliente avisado: ${fmtDT(p.avisadoEn)}` : ""}${p.entregadoEn ? `<br>Entregado: ${fmtDT(p.entregadoEn)}` : ""}${(p.asignados || []).length ? `<br>Visible solo para: ${esc(p.asignados.map(nameOf).join(", "))}` : ""}</p>
     </div>
     <div class="mf dfoot">
       <div class="drow2">
@@ -2019,9 +2100,9 @@ function openDetail(id){
         ${pr.eliminar ? `<button class="btn danger" id="d-del">${I("trash")}Eliminar</button>` : ""}
         <button class="btn" id="d-edit">${I("edit")}Editar</button>
       </div>
-      ${est === "pendiente" ? `<button class="btn listo" id="d-listo">${I("check")}Pedido listo</button>` : ""}
+      ${est === "pendiente" ? `<button class="btn pdlisto" id="d-listo">${I("check")}Marcar pedido listo</button>` : ""}
       ${est === "listo" ? `<div class="dgrid"><a class="btn wa big" id="d-wa" href="${esc(waLink(p))}" target="_blank" rel="noopener">${I("msg")}${p.avisado ? "Volver a avisar" : "Avisar al cliente"}</a><button class="btn listo" id="d-ent">${I("box")}Entregado</button></div>` : ""}
-    </div>`);
+    </div>`, "pdmd");
   loadFotos(ov);
   ov.querySelectorAll(".imgbox img").forEach(i => i.onclick = () => i.src && lightbox(i.src));
   const upd = async (data, msg) => { try { await updateDoc(doc(S.db, "pedidos/" + id), data); toast(msg); ov.close(); } catch(e) { toast("No se pudo actualizar el pedido", true); } };
