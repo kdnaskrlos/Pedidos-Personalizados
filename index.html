@@ -739,11 +739,11 @@ table.mx{border-collapse:collapse;width:100%;font-size:13px}
 .pill.demo .m-pr{display:none}
 /* v2.40 Vencido en amarillo */
 /* v2.51 píldoras con los mismos colores de la tarjeta de fecha del detalle */
-.oc2-due,.aday{border:1px solid #fbd9b4;background:#fff4e8;color:#c2410c}
+.oc2-due,.aday,.oc2-due.warn,.aday.warn{border:1px solid #f3dc7c;background:#fff7d1;color:#a16207}
 .oc2-due.err,.aday.err{border-color:#f6c0c0;background:#fdecec;color:var(--err)}
 .oc2-due.ok,.aday.ok,.aday.info{border-color:#bfe6cc;background:#e9f7ee;color:var(--ok)}
 .oc2-due.info{border-color:#c5d8fb;background:#ebf2fe;color:var(--t-info)}
-:root[data-theme="dark"] .oc2-due,:root[data-theme="dark"] .aday{border-color:color-mix(in srgb,var(--warn) 30%,var(--line));background:color-mix(in srgb,var(--warn) 12%,var(--surface));color:var(--warn)}
+:root[data-theme="dark"] .oc2-due,:root[data-theme="dark"] .aday,:root[data-theme="dark"] .oc2-due.warn,:root[data-theme="dark"] .aday.warn{border-color:color-mix(in srgb,var(--soon) 30%,var(--line));background:color-mix(in srgb,var(--soon) 12%,var(--surface));color:var(--soon)}
 :root[data-theme="dark"] .oc2-due.err,:root[data-theme="dark"] .aday.err{border-color:color-mix(in srgb,var(--err) 30%,var(--line));background:color-mix(in srgb,var(--err) 12%,var(--surface));color:var(--err)}
 :root[data-theme="dark"] .oc2-due.ok,:root[data-theme="dark"] .aday.ok,:root[data-theme="dark"] .aday.info{border-color:color-mix(in srgb,var(--ok) 30%,var(--line));background:color-mix(in srgb,var(--ok) 12%,var(--surface));color:var(--ok)}
 :root[data-theme="dark"] .oc2-due.info{border-color:color-mix(in srgb,var(--t-info) 30%,var(--line));background:color-mix(in srgb,var(--t-info) 12%,var(--surface));color:var(--t-info)}
@@ -758,6 +758,13 @@ table.mx{border-collapse:collapse;width:100%;font-size:13px}
 .oc2-urgi svg.i{width:13px;height:13px;stroke-width:2.6}
 @media (prefers-reduced-motion:reduce){.oc2-urgi{animation:none}}
 .oc2-meta .oc2-due{margin-left:auto}
+/* v2.53 pronta entrega en amarillo */
+:root{--soon:#ca8a04}
+:root[data-theme="dark"]{--soon:#facc15}
+.pddate:not(.err):not(.ok):not(.info){background:#fff8d6;border-color:#f3dc7c}
+.pddate:not(.err):not(.ok):not(.info) .pdrel,.pddate:not(.err):not(.ok):not(.info) .pdcal small{color:#a16207}
+:root[data-theme="dark"] .pddate:not(.err):not(.ok):not(.info){background:color-mix(in srgb,var(--soon) 12%,var(--surface));border-color:color-mix(in srgb,var(--soon) 30%,var(--line))}
+:root[data-theme="dark"] .pddate:not(.err):not(.ok):not(.info) .pdrel,:root[data-theme="dark"] .pddate:not(.err):not(.ok):not(.info) .pdcal small{color:var(--soon)}
 @media (max-width:1000px){.pill.demo .m-pr{display:inline}}
 .pill.demo.on{border-style:solid;border-color:#f59e0b;background:#fff4dc;color:#b45309}
 [data-theme="dark"] .pill.demo.on{background:#3a2a0a;color:#fbbf24}
@@ -849,7 +856,7 @@ import { initializeApp, deleteApp } from "https://www.gstatic.com/firebasejs/10.
 import { getAuth, onAuthStateChanged, signInWithEmailAndPassword, createUserWithEmailAndPassword, signOut, updatePassword, reauthenticateWithCredential, EmailAuthProvider } from "https://www.gstatic.com/firebasejs/10.12.2/firebase-auth.js";
 import { initializeFirestore, getFirestore, persistentLocalCache, persistentMultipleTabManager, doc, collection, query, where, onSnapshot, getDoc, setDoc, updateDoc, deleteDoc, writeBatch, runTransaction } from "https://www.gstatic.com/firebasejs/10.12.2/firebase-firestore.js";
 
-const VERSION = "v2.52";
+const VERSION = "v2.53";
 /* ================= Utilidades ================= */
 const $ = (s, r = document) => r.querySelector(s);
 const esc = s => String(s ?? "").replace(/[&<>"']/g, c => ({"&":"&amp;","<":"&lt;",">":"&gt;",'"':"&quot;","'":"&#39;"}[c]));
@@ -1248,7 +1255,7 @@ function viewResumen(a, pr){
     <div class="hello"><h1>${h < 12 ? "Buenos días" : h < 19 ? "Buenas tardes" : "Buenas noches"}, <span>${esc((S.me.nombre || S.me.usuario).split(" ")[0])}</span></h1><span class="date">${I("cal")}${DIAS[d.getDay()]} ${d.getDate()} de ${MESES[d.getMonth()]} ${d.getFullYear()}</span></div>
     <div class="tiles">
       ${tile("var(--accent)","box","Pendientes", a.pend.length, "por producir", "pendientes")}
-      ${tile("var(--warn)","clock","Entregas pronto", a.proximos.length, `próximos ${cfg().dias} días`, "avisos")}
+      ${tile("var(--soon)","clock","Entregas pronto", a.proximos.length, `próximos ${cfg().dias} días`, "avisos")}
       ${tile("var(--err)","alert","Vencidos", a.vencidos.length, a.vencidos.length ? "revisar hoy" : "todo al día", "avisos")}
       ${tile("var(--t-info)","msg","Por avisar", a.avisar.length, "clientes con pedido listo", "avisar")}
     </div>
@@ -1452,7 +1459,7 @@ function viewAvisos(a){
     ${sec("var(--t-info)","msg","Por avisar al cliente", a.avisar, "avisar")}
     ${sec("var(--t-violet)","box","Avisados sin retirar", a.retiro, "retiro")}
     ${sec("var(--err)","alert","Entregas vencidas", a.vencidos, "fecha")}
-    ${sec("var(--warn)","clock","Se entregan pronto", a.proximos, "fecha")}`;
+    ${sec("var(--soon)","clock","Se entregan pronto", a.proximos, "fecha")}`;
 }
 function notifyIfNeeded(a){
   try {
