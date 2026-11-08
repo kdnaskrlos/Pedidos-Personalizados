@@ -842,7 +842,7 @@ import { initializeApp, deleteApp } from "https://www.gstatic.com/firebasejs/10.
 import { getAuth, onAuthStateChanged, signInWithEmailAndPassword, createUserWithEmailAndPassword, signOut, updatePassword, reauthenticateWithCredential, EmailAuthProvider } from "https://www.gstatic.com/firebasejs/10.12.2/firebase-auth.js";
 import { initializeFirestore, getFirestore, persistentLocalCache, persistentMultipleTabManager, doc, collection, query, where, onSnapshot, getDoc, setDoc, updateDoc, deleteDoc, writeBatch, runTransaction } from "https://www.gstatic.com/firebasejs/10.12.2/firebase-firestore.js";
 
-const VERSION = "v2.49";
+const VERSION = "v2.50";
 /* ================= Utilidades ================= */
 const $ = (s, r = document) => r.querySelector(s);
 const esc = s => String(s ?? "").replace(/[&<>"']/g, c => ({"&":"&amp;","<":"&lt;",">":"&gt;",'"':"&quot;","'":"&#39;"}[c]));
@@ -1424,7 +1424,7 @@ function avisoRow(p, modo){
     ? `<span class="aday info">avisado hace ${hace} d</span>`
     : `<span class="aday ${n < 0 ? "err" : "warn"}">${cuando}</span>`;
   if (modo === "retiro") return `<div class="arow rt" style="--c:${T.c}">
-    <div class="rt-top" data-open="${esc(p._id)}" role="button" tabindex="0"><div class="atx"><b>${esc(p.cliente.nombre)}</b><small>${t.piezas} pz${t.saldo > 0 ? ` · Saldo ${esc(money(t.saldo, p.moneda))}` : ""}</small></div>${right}</div>
+    <div class="rt-top" data-open="${esc(p._id)}" role="button" tabindex="0"><div class="atx"><b>${esc(p.cliente.nombre)}</b><small>${esc(p.tema || "Sin nombre de diseño")}</small></div>${right}</div>
     <div class="rt-acts">
       <a class="rbtn wa" href="${esc(waLink(p, cfg().plantillaRetiro))}" target="_blank" rel="noopener" data-recordar="${esc(p._id)}">${I("msg")}Recordar</a>
       <button class="rbtn" data-posponer="${esc(p._id)}">${I("cal")}Posponer</button>
@@ -1432,7 +1432,7 @@ function avisoRow(p, modo){
     </div>
   </div>`;
   return `<div class="arow" style="--c:${T.c}" data-open="${esc(p._id)}" role="button" tabindex="0">
-    <div class="atx"><b>${esc(p.cliente.nombre)}</b><small>${t.piezas} pz · ${fmtDate(p.fechaEntrega).slice(0, -5)}${t.saldo > 0 ? ` · Saldo ${esc(money(t.saldo, p.moneda))}` : ""}</small></div>
+    <div class="atx"><b>${esc(p.cliente.nombre)}</b><small>${esc(p.tema || "Sin nombre de diseño")}</small></div>
     ${right}
   </div>`;
 }
