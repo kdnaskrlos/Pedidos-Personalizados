@@ -591,6 +591,11 @@ table.mx{border-collapse:collapse;width:100%;font-size:13px}
 .dsec-h b{font-size:15px;font-weight:800}
 .dsec-h span{font-size:13px;color:var(--muted);font-weight:600}
 
+.dhead{align-items:center}
+.dcli{display:flex;align-items:center;justify-content:space-between;gap:10px;flex-wrap:wrap;padding:2px 2px 14px;border-bottom:1px solid var(--line)}
+.dcli b{font-size:20px;font-weight:800;line-height:1.2;min-width:0}
+.dwork h3{font-size:17px}
+
 @media (max-width:1000px){
   .cols{grid-template-columns:minmax(0,1fr)}
   .tipotabs{display:flex}
@@ -677,7 +682,7 @@ import { initializeApp, deleteApp } from "https://www.gstatic.com/firebasejs/10.
 import { getAuth, onAuthStateChanged, signInWithEmailAndPassword, createUserWithEmailAndPassword, signOut, updatePassword, reauthenticateWithCredential, EmailAuthProvider } from "https://www.gstatic.com/firebasejs/10.12.2/firebase-auth.js";
 import { initializeFirestore, getFirestore, persistentLocalCache, persistentMultipleTabManager, doc, collection, query, where, onSnapshot, getDoc, setDoc, updateDoc, deleteDoc, writeBatch } from "https://www.gstatic.com/firebasejs/10.12.2/firebase-firestore.js";
 
-const VERSION = "v2.21";
+const VERSION = "v2.22";
 /* ================= Utilidades ================= */
 const $ = (s, r = document) => r.querySelector(s);
 const esc = s => String(s ?? "").replace(/[&<>"']/g, c => ({"&":"&amp;","<":"&lt;",">":"&gt;",'"':"&quot;","'":"&#39;"}[c]));
@@ -1888,10 +1893,7 @@ function openDetail(id){
   const p = S.pedidos[id]; if (!p) return;
   const T = TIPOS[p.tipo], t = totales(p), pr = perm(), est = p.estado || "pendiente";
   const ov = modal(`
-    <div class="mh dhead" style="--c:${T.c}">
-      <div class="dh"><h2>${esc(p.cliente.nombre)}</h2><a class="dwa" href="https://wa.me/${esc(p.cliente.telefono)}" target="_blank" rel="noopener">${I("msg")}${esc(prettyPhone(p.cliente.telefono))}</a></div>
-      <button class="ib" data-close>${I("x")}</button>
-    </div>
+    <div class="mh dhead" style="--c:${T.c}"><span class="chip" style="--c:${T.c}">${I(T.icon)}</span><h2 class="up">${T.label.toUpperCase()}</h2><button class="ib" data-close>${I("x")}</button></div>
     <div class="mb">
       ${(() => {
         const fd = p.fechaEntrega ? parseYmd(p.fechaEntrega) : null;
@@ -1902,8 +1904,8 @@ function openDetail(id){
           <div class="dw-r">${d.t ? `<span class="dw-rel">${esc(d.t)}</span>` : ""}${p.urgente ? `<span class="dw-urg">${I("alert")}Urgente</span>` : ""}</div>
         </div>`;
       })()}
+      <div class="dcli"><b>${esc(p.cliente.nombre)}</b><a class="dwa" href="https://wa.me/${esc(p.cliente.telefono)}" target="_blank" rel="noopener">${I("msg")}${esc(prettyPhone(p.cliente.telefono))}</a></div>
       <div class="dwork" style="--c:${T.c}">
-        <span class="dw-tipo"><i></i>${T.label}</span>
         <h3>${esc(p.tema || "Sin tema")}</h3>
         ${[p.servicio, p.tipo === "personalizado" ? (p.prendaDe === "cliente" ? "Prenda del cliente" : p.prendaDe === "tienda" ? "Prenda de la tienda" : "") : ""].filter(Boolean).length
           ? `<div class="dchips">${[p.servicio, p.tipo === "personalizado" ? (p.prendaDe === "cliente" ? "Prenda del cliente" : p.prendaDe === "tienda" ? "Prenda de la tienda" : "") : ""].filter(Boolean).map(x => `<span>${esc(x)}</span>`).join("")}</div>` : ""}
