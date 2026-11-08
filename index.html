@@ -943,7 +943,7 @@ import { initializeApp, deleteApp } from "https://www.gstatic.com/firebasejs/10.
 import { getAuth, onAuthStateChanged, signInWithEmailAndPassword, createUserWithEmailAndPassword, signOut, updatePassword, reauthenticateWithCredential, EmailAuthProvider } from "https://www.gstatic.com/firebasejs/10.12.2/firebase-auth.js";
 import { initializeFirestore, getFirestore, persistentLocalCache, persistentMultipleTabManager, doc, collection, query, where, onSnapshot, getDoc, getDocs, setDoc, updateDoc, deleteDoc, writeBatch, runTransaction } from "https://www.gstatic.com/firebasejs/10.12.2/firebase-firestore.js";
 
-const VERSION = "v2.84";
+const VERSION = "v2.85";
 /* ================= Utilidades ================= */
 const $ = (s, r = document) => r.querySelector(s);
 const esc = s => String(s ?? "").replace(/[&<>"']/g, c => ({"&":"&amp;","<":"&lt;",">":"&gt;",'"':"&quot;","'":"&#39;"}[c]));
@@ -1477,10 +1477,22 @@ async function restaurarArchivo(f){
   try { data = JSON.parse(await f.text()); } catch(e) { return toast("Archivo no válido", true); }
   if (!data || data.app !== "comicshop-pedidos" || !data.colecciones) return toast("No es un respaldo de la app", true);
   const C = data.colecciones, n = k => Object.keys(C[k] || {}).length;
-  confirmar("¿Restaurar este respaldo?", `${fmtDT(data.creado)} · ${n("pedidos")} pedidos, ${n("clientes")} clientes, ${n("fotos")} fotos y ajustes. Lo que ya existe se reemplaza con el respaldo; no se borra nada más.`, "Restaurar", async () => {
+  confirmar("¿Restaurar este respaldo?", `${fmtDT(data.creado)} · ${n("pedidos")} pedidos, ${n("clientes")} clientes, ${n("fotos")} fotos y ajustes. Si un dato existe en la app y en el respaldo, se queda la versión más reciente.`, "Restaurar", async () => {
     toast("Restaurando…");
-    const ops = [];
-    for (const k of ["config","contadores","clientes","fotos","pedidos"]) for (const [id, v] of Object.entries(C[k] || {})) ops.push([k + "/" + id, v]);
+    // Fecha más reciente de cualquier cambio en un pedido o cliente
+    const fecha = v => [v.editadoEn, v.creadoEn, v.listoEn, v.avisadoEn, v.entregadoEn, v.recordadoEn, v.revisarEn, v.actualizadoEn, v.posponerHasta].filter(x => typeof x === "string").sort().pop() || "";
+    const ops = []; let nuevos = 0, reemplazados = 0, iguales = 0;
+    for (const k of ["config","contadores","clientes","fotos","pedidos"]) {
+      const act = {}; (await getDocs(collection(S.db, k))).forEach(d => act[d.id] = d.data());
+      for (const [id, v] of Object.entries(C[k] || {})) {
+        const a = act[id];
+        if (!a) { ops.push([k + "/" + id, v]); if (k === "pedidos") nuevos++; continue; }
+        if (k === "contadores") { if ((Number(v.n) || 0) > (Number(a.n) || 0)) ops.push([k + "/" + id, v]); continue; }
+        if (k === "config" || k === "fotos") continue; // ya existen: se conservan los actuales
+        if (fecha(v) > fecha(a)) { ops.push([k + "/" + id, v]); if (k === "pedidos") reemplazados++; }
+        else if (k === "pedidos") iguales++;
+      }
+    }
     let b = writeBatch(S.db), peso = 0, cnt = 0;
     for (const [path, v] of ops) {
       const t = JSON.stringify(v).length;
@@ -1488,7 +1500,7 @@ async function restaurarArchivo(f){
       b.set(doc(S.db, path), v); peso += t; cnt++;
     }
     if (cnt) await b.commit();
-    toast("Respaldo restaurado");
+    toast(`Restaurado: ${nuevos} recuperados, ${reemplazados} actualizados`);
   });
 }
 /* ===== Cambios del equipo (solo administrador) ===== */
