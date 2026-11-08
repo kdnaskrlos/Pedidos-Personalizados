@@ -738,8 +738,15 @@ table.mx{border-collapse:collapse;width:100%;font-size:13px}
 .pill.demo{border-style:dashed;color:var(--muted)}
 .pill.demo .m-pr{display:none}
 /* v2.40 Vencido en amarillo */
-.oc2-due.err,.aday.err,.tag.c.err{color:#a16207;background:#fff3bf;border-color:#fde68a}
-:root[data-theme="dark"] .oc2-due.err,:root[data-theme="dark"] .aday.err,:root[data-theme="dark"] .tag.c.err{color:#facc15;background:#3a3008;border-color:#5c4b0c}
+/* v2.51 píldoras con los mismos colores de la tarjeta de fecha del detalle */
+.oc2-due,.aday{border:1px solid #fbd9b4;background:#fff4e8;color:#c2410c}
+.oc2-due.err,.aday.err{border-color:#f6c0c0;background:#fdecec;color:var(--err)}
+.oc2-due.ok,.aday.ok,.aday.info{border-color:#bfe6cc;background:#e9f7ee;color:var(--ok)}
+.oc2-due.info{border-color:#c5d8fb;background:#ebf2fe;color:var(--t-info)}
+:root[data-theme="dark"] .oc2-due,:root[data-theme="dark"] .aday{border-color:color-mix(in srgb,var(--warn) 30%,var(--line));background:color-mix(in srgb,var(--warn) 12%,var(--surface));color:var(--warn)}
+:root[data-theme="dark"] .oc2-due.err,:root[data-theme="dark"] .aday.err{border-color:color-mix(in srgb,var(--err) 30%,var(--line));background:color-mix(in srgb,var(--err) 12%,var(--surface));color:var(--err)}
+:root[data-theme="dark"] .oc2-due.ok,:root[data-theme="dark"] .aday.ok,:root[data-theme="dark"] .aday.info{border-color:color-mix(in srgb,var(--ok) 30%,var(--line));background:color-mix(in srgb,var(--ok) 12%,var(--surface));color:var(--ok)}
+:root[data-theme="dark"] .oc2-due.info{border-color:color-mix(in srgb,var(--t-info) 30%,var(--line));background:color-mix(in srgb,var(--t-info) 12%,var(--surface));color:var(--t-info)}
 /* v2.42 campos inhabilitados (Sublimación completa) */
 .pbtn.off{opacity:.45;cursor:not-allowed;pointer-events:none}
 /* v2.45 detalle: cliente y WhatsApp más grandes */
@@ -803,8 +810,8 @@ table.mx{border-collapse:collapse;width:100%;font-size:13px}
   .thalf b{font-size:21px}
   .ov.popup{padding:16px;align-items:center}
   .ov.popup .md{height:auto;max-height:100%;border-radius:16px;border:1px solid var(--line)}
-  .toolbar .seg{display:grid;grid-template-columns:repeat(4,minmax(0,1fr));width:100%}
-  .toolbar .seg button{padding:8px 2px;font-size:11.5px;white-space:nowrap;border-left:0}
+  .toolbar .seg{display:grid;grid-template-columns:repeat(5,minmax(0,1fr));width:100%}
+  .toolbar .seg button{padding:8px 1px;font-size:11px;letter-spacing:-.01em;white-space:nowrap;border-left:0}
   .toolbar .seg button+button{border-left:1px solid var(--line)}
   .toolbar .search{min-width:0;max-width:none;width:100%}
   .d-only{display:none}
@@ -842,7 +849,7 @@ import { initializeApp, deleteApp } from "https://www.gstatic.com/firebasejs/10.
 import { getAuth, onAuthStateChanged, signInWithEmailAndPassword, createUserWithEmailAndPassword, signOut, updatePassword, reauthenticateWithCredential, EmailAuthProvider } from "https://www.gstatic.com/firebasejs/10.12.2/firebase-auth.js";
 import { initializeFirestore, getFirestore, persistentLocalCache, persistentMultipleTabManager, doc, collection, query, where, onSnapshot, getDoc, setDoc, updateDoc, deleteDoc, writeBatch, runTransaction } from "https://www.gstatic.com/firebasejs/10.12.2/firebase-firestore.js";
 
-const VERSION = "v2.50";
+const VERSION = "v2.51";
 /* ================= Utilidades ================= */
 const $ = (s, r = document) => r.querySelector(s);
 const esc = s => String(s ?? "").replace(/[&<>"']/g, c => ({"&":"&amp;","<":"&lt;",">":"&gt;",'"':"&quot;","'":"&#39;"}[c]));
@@ -1226,6 +1233,7 @@ function filtrar(tipo){
   if (f === "pendientes") l = l.filter(p => (p.estado || "pendiente") === "pendiente");
   if (f === "avisar") l = l.filter(p => p.estado === "listo" && !p.avisado);
   if (f === "listos") l = l.filter(p => p.estado === "listo");
+  if (f === "retirar") l = l.filter(p => p.estado === "listo" && p.avisado);
   if (f === "entregados") l = l.filter(p => p.estado === "entregado");
   const key = p => (p.fechaEntrega || "9999") + (p.urgente ? "0" : "1");
   l.sort((a, b) => f === "entregados" ? String(b.entregadoEn || "").localeCompare(a.entregadoEn || "") : key(a).localeCompare(key(b)));
@@ -1253,7 +1261,7 @@ function viewPedidos(a, pr){
   const tipos = ["personalizado","sublimacion"].filter(t => pr.ver[t]);
   if (!tipos.length) return `<div class="card"><p class="note">Todavía no tienes permiso para ver pedidos. Pídeselo al administrador.</p></div>`;
   if (!tipos.includes(S.tab)) S.tab = tipos[0];
-  const fl = [["pendientes","Pendientes"],["avisar","Por avisar"],["listos","Listos"],["entregados","Entregados"]];
+  const fl = [["pendientes","Pendientes"],["avisar","Por avisar"],["listos","Listos"],["retirar","Sin retirar"],["entregados","Entregados"]];
   const col = t => {
     const l = filtrar(t), T = TIPOS[t];
     return `<section class="col ${S.tab === t ? "" : "off"}" style="--c:${T.c}">
@@ -2309,7 +2317,7 @@ function openDetail(id){
         <button class="btn" id="d-edit">${I("edit")}Editar</button>
       </div>
       ${est === "pendiente" ? `<button class="btn pdlisto" id="d-listo">${I("check")}Marcar pedido listo</button>` : ""}
-      ${est === "listo" ? `<div class="dgrid"><a class="btn wa big" id="d-wa" href="${esc(waLink(p))}" target="_blank" rel="noopener">${I("msg")}${p.avisado ? "Volver a avisar" : "Avisar al cliente"}</a><button class="btn listo" id="d-ent">${I("box")}Entregado</button></div>` : ""}
+      ${est === "listo" ? `<div class="dgrid">${p.avisado ? `<a class="btn wa big" id="d-rec" href="${esc(waLink(p, cfg().plantillaRetiro))}" target="_blank" rel="noopener">${I("msg")}Recordar</a>` : `<a class="btn wa big" id="d-wa" href="${esc(waLink(p))}" target="_blank" rel="noopener">${I("msg")}Avisar al cliente</a>`}<button class="btn listo" id="d-ent">${I("box")}Entregado</button></div>` : ""}
     </div>`, "pdmd");
   loadFotos(ov);
   ov.querySelectorAll(".imgbox img").forEach(i => i.onclick = () => i.src && lightbox(i.src));
@@ -2323,6 +2331,7 @@ function openDetail(id){
     popupListo(Object.assign({}, p, {estado:"listo"}));
   });
   on("#d-wa", () => { marcarAvisado(id); ov.close(); });
+  on("#d-rec", () => { const n = new Date().toISOString(); updateDoc(doc(S.db, "pedidos/" + id), {avisadoEn:n, recordadoEn:n, posponerHasta:""}).then(() => toast(`Cliente recordado. Te aviso otra vez en ${cfg().diasRetiro} día${cfg().diasRetiro === 1 ? "" : "s"}`)).catch(() => toast("No se pudo actualizar el pedido", true)); ov.close(); });
   on("#d-ent", () => upd({estado:"entregado", entregadoEn:new Date().toISOString()}, "Pedido entregado"));
   on("#d-reab", () => upd({estado:"pendiente", avisado:false}, "Pedido reabierto"));
   on("#d-del", () => confirmar(`¿Eliminar el pedido ${p.codigo}?`, "Esta acción no se puede deshacer.", "Eliminar", async () => {
