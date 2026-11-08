@@ -933,7 +933,7 @@ import { initializeApp, deleteApp } from "https://www.gstatic.com/firebasejs/10.
 import { getAuth, onAuthStateChanged, signInWithEmailAndPassword, createUserWithEmailAndPassword, signOut, updatePassword, reauthenticateWithCredential, EmailAuthProvider } from "https://www.gstatic.com/firebasejs/10.12.2/firebase-auth.js";
 import { initializeFirestore, getFirestore, persistentLocalCache, persistentMultipleTabManager, doc, collection, query, where, onSnapshot, getDoc, setDoc, updateDoc, deleteDoc, writeBatch, runTransaction } from "https://www.gstatic.com/firebasejs/10.12.2/firebase-firestore.js";
 
-const VERSION = "v2.81";
+const VERSION = "v2.82";
 /* ================= Utilidades ================= */
 const $ = (s, r = document) => r.querySelector(s);
 const esc = s => String(s ?? "").replace(/[&<>"']/g, c => ({"&":"&amp;","<":"&lt;",">":"&gt;",'"':"&quot;","'":"&#39;"}[c]));
@@ -1341,10 +1341,9 @@ function filtrar(tipo){
 const revisarList = () => pedidosList().filter(p => p.revisar).sort((a, b) => String(b.revisarEn).localeCompare(String(a.revisarEn)));
 function openRevisar(){
   if (!perm().admin) return;
-  const ov = modal(`<div class="mh"><h2>Cambios del equipo</h2><button class="ib" data-close>${I("x")}</button></div><div class="mb" id="rvb"></div><div class="mf rvf"><button class="btn" id="rvall">Descartar todas</button><button class="btn primary" data-close>Cerrar</button></div>`, "rvmd");
+  const ov = modal(`<div class="mh"><h2>Cambios del equipo</h2><button class="ib" data-close>${I("x")}</button></div><div class="mb" id="rvb"></div>`, "rvmd");
   let draw = () => {
     const l = revisarList();
-    $("#rvall", ov).disabled = !l.length;
     $("#rvb", ov).innerHTML = l.length ? l.map(p => { const T = TIPOS[p.tipo], im = (p.imagenes || [])[0]; return `<div class="oc2 rvcard" role="button" tabindex="0" style="--c:${T.c}" data-rvver="${esc(p._id)}">
         <div class="oc2-side"><span class="oc2-code">${esc(p.codigo || "")}</span>${im ? `<img class="oc2-img" data-foto="${esc(im)}" alt="">` : `<span class="oc2-img oc2-noimg">${I(T.icon)}</span>`}</div>
         <div class="oc2-main">
@@ -1362,12 +1361,7 @@ function openRevisar(){
     if (v) openDetail(v.dataset.rvver);
     if (x) { cambiar(x.dataset.rvdel, {revisar:false}, "Descartado").then(draw); }
   });
-  $("#rvall", ov).onclick = async () => {
-    const l = revisarList(); if (!l.length) return;
-    const b = writeBatch(S.db); l.forEach(p => b.update(doc(S.db, "pedidos/" + p._id), {revisar:false})); await b.commit();
-    toastUndo("Descartadas", async () => { const u = writeBatch(S.db); l.forEach(p => u.update(doc(S.db, "pedidos/" + p._id), {revisar:true})); await u.commit(); });
-    draw();
-  };
+
 }
 function viewResumen(a, pr){
   const d = new Date(), h = d.getHours();
