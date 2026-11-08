@@ -866,7 +866,7 @@ import { initializeApp, deleteApp } from "https://www.gstatic.com/firebasejs/10.
 import { getAuth, onAuthStateChanged, signInWithEmailAndPassword, createUserWithEmailAndPassword, signOut, updatePassword, reauthenticateWithCredential, EmailAuthProvider } from "https://www.gstatic.com/firebasejs/10.12.2/firebase-auth.js";
 import { initializeFirestore, getFirestore, persistentLocalCache, persistentMultipleTabManager, doc, collection, query, where, onSnapshot, getDoc, setDoc, updateDoc, deleteDoc, writeBatch, runTransaction } from "https://www.gstatic.com/firebasejs/10.12.2/firebase-firestore.js";
 
-const VERSION = "v2.56";
+const VERSION = "v2.57";
 /* ================= Utilidades ================= */
 const $ = (s, r = document) => r.querySelector(s);
 const esc = s => String(s ?? "").replace(/[&<>"']/g, c => ({"&":"&amp;","<":"&lt;",">":"&gt;",'"':"&quot;","'":"&#39;"}[c]));
@@ -1277,8 +1277,6 @@ function viewResumen(a, pr){
       ${tile("var(--t-info)","msg","Por avisar", a.avisar.length, "clientes con pedido listo", "avisar")}
       ${(() => { const n = pedidosList().filter(p => p.estado === "listo" && p.avisado).length; return tile("var(--t-violet)","bag","Sin retirar", n, n === 1 ? "cliente avisado que no ha retirado" : "clientes avisados que no han retirado", "retirar"); })()}
     </div>
-    ${tipos.length ? `<div class="sec">${I("list")}Pendientes por tipo</div>
-    <div class="tiles">${tipos.map(t => tile(TIPOS[t].c, TIPOS[t].icon, TIPOS[t].label, pendTipo(t), "ver pedidos", "tipo-" + t)).join("")}</div>` : ""}
     <p class="appver">${esc(cfg().negocio)} · Pedidos · versión ${VERSION}</p>`;
 }
 function viewPedidos(a, pr){
