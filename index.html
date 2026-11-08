@@ -794,6 +794,11 @@ table.mx{border-collapse:collapse;width:100%;font-size:13px}
 @keyframes undobar{to{transform:scaleX(0)}}
 .dpok{display:flex;justify-content:flex-end;border-top:1px solid var(--line);padding-top:8px}
 .dpok .btn{min-width:96px}
+/* v2.64 botones de acción alineados a la derecha */
+.uacts,.uacts.one{display:flex;justify-content:flex-end;flex-wrap:wrap;gap:8px}
+.uacts .btn{width:auto;min-height:40px}
+.credf{display:flex;justify-content:flex-end}
+.credf .btn{width:auto}
 @media (max-width:1000px){.hello{padding-bottom:8px;margin-top:-6px}.hello h1{font-size:25px}}
 @media (max-width:1000px){.tiles.t5>:last-child{grid-column:1/-1}}
 @media (max-width:1000px){.pill.demo .m-pr{display:inline}}
@@ -887,7 +892,7 @@ import { initializeApp, deleteApp } from "https://www.gstatic.com/firebasejs/10.
 import { getAuth, onAuthStateChanged, signInWithEmailAndPassword, createUserWithEmailAndPassword, signOut, updatePassword, reauthenticateWithCredential, EmailAuthProvider } from "https://www.gstatic.com/firebasejs/10.12.2/firebase-auth.js";
 import { initializeFirestore, getFirestore, persistentLocalCache, persistentMultipleTabManager, doc, collection, query, where, onSnapshot, getDoc, setDoc, updateDoc, deleteDoc, writeBatch, runTransaction } from "https://www.gstatic.com/firebasejs/10.12.2/firebase-firestore.js";
 
-const VERSION = "v2.63";
+const VERSION = "v2.64";
 /* ================= Utilidades ================= */
 const $ = (s, r = document) => r.querySelector(s);
 const esc = s => String(s ?? "").replace(/[&<>"']/g, c => ({"&":"&amp;","<":"&lt;",">":"&gt;",'"':"&quot;","'":"&#39;"}[c]));
@@ -1572,7 +1577,7 @@ function viewAjustes(){
       </div>
       <div class="f"><label>Mensaje de WhatsApp cuando el pedido está listo</label><textarea class="inp" id="cPl" rows="4">${esc(c.plantilla)}</textarea></div>
       <div class="f"><label>Mensaje de WhatsApp para recordar el retiro</label><textarea class="inp" id="cPlR" rows="3">${esc(c.plantillaRetiro)}</textarea><span class="msg mut">Puedes usar: {cliente} {negocio} {codigo} {resumen} {saldo} {total} {fecha}</span></div>
-      <button class="btn primary" id="cSave" style="align-self:flex-start">${I("check")}Guardar</button>
+      <button class="btn primary" id="cSave" style="align-self:flex-end">${I("check")}Guardar</button>
     </div>
     <div class="sec">${I("list")}Opciones de los pedidos</div>
     <div class="lists2">${LISTAS.map(listaHTML).join("")}
@@ -1740,7 +1745,7 @@ function openCuenta(){
   const pr = perm();
   const ov = modal(`<div class="mh"><h2>${esc(S.me.nombre)}</h2><button class="ib" data-close>${I("x")}</button></div>
     <div class="mb"><dl class="kv"><dt>Usuario</dt><dd>@${esc(S.me.usuario)}</dd><dt>Rol</dt><dd>${pr.admin ? "Administrador" : "Equipo"}</dd><dt>Versión</dt><dd>${VERSION}</dd><dt>Puede ver</dt><dd>${[pr.ver.personalizado && "Personalizado", pr.ver.sublimacion && "Sublimación completa"].filter(Boolean).join(" y ") || "—"}${pr.soloAsignados ? " (solo asignados)" : ""}</dd></dl>
-    <div style="display:flex;gap:8px;flex-wrap:wrap"><button class="btn" id="tm">${I("moon")}Cambiar tema</button><button class="btn" id="cp">${I("key")}Cambiar mi PIN</button></div></div>
+    <div style="display:flex;gap:8px;flex-wrap:wrap;justify-content:flex-end"><button class="btn" id="tm">${I("moon")}Cambiar tema</button><button class="btn" id="cp">${I("key")}Cambiar mi PIN</button></div></div>
     <div class="mf"><button class="btn danger" id="lo">${I("logout")}Cerrar sesión</button></div>`, "sm");
   $("#tm", ov).onclick = () => $("#themeBtn").click();
   $("#cp", ov).onclick = () => { ov.close(); cambiarMiPin(); };
