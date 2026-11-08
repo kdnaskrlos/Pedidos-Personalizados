@@ -682,7 +682,7 @@ import { initializeApp, deleteApp } from "https://www.gstatic.com/firebasejs/10.
 import { getAuth, onAuthStateChanged, signInWithEmailAndPassword, createUserWithEmailAndPassword, signOut, updatePassword, reauthenticateWithCredential, EmailAuthProvider } from "https://www.gstatic.com/firebasejs/10.12.2/firebase-auth.js";
 import { initializeFirestore, getFirestore, persistentLocalCache, persistentMultipleTabManager, doc, collection, query, where, onSnapshot, getDoc, setDoc, updateDoc, deleteDoc, writeBatch } from "https://www.gstatic.com/firebasejs/10.12.2/firebase-firestore.js";
 
-const VERSION = "v2.22";
+const VERSION = "v2.23";
 /* ================= Utilidades ================= */
 const $ = (s, r = document) => r.querySelector(s);
 const esc = s => String(s ?? "").replace(/[&<>"']/g, c => ({"&":"&amp;","<":"&lt;",">":"&gt;",'"':"&quot;","'":"&#39;"}[c]));
@@ -1405,7 +1405,7 @@ function chooseTipo(cliente){
   };
   const el = document.createElement("div");
   el.className = "tsplit";
-  el.innerHTML = tipos.map(t => `<button class="thalf" style="--c:${TIPOS[t].c}" data-t="${t}"><span class="tic">${I(TIPOS[t].icon)}</span><b>${TIPOS[t].label.toUpperCase()}</b><span>${info[t]}</span></button>`).join("")
+  el.innerHTML = tipos.map(t => `<button class="thalf" style="--c:${TIPOS[t].c}" data-t="${t}"><span class="tic">${I(TIPOS[t].icon)}</span><b>${TIPOS[t].label.toUpperCase()}</b></button>`).join("")
     + `<div class="tq">¿Qué tipo de pedido es?</div><button class="tclose" data-close aria-label="Cerrar">${I("x")}</button>`;
   overlay(el);
   el.onclick = e => {
