@@ -849,7 +849,7 @@ import { initializeApp, deleteApp } from "https://www.gstatic.com/firebasejs/10.
 import { getAuth, onAuthStateChanged, signInWithEmailAndPassword, createUserWithEmailAndPassword, signOut, updatePassword, reauthenticateWithCredential, EmailAuthProvider } from "https://www.gstatic.com/firebasejs/10.12.2/firebase-auth.js";
 import { initializeFirestore, getFirestore, persistentLocalCache, persistentMultipleTabManager, doc, collection, query, where, onSnapshot, getDoc, setDoc, updateDoc, deleteDoc, writeBatch, runTransaction } from "https://www.gstatic.com/firebasejs/10.12.2/firebase-firestore.js";
 
-const VERSION = "v2.51";
+const VERSION = "v2.52";
 /* ================= Utilidades ================= */
 const $ = (s, r = document) => r.querySelector(s);
 const esc = s => String(s ?? "").replace(/[&<>"']/g, c => ({"&":"&amp;","<":"&lt;",">":"&gt;",'"':"&quot;","'":"&#39;"}[c]));
@@ -1261,7 +1261,7 @@ function viewPedidos(a, pr){
   const tipos = ["personalizado","sublimacion"].filter(t => pr.ver[t]);
   if (!tipos.length) return `<div class="card"><p class="note">Todavía no tienes permiso para ver pedidos. Pídeselo al administrador.</p></div>`;
   if (!tipos.includes(S.tab)) S.tab = tipos[0];
-  const fl = [["pendientes","Pendientes"],["avisar","Por avisar"],["listos","Listos"],["retirar","Sin retirar"],["entregados","Entregados"]];
+  const fl = [["pendientes","Pendientes"],["listos","Listos"],["avisar","Por avisar"],["retirar","Sin retirar"],["entregados","Entregados"]];
   const col = t => {
     const l = filtrar(t), T = TIPOS[t];
     return `<section class="col ${S.tab === t ? "" : "off"}" style="--c:${T.c}">
