@@ -836,7 +836,7 @@ import { initializeApp, deleteApp } from "https://www.gstatic.com/firebasejs/10.
 import { getAuth, onAuthStateChanged, signInWithEmailAndPassword, createUserWithEmailAndPassword, signOut, updatePassword, reauthenticateWithCredential, EmailAuthProvider } from "https://www.gstatic.com/firebasejs/10.12.2/firebase-auth.js";
 import { initializeFirestore, getFirestore, persistentLocalCache, persistentMultipleTabManager, doc, collection, query, where, onSnapshot, getDoc, setDoc, updateDoc, deleteDoc, writeBatch, runTransaction } from "https://www.gstatic.com/firebasejs/10.12.2/firebase-firestore.js";
 
-const VERSION = "v2.47";
+const VERSION = "v2.48";
 /* ================= Utilidades ================= */
 const $ = (s, r = document) => r.querySelector(s);
 const esc = s => String(s ?? "").replace(/[&<>"']/g, c => ({"&":"&amp;","<":"&lt;",">":"&gt;",'"':"&quot;","'":"&#39;"}[c]));
@@ -1871,7 +1871,7 @@ function openForm(id, tipo, cliente){
           </div>
           <span class="msg" id="pago-msg"></span>
           <div class="f" id="f-motivo"><label>Motivo por el que no hay abono <span class="req">*</span></label><input class="inp" id="in-motivo" value="${esc(F.motivoSinAbono || "")}"><span class="msg"></span></div>
-          <div class="totals" id="totals"></div>
+          <div class="totals t2" id="totals"></div>
         </div>
       </section>
 
@@ -2152,7 +2152,7 @@ function renderPrecios(){
 }
 function renderTotals(){
   const t = totales(F), ab = num(F.abono);
-  $("#totals", F._ov).innerHTML = `<div class="tot"><small>Piezas</small><b class="num">${t.piezas}</b></div><div class="tot"><small>Total</small><b class="num">${esc(money(t.total, F.moneda))}</b></div><div class="tot"><small>Saldo</small><b class="num" style="color:${t.saldo > 0 ? "var(--err)" : "var(--ok)"}">${esc(money(t.saldo, F.moneda))}</b></div>`;
+  $("#totals", F._ov).innerHTML = `<div class="tot"><small>Total</small><b class="num">${esc(money(t.total, F.moneda))}</b></div><div class="tot"><small>Saldo</small><b class="num" style="color:${t.saldo > 0 ? "var(--err)" : "var(--ok)"}">${esc(money(t.saldo, F.moneda))}</b></div>`;
   const m = $("#pago-msg", F._ov);
   if (ab > t.total && t.total > 0) { m.className = "msg warn"; m.textContent = "⚠ El abono es mayor que el total"; } else m.textContent = "";
   $("#f-motivo", F._ov).hidden = ab > 0;
