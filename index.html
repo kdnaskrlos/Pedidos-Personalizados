@@ -827,7 +827,7 @@ import { initializeApp, deleteApp } from "https://www.gstatic.com/firebasejs/10.
 import { getAuth, onAuthStateChanged, signInWithEmailAndPassword, createUserWithEmailAndPassword, signOut, updatePassword, reauthenticateWithCredential, EmailAuthProvider } from "https://www.gstatic.com/firebasejs/10.12.2/firebase-auth.js";
 import { initializeFirestore, getFirestore, persistentLocalCache, persistentMultipleTabManager, doc, collection, query, where, onSnapshot, getDoc, setDoc, updateDoc, deleteDoc, writeBatch, runTransaction } from "https://www.gstatic.com/firebasejs/10.12.2/firebase-firestore.js";
 
-const VERSION = "v2.35";
+const VERSION = "v2.36";
 /* ================= Utilidades ================= */
 const $ = (s, r = document) => r.querySelector(s);
 const esc = s => String(s ?? "").replace(/[&<>"']/g, c => ({"&":"&amp;","<":"&lt;",">":"&gt;",'"':"&quot;","'":"&#39;"}[c]));
@@ -1156,7 +1156,7 @@ function doRender(){
   <div class="shell">
     <div class="topbar">
       <span class="pill st ${S.online && !S.cache ? "ok" : "bad"}"><i></i>${S.online ? (S.cache ? "Sincronizando…" : "En línea") : "Sin conexión · se guardará al volver"}</span>
-      ${pr.admin && S.view === "resumen" ? `<button class="pill demo ${hayDemo() ? "on" : ""}" id="demoBtn">${I("flask")}<span class="hide-m">Modo prueba${hayDemo() ? " · activo" : ""}</span><span class="m-pr">Prueba</span></button>` : ""}
+      ${pr.admin && S.me && S.me.rol === "admin" && S.view === "resumen" ? `<button class="pill demo ${hayDemo() ? "on" : ""}" id="demoBtn">${I("flask")}<span class="hide-m">Modo prueba${hayDemo() ? " · activo" : ""}</span><span class="m-pr">Prueba</span></button>` : ""}
       <span class="pill hide-m">${I("cal")}${DIAS[d.getDay()]} ${d.getDate()} de ${MESES[d.getMonth()]}</span>
       <span class="sp"></span>
       ${S.installEvt ? `<button class="pill" id="instBtn">${I("download")}<span class="hide-m">Instalar app</span></button>` : ""}
@@ -1318,7 +1318,7 @@ function demoPedidos(){
       motivoSinAbono:abono ? "" : "Cliente frecuente, paga al retirar",
       fechaEntrega:D(o.dias), urgente:!!o.urg, imagenes:[], nota:o.nota || "",
       creadoEn:T(o.creado != null ? o.creado : Math.min(-1, o.dias - 7)), creadoPor:yo,
-      estado:"pendiente", avisado:false, asignados:[], publico:true, lectores:[yo]
+      estado:"pendiente", avisado:false, asignados:[yo], publico:false, lectores:[yo]
     }, o.extra || {});
   };
   const listo = (d, av, extra) => Object.assign({estado:"listo", listoEn:T(d), listoPor:yo, avisado:av != null}, av != null ? {avisadoEn:T(av), avisadoPor:yo} : {}, extra || {});
@@ -1346,6 +1346,7 @@ function demoPedidos(){
   ];
 }
 function toggleDemo(){
+  if (!perm().admin) return;
   if (hayDemo()) {
     const ids = Object.values(S.pedidos).filter(p => p.demo).map(p => p._id);
     return confirmar("Quitar modo prueba", `Se borrarán los ${ids.length} pedidos de ejemplo. Tus pedidos reales no se tocan.`, "Quitar ejemplos", async () => {
