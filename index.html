@@ -792,26 +792,16 @@ table.mx{border-collapse:collapse;width:100%;font-size:13px}
 .toast.undo button svg.i{width:15px;height:15px}
 .toast.undo i{position:absolute;left:0;bottom:0;height:3px;width:100%;background:#86efac;transform-origin:left;animation:undobar linear forwards}
 @keyframes undobar{to{transform:scaleX(0)}}
-.dpq .dpokb{margin-left:auto}
+.dpq>.btn{flex:1 1 auto}
 /* v2.64 botones de acción alineados a la derecha */
 .uacts,.uacts.one{display:flex;justify-content:flex-end;flex-wrap:wrap;gap:8px}
 .uacts .btn{width:auto;min-height:40px}
 .credf{display:flex;justify-content:flex-end}
 .credf .btn{width:auto}
-/* v2.65 Resumen fijo: todo cabe en la pantalla, sin desplazamiento */
-body.fixedv{overflow:hidden;overscroll-behavior:none}
-body.fixedv .shell{height:100vh;height:100dvh;min-height:0;display:flex;flex-direction:column;overflow:hidden;box-sizing:border-box}
-body.fixedv .main{flex:1;min-height:0;overflow:hidden}
-body.fixedv .tiles.t5{flex:1;min-height:0;grid-auto-rows:minmax(0,1fr);align-content:stretch}
-body.fixedv .tiles.t5 .tile{min-height:0}
-body.fixedv .appver{flex:none;margin:0}
-@media (max-width:1000px){
-  body.fixedv .main{padding-bottom:12px;gap:12px}
-  body.fixedv .tiles.t5{gap:10px;grid-template-rows:repeat(2,minmax(0,1fr)) minmax(0,.8fr)}
-  body.fixedv .tile{padding:12px 14px;gap:4px;justify-content:space-between}
-  body.fixedv .tile .v{font-size:clamp(22px,6vh,34px)}
-}
-@media (min-width:1001px){body.fixedv .tiles.t5{flex:0 1 auto;max-height:320px}}
+/* v2.71 Resumen: se puede desplazar, sin barra visible */
+html:has(body.fixedv){scrollbar-width:none}
+html:has(body.fixedv)::-webkit-scrollbar,body.fixedv::-webkit-scrollbar{display:none;width:0;height:0}
+body.fixedv{scrollbar-width:none}
 @media (max-width:1000px){.hello{padding-bottom:8px;margin-top:-6px}.hello h1{font-size:25px}}
 @media (max-width:1000px){.tiles.t5>:last-child{grid-column:1/-1}}
 @media (max-width:1000px){.pill.demo .m-pr{display:inline}}
@@ -905,7 +895,7 @@ import { initializeApp, deleteApp } from "https://www.gstatic.com/firebasejs/10.
 import { getAuth, onAuthStateChanged, signInWithEmailAndPassword, createUserWithEmailAndPassword, signOut, updatePassword, reauthenticateWithCredential, EmailAuthProvider } from "https://www.gstatic.com/firebasejs/10.12.2/firebase-auth.js";
 import { initializeFirestore, getFirestore, persistentLocalCache, persistentMultipleTabManager, doc, collection, query, where, onSnapshot, getDoc, setDoc, updateDoc, deleteDoc, writeBatch, runTransaction } from "https://www.gstatic.com/firebasejs/10.12.2/firebase-firestore.js";
 
-const VERSION = "v2.70";
+const VERSION = "v2.71";
 /* ================= Utilidades ================= */
 const $ = (s, r = document) => r.querySelector(s);
 const esc = s => String(s ?? "").replace(/[&<>"']/g, c => ({"&":"&amp;","<":"&lt;",">":"&gt;",'"':"&quot;","'":"&#39;"}[c]));
@@ -1166,7 +1156,7 @@ function gateMsg(icon, title, text, withLogout){
 }
 function renderLogin(){
   if ($("#loginForm")) return;
-  $("#app").innerHTML = `<div class="gate"><form class="card" id="loginForm" autocomplete="on">
+  $("#app").innerHTML = `<div class="gate"><form autocomplete="off" class="card" id="loginForm">
     <div class="logo">${I("shirt")}</div>
     <div><h1>Comic Shop · Pedidos</h1><p class="note">Entra con el usuario y el PIN que te dio el administrador.</p></div>
     <div class="f"><label>Usuario</label><input class="inp" id="lu" autocomplete="username" autocapitalize="none" spellcheck="false"></div>
@@ -2198,7 +2188,7 @@ function renderItems(){
       <div class="r1">
         ${pb("etiqueta", isSub ? "" : it.etiqueta, "Etiqueta", "", isSub)}
         ${pb("talla", it.talla, "Talla")}
-        <div class="qty">${it.cant === 1 ? `<button type="button" class="del" data-del title="Quitar">${I("trash")}</button>` : `<button type="button" data-q="-1">−</button>`}<input class="qin" type="text" inputmode="numeric" pattern="[0-9]*" data-cant value="${it.cant}" aria-label="Unidades"><button type="button" data-q="1">+</button></div>
+        <div class="qty">${it.cant === 1 ? `<button type="button" class="del" data-del title="Quitar">${I("trash")}</button>` : `<button type="button" data-q="-1">−</button>`}<input class="qin" type="text" inputmode="numeric" pattern="[0-9]*" data-cant value="${it.cant || 1}" placeholder="1" aria-label="Unidades"><button type="button" data-q="1">+</button></div>
       </div>
       <div class="r1">
         ${pb("prenda", it.prenda, F.tipo === "personalizado" ? "Prenda" : "Producto")}
@@ -2227,7 +2217,7 @@ function renderItems(){
     if (e.target.hasAttribute("data-cant")) { e.target.value = e.target.value.replace(/\D/g, "").slice(0, 4); const n = parseInt(e.target.value) || 0; if (n > 0) { it.cant = n; renderTotals(); } }
   };
   box.onfocusin = e => { if (e.target.hasAttribute("data-cant")) setTimeout(() => e.target.select(), 0); };
-  box.onfocusout = e => {
+  box.onchange = box.onfocusout = e => {
     if (!e.target.hasAttribute("data-cant")) return;
     const row = e.target.closest("[data-i]"), it = F.items[Number(row.dataset.i)];
     it.cant = Math.max(1, parseInt(e.target.value) || 1); renderItems(); renderTotals();
@@ -2470,6 +2460,17 @@ function popupListo(p){
 async function marcarAvisado(id){
   cambiar(id, {avisado:true, avisadoEn:new Date().toISOString(), avisadoPor:S.me.usuario}, "Avisado", "Error al guardar");
 }
+/* ===== Sin autocompletado del navegador en ningún campo ===== */
+function sinAutocompletar(root){
+  (root.querySelectorAll ? root.querySelectorAll("input,textarea") : []).forEach(el => {
+    if (el.dataset.noac) return; el.dataset.noac = "1";
+    el.setAttribute("autocomplete", el.type === "password" ? "new-password" : "off");
+    el.setAttribute("autocorrect", "off"); el.setAttribute("spellcheck", "false");
+    if (el.tagName === "INPUT" && !el.name) el.name = "f" + Math.random().toString(36).slice(2, 8);
+  });
+}
+new MutationObserver(ms => ms.forEach(m => m.addedNodes.forEach(n => n.nodeType === 1 && sinAutocompletar(n.matches && n.matches("input,textarea") ? n.parentNode : n)))).observe(document.documentElement, {childList:true, subtree:true});
+sinAutocompletar(document);
 /* ===== Deshacer ===== */
 function toastUndo(msg, onUndo, ms = 7000, onEnd){
   document.querySelectorAll(".toast").forEach(x => x.remove());
