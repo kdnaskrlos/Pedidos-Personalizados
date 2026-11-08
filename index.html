@@ -734,6 +734,11 @@ table.mx{border-collapse:collapse;width:100%;font-size:13px}
 .oc2-urg svg.i{width:12px;height:12px;stroke-width:2.6}
 @keyframes urgp{50%{box-shadow:0 2px 14px rgba(255,59,48,.7)}}
 @media (prefers-reduced-motion:reduce){.oc2-urg{animation:none}}
+.pill.demo{border-style:dashed;color:var(--muted)}
+.pill.demo .m-pr{display:none}
+@media (max-width:1000px){.pill.demo .m-pr{display:inline}}
+.pill.demo.on{border-style:solid;border-color:#f59e0b;background:#fff4dc;color:#b45309}
+[data-theme="dark"] .pill.demo.on{background:#3a2a0a;color:#fbbf24}
 @media (max-width:1000px){
   .cols{grid-template-columns:minmax(0,1fr)}
   .tipotabs{display:flex}
@@ -822,7 +827,7 @@ import { initializeApp, deleteApp } from "https://www.gstatic.com/firebasejs/10.
 import { getAuth, onAuthStateChanged, signInWithEmailAndPassword, createUserWithEmailAndPassword, signOut, updatePassword, reauthenticateWithCredential, EmailAuthProvider } from "https://www.gstatic.com/firebasejs/10.12.2/firebase-auth.js";
 import { initializeFirestore, getFirestore, persistentLocalCache, persistentMultipleTabManager, doc, collection, query, where, onSnapshot, getDoc, setDoc, updateDoc, deleteDoc, writeBatch, runTransaction } from "https://www.gstatic.com/firebasejs/10.12.2/firebase-firestore.js";
 
-const VERSION = "v2.32";
+const VERSION = "v2.33";
 /* ================= Utilidades ================= */
 const $ = (s, r = document) => r.querySelector(s);
 const esc = s => String(s ?? "").replace(/[&<>"']/g, c => ({"&":"&amp;","<":"&lt;",">":"&gt;",'"':"&quot;","'":"&#39;"}[c]));
@@ -848,6 +853,7 @@ function toast(msg, bad){ document.querySelectorAll(".toast").forEach(x => x.rem
 const P = {
   home:'<path d="M3 10.5 12 3l9 7.5V20a1 1 0 0 1-1 1h-5v-6H9v6H4a1 1 0 0 1-1-1z"/>',
   back:'<path d="m15 18-6-6 6-6"/>',
+  flask:'<path d="M9 3h6M10 3v6.5L4.6 18.4A1.7 1.7 0 0 0 6 21h12a1.7 1.7 0 0 0 1.4-2.6L14 9.5V3"/><path d="M7.5 15h9"/>',
   chev:'<path d="m6 9 6 6 6-6"/>',
   list:'<path d="M9 5h11M9 12h11M9 19h11M4 5h.01M4 12h.01M4 19h.01"/>',
   bell:'<path d="M6 8a6 6 0 1 1 12 0c0 7 3 9 3 9H3s3-2 3-9"/><path d="M10.3 21a1.94 1.94 0 0 0 3.4 0"/>',
@@ -1150,6 +1156,7 @@ function doRender(){
   <div class="shell">
     <div class="topbar">
       <span class="pill st ${S.online && !S.cache ? "ok" : "bad"}"><i></i>${S.online ? (S.cache ? "Sincronizando…" : "En línea") : "Sin conexión · se guardará al volver"}</span>
+      ${pr.admin && S.view === "resumen" ? `<button class="pill demo ${hayDemo() ? "on" : ""}" id="demoBtn">${I("flask")}<span class="hide-m">Modo prueba${hayDemo() ? " · activo" : ""}</span><span class="m-pr">Prueba</span></button>` : ""}
       <span class="pill hide-m">${I("cal")}${DIAS[d.getDay()]} ${d.getDate()} de ${MESES[d.getMonth()]}</span>
       <span class="sp"></span>
       ${S.installEvt ? `<button class="pill" id="instBtn">${I("download")}<span class="hide-m">Instalar app</span></button>` : ""}
@@ -1279,12 +1286,73 @@ async function migrarCodigos(){
       const ref = doc(S.db, "contadores/" + t), s = await getDoc(ref);
       if (s.exists()) continue;
       const re = new RegExp("^" + TIPOS[t].pre + "-\\d{4,}$");
-      const lst = Object.values(S.pedidos).filter(p => p.tipo === t).sort((a, b) => String(a.creadoEn).localeCompare(String(b.creadoEn)));
+      const lst = Object.values(S.pedidos).filter(p => p.tipo === t && !p.demo).sort((a, b) => String(a.creadoEn).localeCompare(String(b.creadoEn)));
       const b = writeBatch(S.db); let n = 0;
       lst.forEach(p => { n++; const c = fmtCodigo(t, n); if (p.codigo !== c && !re.test(p.codigo || "")) b.update(doc(S.db, "pedidos/" + p._id), {codigo:c}); });
       b.set(ref, {n}); await b.commit();
     }
   } catch(e) { console.warn("migrar códigos", e); }
+}
+/* ===== Modo prueba: pedidos de ejemplo (se marcan con demo:true y se pueden quitar) ===== */
+const hayDemo = () => Object.values(S.pedidos || {}).some(p => p.demo);
+function demoPedidos(){
+  const yo = S.me.usuario, now = Date.now(), D = n => ymd(new Date(now + n * 86400000)), T = n => new Date(now + n * 86400000).toISOString();
+  const tel = ["584121234567","584144567890","584161112233","584247361430","584264445566","584125558899","584143332211","584167778899","584241234500","584261239876"];
+  const nom = ["María González","José Ramírez","Luis Pérez","Andrea Rodríguez","Colegio San Agustín","Carlos Gutiérrez","Daniela Mendoza","Club Deportivo Los Halcones","Pedro Hernández","Gabriela Rojas","Farmacia La Salud","Academia de Fútbol Táchira"];
+  let k = 0;
+  const mk = (tipo, o) => {
+    const i = k++, pre = TIPOS[tipo].pre;
+    const items = o.items.map(([prenda, color, talla, cant, extra]) => Object.assign({etiqueta:o.etiqueta || "Comic Shop", prenda, color, horma:tipo === "personalizado" ? "Unisex" : "", talla, cant, nombre:"", numero:""}, extra || {}));
+    const precios = [...new Set(items.map(x => x.prenda))].map((n, j) => ({n, v:o.precios ? o.precios[j] : 15000 + j * 5000}));
+    const total = items.reduce((s, x) => s + x.cant * precios.find(z => z.n === x.prenda).v, 0);
+    const abono = o.abono === "total" ? total : o.abono === 0 ? 0 : Math.round(total / 2000) * 1000;
+    return Object.assign({
+      demo:true, tipo, codigo:pre + "-T" + String(i + 1).padStart(3, "0"),
+      cliente:{nombre:nom[i % nom.length], telefono:tel[i % tel.length]}, tema:o.tema,
+      servicio:tipo === "personalizado" ? (o.serv || ["DTF"]).join(", ") : "", servicios:tipo === "personalizado" ? (o.serv || ["DTF"]) : [],
+      prendaDe:tipo === "personalizado" ? (o.prendaDe || "tienda") : "tienda", etiqueta:o.etiqueta || "Comic Shop",
+      items, precios, precio:precios.length === 1 ? precios[0].v : 0, moneda:"COP", abono,
+      motivoSinAbono:abono ? "" : "Cliente frecuente, paga al retirar",
+      fechaEntrega:D(o.dias), urgente:!!o.urg, imagenes:[], nota:o.nota || "",
+      creadoEn:T(o.creado != null ? o.creado : Math.min(-1, o.dias - 7)), creadoPor:yo,
+      estado:"pendiente", avisado:false, asignados:[], publico:true, lectores:[yo]
+    }, o.extra || {});
+  };
+  const listo = (d, av, extra) => Object.assign({estado:"listo", listoEn:T(d), listoPor:yo, avisado:av != null}, av != null ? {avisadoEn:T(av), avisadoPor:yo} : {}, extra || {});
+  const P = "personalizado", Sb = "sublimacion";
+  return [
+    mk(P, {tema:"Logo Panadería El Trigal", dias:-2, urg:true, serv:["DTF","Vinilo textil"], items:[["Franela","Blanco","M",6],["Franela","Blanco","L",4]], nota:"El logo va en el pecho izquierdo"}),
+    mk(P, {tema:"Cumpleaños Valentina 15", dias:-5, items:[["Franela oversize","Rosado","S",3],["Franela oversize","Rosado","M",2]], abono:0}),
+    mk(P, {tema:"Equipo de Kickingball", dias:0, urg:true, items:[["Franelilla","Negro","M",8,{nombre:"Ana",numero:"7"}],["Franelilla","Negro","L",4]], precios:[18000]}),
+    mk(P, {tema:"Promoción 5to año 2026", dias:1, serv:["Sublimación sencilla"], items:[["Chemise","Azul marino","M",12],["Chemise","Azul marino","L",10],["Suéter","Gris oscuro","L",3]], precios:[25000, 45000]}),
+    mk(P, {tema:"Gorra Taller Mecánico Ruiz", dias:2, items:[["Gorra","Negro","Única",15]], precios:[12000], prendaDe:"cliente"}),
+    mk(P, {tema:"Uniforme Farmacia La Salud", dias:6, serv:["Bordado"], items:[["Chemise","Blanco","S",4],["Chemise","Blanco","M",6]], abono:"total"}),
+    mk(P, {tema:"Hoodie Graduación Ingeniería", dias:15, items:[["Hoodie","Vinotinto","M",5],["Hoodie","Vinotinto","XL",2]], precios:[55000]}),
+    mk(P, {tema:"Franelas Día del Padre", dias:-1, items:[["Franela","Azul cielo","L",2],["Franela","Gris claro","XL",1]], extra:listo(-1)}),
+    mk(P, {tema:"Logo Barbería Estilo", dias:-1, items:[["Franela","Negro","M",3]], extra:listo(-2, -1)}),
+    mk(P, {tema:"Camisas Iglesia Renacer", dias:-6, items:[["Franela","Blanco","M",20]], extra:listo(-7, -5)}),
+    mk(P, {tema:"Franela personalizada Mamá", dias:-8, items:[["Franela","Morado","S",1]], extra:listo(-9, -7, {posponerHasta:D(2)})}),
+    mk(P, {tema:"Uniforme Ferretería El Tornillo", dias:-10, items:[["Chemise","Rojo","L",6]], abono:"total", extra:{estado:"entregado", listoEn:T(-12), avisado:true, avisadoEn:T(-11), entregadoEn:T(-10)}}),
+    mk(Sb, {tema:"Uniforme Los Halcones Sub-12", dias:-1, items:[["Uniforme completo","Fullprint","10",12,{nombre:"Sebastián",numero:"10"}],["Uniforme completo","Fullprint","12",6]], precios:[38000]}),
+    mk(Sb, {tema:"Camisas Maratón 10K", dias:1, urg:true, items:[["Camisa deportiva","Fullprint","M",25],["Camisa deportiva","Fullprint","L",15]], precios:[16000]}),
+    mk(Sb, {tema:"Licras Academia de Baile", dias:4, items:[["Licra","Fullprint","S",10],["Short deportivo","Fullprint","S",10]], precios:[20000, 14000]}),
+    mk(Sb, {tema:"Selección Voleibol Femenino", dias:9, items:[["Camisa deportiva","Fullprint","S",8],["Short deportivo","Fullprint","S",8]], abono:0}),
+    mk(Sb, {tema:"Franelas Evento Corporativo", dias:-1, items:[["Franela","Fullprint","M",30]], extra:listo(0)}),
+    mk(Sb, {tema:"Trajes de baño Club Delfines", dias:-5, items:[["Traje de baño","Fullprint","10",10]], extra:listo(-6, -4)}),
+    mk(Sb, {tema:"Uniformes Academia Táchira", dias:-12, items:[["Uniforme completo","Fullprint","14",18]], abono:"total", extra:{estado:"entregado", listoEn:T(-14), avisado:true, avisadoEn:T(-13), entregadoEn:T(-12)}})
+  ];
+}
+function toggleDemo(){
+  if (hayDemo()) {
+    const ids = Object.values(S.pedidos).filter(p => p.demo).map(p => p._id);
+    return confirmar("Quitar modo prueba", `Se borrarán los ${ids.length} pedidos de ejemplo. Tus pedidos reales no se tocan.`, "Quitar ejemplos", async () => {
+      const b = writeBatch(S.db); ids.forEach(id => b.delete(doc(S.db, "pedidos/" + id))); await b.commit(); toast("Modo prueba desactivado");
+    });
+  }
+  const lst = demoPedidos();
+  confirmar("Activar modo prueba", `Se agregarán ${lst.length} pedidos de ejemplo (urgentes, vencidos, próximos, por avisar, avisados y entregados). Para quitarlos, toca otra vez la píldora.`, "Cargar ejemplos", async () => {
+    const b = writeBatch(S.db); lst.forEach(p => b.set(doc(collection(S.db, "pedidos")), p)); await b.commit(); toast("Pedidos de ejemplo cargados");
+  });
 }
 function cardHTML(p){
   const T = TIPOS[p.tipo], t = totales(p), im = (p.imagenes || [])[0], due = dueShort(p);
@@ -1444,6 +1512,7 @@ function bindMain(){
   if (q) q.oninput = () => { S.q = q.value; clearTimeout(q._t); q._t = setTimeout(render, 160); };
   $("#themeBtn").onclick = () => { const t = document.documentElement.dataset.theme === "dark" ? "light" : "dark"; document.documentElement.dataset.theme = t; try { localStorage.setItem("cs-tema", t); } catch(e) {} };
   $("#meBtn").onclick = openCuenta;
+  if ($("#demoBtn")) $("#demoBtn").onclick = toggleDemo;
   if ($("#instBtn")) $("#instBtn").onclick = async () => { S.installEvt.prompt(); await S.installEvt.userChoice; S.installEvt = null; render(); };
   if ($("#notifBtn")) $("#notifBtn").onclick = async () => { const r = await Notification.requestPermission(); toast(r === "granted" ? "Notificaciones activadas" : "No se activaron las notificaciones", r !== "granted"); render(); };
   if ($("#newUser")) $("#newUser").onclick = nuevoUsuario;
