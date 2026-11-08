@@ -905,7 +905,7 @@ import { initializeApp, deleteApp } from "https://www.gstatic.com/firebasejs/10.
 import { getAuth, onAuthStateChanged, signInWithEmailAndPassword, createUserWithEmailAndPassword, signOut, updatePassword, reauthenticateWithCredential, EmailAuthProvider } from "https://www.gstatic.com/firebasejs/10.12.2/firebase-auth.js";
 import { initializeFirestore, getFirestore, persistentLocalCache, persistentMultipleTabManager, doc, collection, query, where, onSnapshot, getDoc, setDoc, updateDoc, deleteDoc, writeBatch, runTransaction } from "https://www.gstatic.com/firebasejs/10.12.2/firebase-firestore.js";
 
-const VERSION = "v2.69";
+const VERSION = "v2.70";
 /* ================= Utilidades ================= */
 const $ = (s, r = document) => r.querySelector(s);
 const esc = s => String(s ?? "").replace(/[&<>"']/g, c => ({"&":"&amp;","<":"&lt;",">":"&gt;",'"':"&quot;","'":"&#39;"}[c]));
@@ -927,7 +927,7 @@ function money(v, mon){
   if (mon === "COP") return "COP " + n.toLocaleString("es-CO", {maximumFractionDigits:0});
   return "$ " + n.toLocaleString("en-US", {minimumFractionDigits:2, maximumFractionDigits:2});
 }
-function toast(msg, bad){ document.querySelectorAll(".toast").forEach(x => x.remove()); const t = document.createElement("div"); t.className = "toast" + (bad ? " bad" : ""); t.textContent = msg; document.body.appendChild(t); setTimeout(() => t.remove(), bad ? 4500 : 2500); }
+function toast(msg, bad){ if (bad && S.me && S.me.rol !== "admin" && /permission|permiso|denied|denegado/i.test(String(msg))) { console.warn("aviso oculto:", msg); return; } document.querySelectorAll(".toast").forEach(x => x.remove()); const t = document.createElement("div"); t.className = "toast" + (bad ? " bad" : ""); t.textContent = msg; document.body.appendChild(t); setTimeout(() => t.remove(), bad ? 4500 : 2500); }
 const P = {
   home:'<path d="M3 10.5 12 3l9 7.5V20a1 1 0 0 1-1 1h-5v-6H9v6H4a1 1 0 0 1-1-1z"/>',
   back:'<path d="m15 18-6-6 6-6"/>',
@@ -1135,7 +1135,9 @@ function startData(){
     // Reintentar una vez: puede ser un permiso que el servidor todavía no había registrado
     if (!S.reintento && gen === S.gen) { S.reintento = true; setTimeout(() => { if (S.me && S.me.activo && gen === S.gen) startData(); }, 2500); return; }
     if (S.errores.includes(nombre)) return;
-    S.errores.push(nombre); toast("No se pudo leer: " + S.errores.join(", ") + " (" + (e.code || e.message) + ")", true);
+    S.errores.push(nombre);
+    if (!perm().admin) return; // los empleados no ven avisos técnicos de permisos
+    toast("No se pudo leer: " + S.errores.join(", ") + " (" + (e.code || e.message) + ")", true);
   };
   add(onSnapshot(doc(S.db, "config/ajustes"), s => { S.cfgRaw = s.exists() ? s.data() : null; render(); }, err("ajustes")));
   add(onSnapshot(collection(S.db, "usuarios"), s => { const o = {}; s.forEach(d => o[d.id] = d.data()); S.usuarios = o; render(); }, err("usuarios")));
@@ -1610,7 +1612,7 @@ function bindMain(){
     if (d.tile) { if (d.tile === "avisos") setView("avisos"); else if (d.tile.startsWith("tipo-")) { S.tab = d.tile.slice(5); S.filtro = "pendientes"; setView("pedidos"); } else { S.filtro = d.tile; autoTab(); setView("pedidos"); } return; }
     if (d.tab) { S.tab = d.tab; render(); return; }
     if (d.filtro) { S.filtro = d.filtro; autoTab(); render(); return; }
-    if (d.act === "nuevo") return d.tipo ? openForm(null, d.tipo) : chooseTipo();
+    if (d.act === "nuevo") return nuevoPedido(d.tipo);
     if (d.act === "mipin") return cambiarMiPin();
     if (d.act === "cuenta") return openCuenta();
     if (d.avisar) { marcarAvisado(d.avisar); return; }
@@ -1697,7 +1699,7 @@ function nuevoUsuario(){
       <div class="opts">
         <label class="tg"><input type="checkbox" id="vp" checked>Personalizado</label>
         <label class="tg"><input type="checkbox" id="vs" checked>Sublimación completa</label>
-        <label class="tg"><input type="checkbox" id="sa">Solo sus asignados</label>
+        <label class="tg"><input type="checkbox" id="sa" checked>Solo sus asignados</label>
         <label class="tg"><input type="checkbox" id="el">Puede eliminar pedidos</label>
       </div>
       <span class="msg bad" id="nm"></span>
@@ -1812,6 +1814,33 @@ function confirmar(title, text, okTxt, fn){
   $("#okc", ov).onclick = async () => { $("#okc", ov).disabled = true; try { await fn(); ov.close(); } catch(e) { console.warn(e); toast("No se pudo completar: " + (e.code || e.message || ""), true); $("#okc", ov).disabled = false; } };
   return ov;
 }
+/* ===== Pedido en curso (borrador local por si la app se cierra) ===== */
+const draftKey = () => "cs-borrador-" + ((S.me && S.me.usuario) || "");
+function leerBorrador(){ try { const d = JSON.parse(localStorage.getItem(draftKey()) || "null"); return d && d.F && TIPOS[d.F.tipo] ? d : null; } catch(e) { return null; } }
+function borrarBorrador(){ try { localStorage.removeItem(draftKey()); } catch(e) {} }
+function guardarBorrador(){
+  if (!F || !F._nuevo) return;
+  const x = {};
+  for (const k of Object.keys(F)) if (!k.startsWith("_") && k !== "visto") x[k] = F[k];
+  x.imagenes = (F.imagenes || []).filter(i => i.id && !i.error).map(i => i.id);
+  const t = F._ov && F._ov.querySelector("#in-tel"), ps = F._ov && F._ov.querySelector("#in-pais");
+  if (t) { x.telRaw = t.value; x.paisRaw = ps ? ps.value : ""; }
+  const hay = (x.cliente && (x.cliente.nombre || x.cliente.telefono)) || x.telRaw || x.tema || (x.items || []).length || x.fechaEntrega;
+  try { hay ? localStorage.setItem(draftKey(), JSON.stringify({F:x, en:Date.now()})) : localStorage.removeItem(draftKey()); } catch(e) {}
+}
+setInterval(guardarBorrador, 1500);
+document.addEventListener("visibilitychange", () => { if (document.visibilityState === "hidden") guardarBorrador(); });
+addEventListener("pagehide", guardarBorrador);
+function nuevoPedido(tipo){
+  const d = leerBorrador();
+  if (!d || !perm().ver[d.F.tipo]) return tipo ? openForm(null, tipo) : chooseTipo();
+  const q = d.F, quien = (q.cliente && q.cliente.nombre) || "Sin nombre";
+  const ov = modal(`<div class="mh"><h2>Pedido en curso</h2><button class="ib" data-close>${I("x")}</button></div>
+    <div class="mb"><p class="note">Tienes un pedido sin terminar: <b>${esc(TIPOS[q.tipo].label)}</b> · ${esc(quien)}${q.tema ? " · " + esc(q.tema) : ""}. ¿Quieres continuarlo?</p></div>
+    <div class="mf"><button class="btn" id="dcan">Cancelar</button><button class="btn primary" id="dok">${I("check")}Continuar</button></div>`, "sm pop");
+  $("#dok", ov).onclick = () => { ov.close(); openForm(null, q.tipo, null, q); };
+  $("#dcan", ov).onclick = () => { ov.close(); borrarBorrador(); chooseTipo(); };
+}
 function chooseTipo(cliente){
   const pr = perm(), tipos = ["personalizado","sublimacion"].filter(t => pr.ver[t]);
   if (!tipos.length) return toast("Sin permiso", true);
@@ -1909,15 +1938,20 @@ function mayus(el, todas){
 /* ================= Formulario de pedido (por pasos) ================= */
 let F = null;
 const PASOS = [["user","Cliente"],["shirt","Prendas"],["cal","Entrega"],["camera","Extras"]];
-function openForm(id, tipo, cliente){
+function openForm(id, tipo, cliente, borrador){
   const orig = id ? S.pedidos[id] : null;
   if (orig) tipo = orig.tipo;
   const c = cfg(), pr = perm(), T = TIPOS[tipo], isP = tipo === "personalizado";
   F = orig ? JSON.parse(JSON.stringify(orig)) : {tipo, cliente:{nombre:(cliente && cliente.nombre) || "", telefono:(cliente && cliente.telefono) || ""}, tema:"", servicio:"", prendaDe:"", etiqueta:"", items:[], fechaEntrega:"", precio:"", moneda:"COP", abono:"", motivoSinAbono:"", urgente:false, imagenes:[], nota:"", asignados:[]};
+  if (borrador && !orig) F = JSON.parse(JSON.stringify(borrador));
+  F._nuevo = !orig;
   F.items = (F.items || []).map(i => Object.assign({etiqueta: F.etiqueta || ""}, i));
   F.imagenes = (F.imagenes || []).map(id => ({id}));
   F.servicios = servsDe(F);
+  const prBorr = borrador && !orig && borrador.pr ? Object.assign({}, borrador.pr) : null;
   { const pr = {}; delete F.pr; (F.items || []).forEach(i => { const k = prKey(i); if (k && pr[k] === undefined) { const v = precioDe(F, k); pr[k] = v ? String(v) : ""; } }); F.pr = pr; }
+  if (prBorr) F.pr = Object.assign(F.pr, prBorr);
+  const pasoBorr = prBorr || borrador ? Math.min(3, Number(borrador.step) || 0) : 0;
   F.step = 0; F.visto = [true, false, false, false];
   const marcas = c.cat.marcas.includes(F.etiqueta) || !F.etiqueta ? c.cat.marcas : [...c.cat.marcas, F.etiqueta];
   const empleados = Object.values(S.usuarios).filter(u => u.activo && u.rol !== "admin");
@@ -1986,7 +2020,7 @@ function openForm(id, tipo, cliente){
     </div>
     <div class="mf"><button class="btn" id="prev">${I("undo")}Atrás</button><span style="flex:1"></span><button class="btn" id="save">${I("check")}Guardar</button><button class="btn c" style="--c:${T.c}" id="next">Siguiente</button></div>`, "wide", true);
   F._ov = ov;
-  const salir = () => confirmar("¿Salir sin guardar?", "Los datos de este pedido se perderán.", "Salir", async () => { ov.close(); F = null; });
+  const salir = () => confirmar("¿Salir sin guardar?", "Los datos de este pedido se perderán.", "Salir", async () => { if (F && F._nuevo) borrarBorrador(); ov.close(); F = null; });
   ov.querySelectorAll("[data-cerrar]").forEach(b => b.onclick = salir);
   ov.onBack = () => { navPush(); if (F && F.step > 0) goStep(F.step - 1); else salir(); };
 
@@ -2057,6 +2091,9 @@ function openForm(id, tipo, cliente){
   $("#fileCam", ov).onchange = e => { addFiles(e.target.files); e.target.value = ""; };
   $("#save", ov).onclick = () => saveForm(ov, orig);
   renderItems(); renderPrecios(); renderTotals(); renderImgs(); goStep(0);
+  if (borrador && !orig && borrador.telRaw) { if (borrador.paisRaw !== undefined) inPais.value = borrador.paisRaw; inTel.value = borrador.telRaw; checkTel(); }
+  delete F.telRaw; delete F.paisRaw;
+  if (pasoBorr) { for (let i = 0; i <= pasoBorr; i++) F.visto[i] = true; goStep(pasoBorr); }
 }
 function goStep(n){
   const ov = F._ov; F.step = n; F.visto[n] = true;
@@ -2319,6 +2356,7 @@ async function saveForm(ov, orig){
     }
     setDoc(doc(S.db, "clientes/" + tel.e164), {nombre, telefono:tel.e164, actualizadoEn:now}).catch(() => {});
     S.tab = F.tipo;
+    if (F._nuevo) borrarBorrador();
     ov.close(); F = null;
     setView("pedidos"); render();
     toast("Guardado");
