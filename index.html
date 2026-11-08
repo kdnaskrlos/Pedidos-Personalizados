@@ -780,6 +780,9 @@ table.mx{border-collapse:collapse;width:100%;font-size:13px}
 .hello h1{font-size:30px}
 /* v2.60 sin títulos de pantalla (la barra de íconos ya indica dónde estás); se mantiene el saludo de Resumen */
 .hello:not(.greet){display:none}
+/* v2.61 botón Restaurar en verde crema (igual que Recordar) */
+.btn.listo.crema{background:#dcfce7;border-color:#bbf7d0;color:#15803d}
+:root[data-theme="dark"] .btn.listo.crema{background:#12311f;border-color:#1f4d31;color:#86efac}
 @media (max-width:1000px){.hello{padding-bottom:8px;margin-top:-6px}.hello h1{font-size:25px}}
 @media (max-width:1000px){.tiles.t5>:last-child{grid-column:1/-1}}
 @media (max-width:1000px){.pill.demo .m-pr{display:inline}}
@@ -873,7 +876,7 @@ import { initializeApp, deleteApp } from "https://www.gstatic.com/firebasejs/10.
 import { getAuth, onAuthStateChanged, signInWithEmailAndPassword, createUserWithEmailAndPassword, signOut, updatePassword, reauthenticateWithCredential, EmailAuthProvider } from "https://www.gstatic.com/firebasejs/10.12.2/firebase-auth.js";
 import { initializeFirestore, getFirestore, persistentLocalCache, persistentMultipleTabManager, doc, collection, query, where, onSnapshot, getDoc, setDoc, updateDoc, deleteDoc, writeBatch, runTransaction } from "https://www.gstatic.com/firebasejs/10.12.2/firebase-firestore.js";
 
-const VERSION = "v2.60";
+const VERSION = "v2.61";
 /* ================= Utilidades ================= */
 const $ = (s, r = document) => r.querySelector(s);
 const esc = s => String(s ?? "").replace(/[&<>"']/g, c => ({"&":"&amp;","<":"&lt;",">":"&gt;",'"':"&quot;","'":"&#39;"}[c]));
@@ -1037,7 +1040,7 @@ const cfg = () => {
   const r = S.cfgRaw || {}, cat = Object.assign({}, DEF.cat, r.cat || {});
   // Firestore no admite listas dentro de listas: los colores se guardan como {n, h}
   cat.colores = (cat.colores || []).map(x => Array.isArray(x) ? x : [x.n, x.h || ""]).filter(x => x[0]);
-  return {negocio:r.negocio || DEF.negocio, dias:(r.dias ?? DEF.dias), pais:"58", plantilla:r.plantilla || DEF.plantilla, diasRetiro:(r.diasRetiro ?? DEF.diasRetiro), plantillaRetiro:r.plantillaRetiro || DEF.plantillaRetiro, cat};
+  return {negocio:DEF.negocio, dias:(r.dias ?? DEF.dias), pais:"58", plantilla:r.plantilla || DEF.plantilla, diasRetiro:(r.diasRetiro ?? DEF.diasRetiro), plantillaRetiro:r.plantillaRetiro || DEF.plantillaRetiro, cat};
 };
 const loginEmail = (u, k) => `${u}.${k}@comicshop-pedidos.app`;
 const pinPass = pin => "cs-" + pin;
@@ -1552,7 +1555,6 @@ function viewAjustes(){
     <div class="card">
       <div class="sec">${I("sliders")}General</div>
       <div class="g3">
-        <div class="f"><label>Nombre del negocio</label><input class="inp" id="cNeg" value="${esc(c.negocio)}"></div>
         <div class="f"><label>Avisar entregas con anticipación de</label><select class="inp" id="cDias">${[0,1,2,3,4,5,7,10,14].map(n => `<option value="${n}" ${n == c.dias ? "selected" : ""}>${n === 0 ? "Solo el mismo día" : n + " día" + (n > 1 ? "s" : "")}</option>`).join("")}</select></div>
         <div class="f"><label>Avisar si un pedido avisado no se retira en</label><select class="inp" id="cDiasRet">${[1,2,3,4,5,7,10,15,30].map(n => `<option value="${n}" ${n == c.diasRetiro ? "selected" : ""}>${n} día${n > 1 ? "s" : ""}</option>`).join("")}</select></div>
       </div>
@@ -1562,7 +1564,7 @@ function viewAjustes(){
     </div>
     <div class="sec">${I("list")}Opciones de los pedidos</div>
     <div class="lists2">${LISTAS.map(listaHTML).join("")}
-      <button class="btn listo" id="cReset">${I("undo")}Restaurar opciones originales</button>
+      <button class="btn listo crema" id="cReset">${I("undo")}Restaurar opciones originales</button>
     </div>`;
 }
 
@@ -1606,7 +1608,7 @@ function bindMain(){
     catch(e) { toast("No se pudo guardar el permiso", true); ch.checked = !ch.checked; }
   });
   // Ajustes: conservar lo escrito y el tamaño de los cuadros de mensaje
-  const campos = {cNeg:"negocio", cDias:"dias", cDiasRet:"diasRetiro", cPl:"plantilla", cPlR:"plantillaRetiro"};
+  const campos = {cDias:"dias", cDiasRet:"diasRetiro", cPl:"plantilla", cPlR:"plantillaRetiro"};
   for (const [id, k] of Object.entries(campos)) { const el = document.getElementById(id); if (el) el.addEventListener("input", () => { S.cdraft = Object.assign({}, S.cdraft, {[k]: el.tagName === "SELECT" ? Number(el.value) : el.value}); }); }
   ["cPl", "cPlR"].forEach(id => {
     const el = document.getElementById(id); if (!el) return;
@@ -1624,7 +1626,7 @@ function bindMain(){
 async function saveCfg(){
   const c0 = cfg().cat, cat = Object.assign({}, c0, {colores: c0.colores.map(x => ({n:x[0], h:x[1] || ""}))});
   S.cdraft = null;
-  try { await setDoc(doc(S.db, "config/ajustes"), {negocio:$("#cNeg").value.trim() || DEF.negocio, dias:Number($("#cDias").value), plantilla:$("#cPl").value.trim() || DEF.plantilla, diasRetiro:Number($("#cDiasRet").value), plantillaRetiro:$("#cPlR").value.trim() || DEF.plantillaRetiro, cat}); toast("Ajustes guardados"); }
+  try { await setDoc(doc(S.db, "config/ajustes"), {negocio:DEF.negocio, dias:Number($("#cDias").value), plantilla:$("#cPl").value.trim() || DEF.plantilla, diasRetiro:Number($("#cDiasRet").value), plantillaRetiro:$("#cPlR").value.trim() || DEF.plantillaRetiro, cat}); toast("Ajustes guardados"); }
   catch(e) { console.warn(e); toast("No se pudieron guardar los ajustes: " + (e.code || e.message), true); }
 }
 
