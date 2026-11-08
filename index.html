@@ -730,9 +730,9 @@ table.mx{border-collapse:collapse;width:100%;font-size:13px}
 .oc2-meta .sv{min-width:0;overflow:hidden;text-overflow:ellipsis}
 .oc2-meta .saldo,.oc2-meta .pag{margin-left:auto;flex:none;font-weight:800}
 .oc2-meta .saldo{color:var(--err)}
-.oc2-urg{display:inline-flex;align-items:center;gap:3px;background:linear-gradient(135deg,#ff3b30,#ff7a00);color:#fff;border-radius:99px;padding:3px 9px 3px 7px;box-shadow:0 2px 8px rgba(255,59,48,.4);animation:urgp 1.6s ease-in-out infinite}
+.oc2-urg{display:inline-flex;align-items:center;gap:3px;background:#ef1f1f;color:#fff;border-radius:99px;padding:3px 9px 3px 7px;box-shadow:0 2px 8px rgba(239,31,31,.4);animation:urgc 1.6s ease-in-out infinite}
 .oc2-urg svg.i{width:12px;height:12px;stroke-width:2.6}
-@keyframes urgp{50%{box-shadow:0 2px 14px rgba(255,59,48,.7)}}
+@keyframes urgc{50%{box-shadow:0 2px 14px rgba(239,31,31,.7)}}
 @media (prefers-reduced-motion:reduce){.oc2-urg{animation:none}}
 .pill.demo{border-style:dashed;color:var(--muted)}
 .pill.demo .m-pr{display:none}
@@ -832,7 +832,7 @@ import { initializeApp, deleteApp } from "https://www.gstatic.com/firebasejs/10.
 import { getAuth, onAuthStateChanged, signInWithEmailAndPassword, createUserWithEmailAndPassword, signOut, updatePassword, reauthenticateWithCredential, EmailAuthProvider } from "https://www.gstatic.com/firebasejs/10.12.2/firebase-auth.js";
 import { initializeFirestore, getFirestore, persistentLocalCache, persistentMultipleTabManager, doc, collection, query, where, onSnapshot, getDoc, setDoc, updateDoc, deleteDoc, writeBatch, runTransaction } from "https://www.gstatic.com/firebasejs/10.12.2/firebase-firestore.js";
 
-const VERSION = "v2.43";
+const VERSION = "v2.44";
 /* ================= Utilidades ================= */
 const $ = (s, r = document) => r.querySelector(s);
 const esc = s => String(s ?? "").replace(/[&<>"']/g, c => ({"&":"&amp;","<":"&lt;",">":"&gt;",'"':"&quot;","'":"&#39;"}[c]));
