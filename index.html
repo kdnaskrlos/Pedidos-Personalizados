@@ -778,6 +778,8 @@ table.mx{border-collapse:collapse;width:100%;font-size:13px}
 .hello .date{display:none}
 .hello{padding-bottom:10px;margin-top:-8px}
 .hello h1{font-size:30px}
+/* v2.60 sin títulos de pantalla (la barra de íconos ya indica dónde estás); se mantiene el saludo de Resumen */
+.hello:not(.greet){display:none}
 @media (max-width:1000px){.hello{padding-bottom:8px;margin-top:-6px}.hello h1{font-size:25px}}
 @media (max-width:1000px){.tiles.t5>:last-child{grid-column:1/-1}}
 @media (max-width:1000px){.pill.demo .m-pr{display:inline}}
@@ -871,7 +873,7 @@ import { initializeApp, deleteApp } from "https://www.gstatic.com/firebasejs/10.
 import { getAuth, onAuthStateChanged, signInWithEmailAndPassword, createUserWithEmailAndPassword, signOut, updatePassword, reauthenticateWithCredential, EmailAuthProvider } from "https://www.gstatic.com/firebasejs/10.12.2/firebase-auth.js";
 import { initializeFirestore, getFirestore, persistentLocalCache, persistentMultipleTabManager, doc, collection, query, where, onSnapshot, getDoc, setDoc, updateDoc, deleteDoc, writeBatch, runTransaction } from "https://www.gstatic.com/firebasejs/10.12.2/firebase-firestore.js";
 
-const VERSION = "v2.59";
+const VERSION = "v2.60";
 /* ================= Utilidades ================= */
 const $ = (s, r = document) => r.querySelector(s);
 const esc = s => String(s ?? "").replace(/[&<>"']/g, c => ({"&":"&amp;","<":"&lt;",">":"&gt;",'"':"&quot;","'":"&#39;"}[c]));
@@ -1275,7 +1277,7 @@ function viewResumen(a, pr){
   const tile = (c, ic, lb, v, sub, act) => `<button class="tile tint" style="--c:${c}" data-tile="${act}"><span class="bg">${I(ic)}</span><span class="lb"><span class="chip sm">${I(ic)}</span>${lb}</span><span class="v num">${v}</span><span class="sub">${sub}</span></button>`;
   const pendTipo = t => pedidosList().filter(p => p.tipo === t && (p.estado || "pendiente") === "pendiente").length;
   return `
-    <div class="hello"><h1>${h < 12 ? "Buenos días" : h < 19 ? "Buenas tardes" : "Buenas noches"}, <span>${esc((S.me.nombre || S.me.usuario).split(" ")[0])}</span></h1><span class="date">${I("cal")}${DIAS[d.getDay()]} ${d.getDate()} de ${MESES[d.getMonth()]} ${d.getFullYear()}</span></div>
+    <div class="hello greet"><h1>${h < 12 ? "Buenos días" : h < 19 ? "Buenas tardes" : "Buenas noches"}, <span>${esc((S.me.nombre || S.me.usuario).split(" ")[0])}</span></h1><span class="date">${I("cal")}${DIAS[d.getDay()]} ${d.getDate()} de ${MESES[d.getMonth()]} ${d.getFullYear()}</span></div>
     <div class="tiles t5">
       ${tile("var(--accent)","box","Pendientes", a.pend.length, "por producir", "pendientes")}
       ${tile("var(--soon)","clock","Entregas pronto", a.proximos.length, `próximos ${cfg().dias} días`, "avisos")}
