@@ -827,7 +827,7 @@ import { initializeApp, deleteApp } from "https://www.gstatic.com/firebasejs/10.
 import { getAuth, onAuthStateChanged, signInWithEmailAndPassword, createUserWithEmailAndPassword, signOut, updatePassword, reauthenticateWithCredential, EmailAuthProvider } from "https://www.gstatic.com/firebasejs/10.12.2/firebase-auth.js";
 import { initializeFirestore, getFirestore, persistentLocalCache, persistentMultipleTabManager, doc, collection, query, where, onSnapshot, getDoc, setDoc, updateDoc, deleteDoc, writeBatch, runTransaction } from "https://www.gstatic.com/firebasejs/10.12.2/firebase-firestore.js";
 
-const VERSION = "v2.33";
+const VERSION = "v2.34";
 /* ================= Utilidades ================= */
 const $ = (s, r = document) => r.querySelector(s);
 const esc = s => String(s ?? "").replace(/[&<>"']/g, c => ({"&":"&amp;","<":"&lt;",">":"&gt;",'"':"&quot;","'":"&#39;"}[c]));
@@ -1437,7 +1437,7 @@ function viewEquipo(){
       <div class="uacts"><button class="btn" data-reset="${esc(uid)}">${I("key")}Nuevo PIN</button><button class="btn danger" data-deluser="${esc(uid)}">${I("trash")}Eliminar</button></div>`}
     </div>`;
   };
-  return `${adminTabs()}<div class="hello"><h1>Equipo</h1><span class="date">${us.length} usuario${us.length === 1 ? "" : "s"}</span></div>
+  return `<div class="hello"><h1>Equipo</h1><span class="date">${us.length} usuario${us.length === 1 ? "" : "s"}</span></div>${adminTabs()}
     <button class="btn primary newu" id="newUser">${I("plus")}Nuevo usuario</button>
     <div class="ulist">${us.map(card).join("")}</div>`;
 }
@@ -1463,7 +1463,7 @@ async function guardarListas(cat){
 }
 function viewAjustes(){
   const c = Object.assign({}, cfg(), S.cdraft || {});
-  return `${adminTabs()}<div class="hello"><h1>Ajustes</h1><span class="date">${I("sliders")}Se aplican a todo el equipo</span></div>
+  return `<div class="hello"><h1>Ajustes</h1><span class="date">${I("sliders")}Se aplican a todo el equipo</span></div>${adminTabs()}
     <div class="card">
       <div class="sec">${I("sliders")}General</div>
       <div class="g3">
