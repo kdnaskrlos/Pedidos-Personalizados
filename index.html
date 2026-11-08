@@ -743,6 +743,8 @@ table.mx{border-collapse:collapse;width:100%;font-size:13px}
 /* v2.40 Vencido en amarillo */
 .oc2-due.err,.aday.err,.tag.c.err{color:#a16207;background:#fff3bf;border-color:#fde68a}
 :root[data-theme="dark"] .oc2-due.err,:root[data-theme="dark"] .aday.err,:root[data-theme="dark"] .tag.c.err{color:#facc15;background:#3a3008;border-color:#5c4b0c}
+/* v2.42 campos inhabilitados (Sublimación completa) */
+.pbtn.off{opacity:.45;cursor:not-allowed;pointer-events:none}
 @media (max-width:1000px){.pill.demo .m-pr{display:inline}}
 .pill.demo.on{border-style:solid;border-color:#f59e0b;background:#fff4dc;color:#b45309}
 [data-theme="dark"] .pill.demo.on{background:#3a2a0a;color:#fbbf24}
@@ -834,7 +836,7 @@ import { initializeApp, deleteApp } from "https://www.gstatic.com/firebasejs/10.
 import { getAuth, onAuthStateChanged, signInWithEmailAndPassword, createUserWithEmailAndPassword, signOut, updatePassword, reauthenticateWithCredential, EmailAuthProvider } from "https://www.gstatic.com/firebasejs/10.12.2/firebase-auth.js";
 import { initializeFirestore, getFirestore, persistentLocalCache, persistentMultipleTabManager, doc, collection, query, where, onSnapshot, getDoc, setDoc, updateDoc, deleteDoc, writeBatch, runTransaction } from "https://www.gstatic.com/firebasejs/10.12.2/firebase-firestore.js";
 
-const VERSION = "v2.41";
+const VERSION = "v2.42";
 /* ================= Utilidades ================= */
 const $ = (s, r = document) => r.querySelector(s);
 const esc = s => String(s ?? "").replace(/[&<>"']/g, c => ({"&":"&amp;","<":"&lt;",">":"&gt;",'"':"&quot;","'":"&#39;"}[c]));
@@ -1987,7 +1989,7 @@ function erroresPaso(i){
   }
   if (i === 1) {
     const llenas = F.items.filter(x => !itemVacio(x));
-    const incompl = F.items.findIndex(x => !itemVacio(x) && (!x.etiqueta || !x.prenda || !x.color || !x.talla));
+    const incompl = F.items.findIndex(x => !itemVacio(x) && (reqItem().some(f => !x[f])));
     if (!llenas.length) e.push(["f-items", "Agrega al menos una prenda"]);
     else if (incompl >= 0) e.push(["f-items", "Completa los datos marcados en rojo"]);
   }
@@ -2046,24 +2048,26 @@ function pickPopup({title, kind, options, sections, current, otro, onPick}){
 
 /* ---- Lista del pedido: cada fila con botones que abren la ventana de opciones ---- */
 const blankItem = prev => ({etiqueta: prev ? prev.etiqueta : "", prenda: prev ? prev.prenda : "", color: prev ? prev.color : "", horma: prev ? prev.horma : "", talla:"", cant:1, nombre:"", numero:""});
+const reqItem = () => F && F.tipo === "sublimacion" ? ["prenda", "talla"] : ["etiqueta", "prenda", "color", "talla"];
 const itemVacio = i => !i.etiqueta && !i.prenda && !i.color && !i.talla && !i.nombre;
 function renderItems(){
   const ov = F._ov, c = cfg().cat;
   const box = $("#items", ov), n = F.items.filter(i => !itemVacio(i)).reduce((s, i) => s + (Number(i.cant) || 1), 0);
   $("#itcount", ov).textContent = n ? `${n} pieza${n > 1 ? "s" : ""}` : "";
   const hexOf = name => (c.colores.find(x => x[0] === name) || [])[1] || "";
-  const pb = (f, val, ph, extra = "") => `<button type="button" class="pbtn ${val ? "on" : ""}" data-pick="${f}" data-err="${f}">${extra}<span>${esc(val || ph)}</span></button>`;
+  const isSub = F.tipo === "sublimacion";
+  const pb = (f, val, ph, extra = "", off = false) => `<button type="button" class="pbtn ${val ? "on" : ""}${off ? " off" : ""}" ${off ? "disabled" : `data-pick="${f}"`} data-err="${f}">${extra}<span>${esc(val || ph)}</span></button>`;
   if (!F.items.length) {
     box.innerHTML = `<div class="iempty"><button type="button" class="addfirst" id="addItem">${I("plus")}Agregar prenda</button></div>`;
   } else box.innerHTML = F.items.map((it, i) => `<div class="irow3" data-i="${i}">
       <div class="r1">
-        ${pb("etiqueta", it.etiqueta, "Etiqueta")}
+        ${pb("etiqueta", isSub ? "" : it.etiqueta, "Etiqueta", "", isSub)}
         ${pb("talla", it.talla, "Talla")}
         <div class="qty">${it.cant === 1 ? `<button type="button" class="del" data-del title="Quitar">${I("trash")}</button>` : `<button type="button" data-q="-1">−</button>`}<input class="qin" type="text" inputmode="numeric" pattern="[0-9]*" data-cant value="${it.cant}" aria-label="Unidades"><button type="button" data-q="1">+</button></div>
       </div>
       <div class="r1">
         ${pb("prenda", it.prenda, F.tipo === "personalizado" ? "Prenda" : "Producto")}
-        ${pb("color", it.color, "Color", `<i class="sw0" style="${swatchStyle(hexOf(it.color))}"></i>`)}
+        ${isSub ? pb("color", "", "Color", `<i class="sw0" style="${swatchStyle("full")}"></i>`, true) : pb("color", it.color, "Color", `<i class="sw0" style="${swatchStyle(hexOf(it.color))}"></i>`)}
         ${pb("horma", it.horma, "Horma")}
       </div>
       <div class="r3">
@@ -2136,7 +2140,7 @@ function marcarFilas(){
   const box = $("#items", F._ov);
   F.items.forEach((it, i) => {
     if (itemVacio(it) && F.items.length > 1) return;
-    ["etiqueta", "prenda", "color", "talla"].forEach(f => { if (!it[f]) box.querySelector(`[data-i="${i}"] [data-err="${f}"]`)?.classList.add("bad"); });
+    reqItem().forEach(f => { if (!it[f]) box.querySelector(`[data-i="${i}"] [data-err="${f}"]`)?.classList.add("bad"); });
   });
 }
 function renderPrecios(){
@@ -2188,8 +2192,8 @@ async function saveForm(ov, orig){
   const now = new Date().toISOString(), nombre = F.cliente.nombre.trim().replace(/\s+/g, " "), pr = perm();
   const data = {
     cliente:{nombre, telefono:tel.e164}, tema:(F.tema || "").trim(), servicio:isP ? F.servicios.join(", ") : "", servicios:isP ? [...F.servicios] : [], prendaDe:isP ? F.prendaDe : "tienda",
-    etiqueta:[...new Set(F.items.filter(i => !itemVacio(i)).map(i => i.etiqueta).filter(Boolean))].join(", "),
-    items:F.items.filter(i => !itemVacio(i)).map(i => ({etiqueta:i.etiqueta || "", prenda:i.prenda, color:i.color, horma:i.horma || "", talla:i.talla, cant:Number(i.cant) || 1, nombre:(i.nombre || "").trim(), numero:(i.numero || "").trim()})),
+    etiqueta:isP ? [...new Set(F.items.filter(i => !itemVacio(i)).map(i => i.etiqueta).filter(Boolean))].join(", ") : "",
+    items:F.items.filter(i => !itemVacio(i)).map(i => ({etiqueta:isP ? (i.etiqueta || "") : "", prenda:i.prenda, color:isP ? i.color : "Fullprint", horma:i.horma || "", talla:i.talla, cant:Number(i.cant) || 1, nombre:(i.nombre || "").trim(), numero:(i.numero || "").trim()})),
     fechaEntrega:F.fechaEntrega, precios:Object.keys(prendasDe(F)).map(k => ({n:k, v:num(F.pr[k])})), precio:(() => { const v = [...new Set(Object.keys(prendasDe(F)).map(k => num(F.pr[k])))]; return v.length === 1 ? v[0] : 0; })(), moneda:F.moneda, abono:num(F.abono), motivoSinAbono:num(F.abono) > 0 ? "" : (F.motivoSinAbono || "").trim(), urgente:!!F.urgente,
     imagenes:F.imagenes.filter(i => i.id && !i.error).map(i => i.id), nota:(F.nota || "").trim(),
     editadoEn:now, editadoPor:S.me.usuario
