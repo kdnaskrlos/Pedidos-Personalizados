@@ -827,7 +827,7 @@ import { initializeApp, deleteApp } from "https://www.gstatic.com/firebasejs/10.
 import { getAuth, onAuthStateChanged, signInWithEmailAndPassword, createUserWithEmailAndPassword, signOut, updatePassword, reauthenticateWithCredential, EmailAuthProvider } from "https://www.gstatic.com/firebasejs/10.12.2/firebase-auth.js";
 import { initializeFirestore, getFirestore, persistentLocalCache, persistentMultipleTabManager, doc, collection, query, where, onSnapshot, getDoc, setDoc, updateDoc, deleteDoc, writeBatch, runTransaction } from "https://www.gstatic.com/firebasejs/10.12.2/firebase-firestore.js";
 
-const VERSION = "v2.37";
+const VERSION = "v2.38";
 /* ================= Utilidades ================= */
 const $ = (s, r = document) => r.querySelector(s);
 const esc = s => String(s ?? "").replace(/[&<>"']/g, c => ({"&":"&amp;","<":"&lt;",">":"&gt;",'"':"&quot;","'":"&#39;"}[c]));
@@ -914,11 +914,34 @@ const TIPOS = {
 const swatchStyle = h => h === "full" ? "background:conic-gradient(#ef4444,#f59e0b,#22c55e,#3b82f6,#a855f7,#ef4444)" : h ? `background:${esc(h)}` : "background:repeating-linear-gradient(45deg,#ccc 0 4px,#fff 4px 8px)";
 
 /* ================= Teléfonos (anti-errores) ================= */
+// m: dígitos del celular sin el código del país [mínimo, máximo]; s: con qué empieza el celular
 const PAISES = [
-  {c:"58",f:"🇻🇪",n:"Venezuela"},{c:"57",f:"🇨🇴",n:"Colombia"},{c:"34",f:"🇪🇸",n:"España"},{c:"1",f:"🇺🇸",n:"EE. UU."},
-  {c:"56",f:"🇨🇱",n:"Chile"},{c:"51",f:"🇵🇪",n:"Perú"},{c:"593",f:"🇪🇨",n:"Ecuador"},{c:"507",f:"🇵🇦",n:"Panamá"},
-  {c:"52",f:"🇲🇽",n:"México"},{c:"54",f:"🇦🇷",n:"Argentina"},{c:"55",f:"🇧🇷",n:"Brasil"},{c:"",f:"🌐",n:"Otro"}
+  {c:"58",f:"🇻🇪",n:"Venezuela",m:[10,10],s:/^4(12|14|16|22|24|26)/},{c:"57",f:"🇨🇴",n:"Colombia",m:[10,10],s:/^3/},
+  {c:"1",f:"🇺🇸",n:"EE. UU. / Canadá",m:[10,10]},{c:"34",f:"🇪🇸",n:"España",m:[9,9],s:/^[67]/},
+  {c:"52",f:"🇲🇽",n:"México",m:[10,11]},{c:"593",f:"🇪🇨",n:"Ecuador",m:[9,9],s:/^9/},{c:"51",f:"🇵🇪",n:"Perú",m:[9,9],s:/^9/},
+  {c:"56",f:"🇨🇱",n:"Chile",m:[9,9],s:/^9/},{c:"54",f:"🇦🇷",n:"Argentina",m:[10,11]},{c:"55",f:"🇧🇷",n:"Brasil",m:[10,11]},
+  {c:"507",f:"🇵🇦",n:"Panamá",m:[8,8],s:/^6/},{c:"506",f:"🇨🇷",n:"Costa Rica",m:[8,8]},{c:"502",f:"🇬🇹",n:"Guatemala",m:[8,8]},
+  {c:"503",f:"🇸🇻",n:"El Salvador",m:[8,8]},{c:"504",f:"🇭🇳",n:"Honduras",m:[8,8]},{c:"505",f:"🇳🇮",n:"Nicaragua",m:[8,8]},
+  {c:"591",f:"🇧🇴",n:"Bolivia",m:[8,8]},{c:"595",f:"🇵🇾",n:"Paraguay",m:[9,9]},{c:"598",f:"🇺🇾",n:"Uruguay",m:[8,8]},
+  {c:"53",f:"🇨🇺",n:"Cuba",m:[8,8]},{c:"1809",f:"🇩🇴",n:"Rep. Dominicana",m:[7,7]},{c:"297",f:"🇦🇼",n:"Aruba",m:[7,7]},{c:"599",f:"🇨🇼",n:"Curazao",m:[7,8]},
+  {c:"351",f:"🇵🇹",n:"Portugal",m:[9,9],s:/^9/},{c:"39",f:"🇮🇹",n:"Italia",m:[9,10],s:/^3/},{c:"33",f:"🇫🇷",n:"Francia",m:[9,9],s:/^[67]/},
+  {c:"49",f:"🇩🇪",n:"Alemania",m:[10,11],s:/^1/},{c:"44",f:"🇬🇧",n:"Reino Unido",m:[10,10],s:/^7/},
+  {c:"",f:"🌐",n:"Otro"}
 ];
+const gruposTel = d => d.length <= 4 ? d : d.length === 7 ? d.slice(0, 3) + " " + d.slice(3) : d.length === 8 ? d.slice(0, 4) + " " + d.slice(4) : d.slice(0, 3) + " " + gruposTel(d.slice(3));
+const paisDe = c => PAISES.find(p => p.c === c);
+const encaja = (p, rest) => p && rest.length >= p.m[0] && rest.length <= p.m[1] && (!p.s || p.s.test(rest));
+// Adivina el país a partir de lo que se escribió: +código, 00código, prefijo local (0412…, 300…) o código sin +
+function detectarPais(raw){
+  const s = String(raw || "").trim(); let d = s.replace(/\D/g, ""); if (!d) return "";
+  let plus = s.startsWith("+"); if (d.startsWith("00")) { d = d.slice(2); plus = true; }
+  const largo = PAISES.filter(p => p.c).sort((a, b) => b.c.length - a.c.length);
+  if (plus) { const m = largo.find(p => d.startsWith(p.c)); return m ? m.c : ""; }
+  if (/^04/.test(d) || /^4(12|14|16|22|24|26)\d{7}$/.test(d)) return "58";
+  if (/^3\d{2,9}$/.test(d)) return "57";
+  const m = largo.find(p => d.startsWith(p.c) && encaja(p, d.slice(p.c.length)));
+  return m ? m.c : "";
+}
 const OPS_VE = {"412":"Digitel","422":"Digitel","414":"Movistar","424":"Movistar","416":"Movilnet","426":"Movilnet"};
 function parsePhone(raw, pais){
   let s = String(raw || "").trim();
@@ -927,11 +950,11 @@ function parsePhone(raw, pais){
   let d = s.replace(/\D/g, "");
   if (d.startsWith("00")) { d = d.slice(2); plus = true; }
   let cc = pais;
-  const intlVE = pais === "58" && d.startsWith("58") && d.length === 12;
+  const intlVE = !!pais && d.startsWith(pais) && encaja(paisDe(pais), d.slice(pais.length));
   if (plus || intlVE || !cc) {
     if (!plus && !intlVE && !cc) return {ok:false, msg:"Escribe el número con + y el código del país"};
     const m = PAISES.filter(p => p.c && d.startsWith(p.c)).sort((a, b) => b.c.length - a.c.length)[0];
-    if (m) { cc = m.c; d = d.slice(m.c.length); }
+    if (m) { cc = m.c; d = d.slice(m.c.length); if (cc === "1" && d.startsWith("809") && d.length === 10) { cc = "1809"; d = d.slice(3); } }
     else if (d.length >= 8 && d.length <= 15) return {ok:true, e164:d, pretty:"+"+d, warn:"País no reconocido: revisa el número"};
     else return {ok:false, msg:"Número internacional incompleto"};
   }
@@ -946,8 +969,10 @@ function parsePhone(raw, pais){
   if (cc === "1") { if (d.startsWith("1") && d.length === 11) d = d.slice(1); if (d.length !== 10) return {ok:false, msg:"Número de EE. UU.: 10 dígitos"}; return {ok:true, e164:"1"+d, pretty:`+1 (${d.slice(0,3)}) ${d.slice(3,6)}-${d.slice(6)}`}; }
   if (cc === "34") { if (d.length !== 9 || !/^[67]/.test(d)) return {ok:false, msg:"Móvil español: 9 dígitos que empiezan por 6 o 7"}; return {ok:true, e164:"34"+d, pretty:`+34 ${d.slice(0,3)} ${d.slice(3,6)} ${d.slice(6)}`}; }
   if (d.startsWith("0")) d = d.slice(1);
-  if (d.length < 6 || d.length > 12) return {ok:false, msg:"La cantidad de dígitos no es válida para ese país"};
-  return {ok:true, e164:cc+d, pretty:`+${cc} ${d}`};
+  const P = paisDe(cc);
+  if (P && P.m) { if (d.length < P.m[0] || d.length > P.m[1]) return {ok:false, msg:`Celular de ${P.n}: ${P.m[0] === P.m[1] ? P.m[0] : P.m[0] + " a " + P.m[1]} dígitos y tiene ${d.length}`}; }
+  else if (d.length < 6 || d.length > 12) return {ok:false, msg:"La cantidad de dígitos no es válida para ese país"};
+  return {ok:true, e164:cc+d, pretty:`+${cc} ${gruposTel(d)}`};
 }
 const ccOf = e => { const m = PAISES.filter(p => p.c && String(e || "").startsWith(p.c)).sort((a, b) => b.c.length - a.c.length)[0]; return m ? m.c : ""; };
 const prettyPhone = e => { const r = parsePhone("+" + e, ""); return r.ok ? r.pretty : "+" + e; };
@@ -1898,7 +1923,7 @@ function openForm(id, tipo, cliente){
     }
     return r;
   };
-  inTel.oninput = () => { checkTel(); };
+  inTel.oninput = () => { const cc = detectarPais(inTel.value); if (cc && cc !== inPais.value) inPais.value = cc; checkTel(); };
   inTel.onblur = () => { const r = checkTel(true); if (r.ok) { const cc = ccOf(r.e164); if (cc) inPais.value = cc; inTel.value = r.pretty; } };
   inPais.onchange = () => checkTel();
   if (inTel.value) checkTel();
