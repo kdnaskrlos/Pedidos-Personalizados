@@ -772,6 +772,9 @@ table.mx{border-collapse:collapse;width:100%;font-size:13px}
 .pdst.vio{background:color-mix(in srgb,var(--t-violet) 12%,var(--surface));color:var(--t-violet)}
 :root[data-theme="dark"] .oc2-due.vio,:root[data-theme="dark"] .aday.vio{border-color:color-mix(in srgb,var(--t-violet) 30%,var(--line));background:color-mix(in srgb,var(--t-violet) 12%,var(--surface))}
 :root[data-theme="dark"] .pddate.vio{background:color-mix(in srgb,var(--t-violet) 12%,var(--surface));border-color:color-mix(in srgb,var(--t-violet) 30%,var(--line))}
+/* v2.56 cinco tarjetas en Resumen */
+@media (min-width:1001px){.tiles.t5{grid-template-columns:repeat(5,minmax(0,1fr))}}
+@media (max-width:1000px){.tiles.t5>:last-child{grid-column:1/-1}}
 @media (max-width:1000px){.pill.demo .m-pr{display:inline}}
 .pill.demo.on{border-style:solid;border-color:#f59e0b;background:#fff4dc;color:#b45309}
 [data-theme="dark"] .pill.demo.on{background:#3a2a0a;color:#fbbf24}
@@ -863,7 +866,7 @@ import { initializeApp, deleteApp } from "https://www.gstatic.com/firebasejs/10.
 import { getAuth, onAuthStateChanged, signInWithEmailAndPassword, createUserWithEmailAndPassword, signOut, updatePassword, reauthenticateWithCredential, EmailAuthProvider } from "https://www.gstatic.com/firebasejs/10.12.2/firebase-auth.js";
 import { initializeFirestore, getFirestore, persistentLocalCache, persistentMultipleTabManager, doc, collection, query, where, onSnapshot, getDoc, setDoc, updateDoc, deleteDoc, writeBatch, runTransaction } from "https://www.gstatic.com/firebasejs/10.12.2/firebase-firestore.js";
 
-const VERSION = "v2.55";
+const VERSION = "v2.56";
 /* ================= Utilidades ================= */
 const $ = (s, r = document) => r.querySelector(s);
 const esc = s => String(s ?? "").replace(/[&<>"']/g, c => ({"&":"&amp;","<":"&lt;",">":"&gt;",'"':"&quot;","'":"&#39;"}[c]));
@@ -911,6 +914,7 @@ const P = {
   share:'<circle cx="18" cy="5" r="3"/><circle cx="6" cy="12" r="3"/><circle cx="18" cy="19" r="3"/><path d="m8.6 13.5 6.8 4M15.4 6.5l-6.8 4"/>',
   copy:'<rect x="9" y="9" width="13" height="13" rx="2"/><path d="M5 15H4a2 2 0 0 1-2-2V4a2 2 0 0 1 2-2h9a2 2 0 0 1 2 2v1"/>',
   logout:'<path d="M9 21H5a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2h4M16 17l5-5-5-5M21 12H9"/>',
+  bag:'<path d="M6 7h12l1 13H5z"/><path d="M9 7V6a3 3 0 0 1 6 0v1"/>',
   box:'<path d="M21 8 12 3 3 8v8l9 5 9-5z"/><path d="M3 8l9 5 9-5M12 13v8"/>',
   alert:'<path d="M12 9v4M12 17h.01"/><path d="M10.3 3.9 1.8 18a2 2 0 0 0 1.7 3h17a2 2 0 0 0 1.7-3L13.7 3.9a2 2 0 0 0-3.4 0z"/>',
   clock:'<circle cx="12" cy="12" r="10"/><path d="M12 6v6l4 2"/>',
@@ -1241,6 +1245,12 @@ function matchQ(p, q){
   const hay = norm([p.codigo, p.cliente && p.cliente.nombre, p.cliente && p.cliente.telefono, p.tema, p.servicio, p.nota, ...(p.items || []).map(i => `${i.prenda} ${i.color} ${i.talla} ${i.nombre || ""} ${i.numero || ""}`)].join(" "));
   return norm(q).split(/\s+/).every(w => hay.includes(w));
 }
+// Al cambiar de filtro: Personalizado si tiene pedidos; si está vacío y Sublimación tiene, pasa a Sublimación
+function autoTab(){
+  const pr = perm(), tipos = ["personalizado","sublimacion"].filter(t => pr.ver[t]);
+  if (!tipos.length) return;
+  S.tab = tipos.find(t => filtrar(t).length) || tipos[0];
+}
 function filtrar(tipo){
   let l = pedidosList().filter(p => p.tipo === tipo && matchQ(p, S.q));
   const f = S.filtro;
@@ -1260,11 +1270,12 @@ function viewResumen(a, pr){
   const pendTipo = t => pedidosList().filter(p => p.tipo === t && (p.estado || "pendiente") === "pendiente").length;
   return `
     <div class="hello"><h1>${h < 12 ? "Buenos días" : h < 19 ? "Buenas tardes" : "Buenas noches"}, <span>${esc((S.me.nombre || S.me.usuario).split(" ")[0])}</span></h1><span class="date">${I("cal")}${DIAS[d.getDay()]} ${d.getDate()} de ${MESES[d.getMonth()]} ${d.getFullYear()}</span></div>
-    <div class="tiles">
+    <div class="tiles t5">
       ${tile("var(--accent)","box","Pendientes", a.pend.length, "por producir", "pendientes")}
       ${tile("var(--soon)","clock","Entregas pronto", a.proximos.length, `próximos ${cfg().dias} días`, "avisos")}
       ${tile("var(--err)","alert","Vencidos", a.vencidos.length, a.vencidos.length ? "revisar hoy" : "todo al día", "avisos")}
       ${tile("var(--t-info)","msg","Por avisar", a.avisar.length, "clientes con pedido listo", "avisar")}
+      ${(() => { const n = pedidosList().filter(p => p.estado === "listo" && p.avisado).length; return tile("var(--t-violet)","bag","Sin retirar", n, n === 1 ? "cliente avisado que no ha retirado" : "clientes avisados que no han retirado", "retirar"); })()}
     </div>
     ${tipos.length ? `<div class="sec">${I("list")}Pendientes por tipo</div>
     <div class="tiles">${tipos.map(t => tile(TIPOS[t].c, TIPOS[t].icon, TIPOS[t].label, pendTipo(t), "ver pedidos", "tipo-" + t)).join("")}</div>` : ""}
@@ -1557,9 +1568,9 @@ function bindMain(){
     if (!b) return;
     const d = b.dataset;
     if (d.view) { setView(d.view); return; }
-    if (d.tile) { if (d.tile === "avisos") setView("avisos"); else if (d.tile.startsWith("tipo-")) { S.tab = d.tile.slice(5); S.filtro = "pendientes"; setView("pedidos"); } else { S.filtro = d.tile; setView("pedidos"); } return; }
+    if (d.tile) { if (d.tile === "avisos") setView("avisos"); else if (d.tile.startsWith("tipo-")) { S.tab = d.tile.slice(5); S.filtro = "pendientes"; setView("pedidos"); } else { S.filtro = d.tile; autoTab(); setView("pedidos"); } return; }
     if (d.tab) { S.tab = d.tab; render(); return; }
-    if (d.filtro) { S.filtro = d.filtro; render(); return; }
+    if (d.filtro) { S.filtro = d.filtro; autoTab(); render(); return; }
     if (d.act === "nuevo") return d.tipo ? openForm(null, d.tipo) : chooseTipo();
     if (d.act === "mipin") return cambiarMiPin();
     if (d.act === "cuenta") return openCuenta();
