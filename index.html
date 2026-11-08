@@ -792,8 +792,7 @@ table.mx{border-collapse:collapse;width:100%;font-size:13px}
 .toast.undo button svg.i{width:15px;height:15px}
 .toast.undo i{position:absolute;left:0;bottom:0;height:3px;width:100%;background:#86efac;transform-origin:left;animation:undobar linear forwards}
 @keyframes undobar{to{transform:scaleX(0)}}
-.dpok{display:flex;justify-content:flex-end;border-top:1px solid var(--line);padding-top:8px}
-.dpok .btn{min-width:96px}
+.dpq .dpokb{margin-left:auto}
 /* v2.64 botones de acción alineados a la derecha */
 .uacts,.uacts.one{display:flex;justify-content:flex-end;flex-wrap:wrap;gap:8px}
 .uacts .btn{width:auto;min-height:40px}
@@ -906,7 +905,7 @@ import { initializeApp, deleteApp } from "https://www.gstatic.com/firebasejs/10.
 import { getAuth, onAuthStateChanged, signInWithEmailAndPassword, createUserWithEmailAndPassword, signOut, updatePassword, reauthenticateWithCredential, EmailAuthProvider } from "https://www.gstatic.com/firebasejs/10.12.2/firebase-auth.js";
 import { initializeFirestore, getFirestore, persistentLocalCache, persistentMultipleTabManager, doc, collection, query, where, onSnapshot, getDoc, setDoc, updateDoc, deleteDoc, writeBatch, runTransaction } from "https://www.gstatic.com/firebasejs/10.12.2/firebase-firestore.js";
 
-const VERSION = "v2.65";
+const VERSION = "v2.66";
 /* ================= Utilidades ================= */
 const $ = (s, r = document) => r.querySelector(s);
 const esc = s => String(s ?? "").replace(/[&<>"']/g, c => ({"&":"&amp;","<":"&lt;",">":"&gt;",'"':"&quot;","'":"&#39;"}[c]));
@@ -1881,7 +1880,7 @@ function openCalendar(current, onPick, opts = {}){
     for (let dd = 1; dd <= nd; dd++) { const s = `${y}-${pad(m+1)}-${pad(dd)}`; cells += `<button class="dd ${s < t0 ? "past" : ""} ${s === t0 ? "hoy" : ""} ${s === sv ? "sel" : ""}" data-d="${s}">${dd}</button>`; }
     const q = n => { const d = today0(); d.setDate(d.getDate() + n); return ymd(d); };
     ov.innerHTML = `<div class="dp-pop"><div class="dph"><button data-nav="-1">‹</button><b>${MESES[m]} ${y}</b><button data-nav="1">›</button></div><div class="dpg">${cells}</div>
-      <div class="dpq"><button class="btn sm" data-d="${q(0)}">Hoy</button><button class="btn sm" data-d="${q(1)}">Mañana</button><button class="btn sm" data-d="${q(3)}">+3 días</button><button class="btn sm" data-d="${q(7)}">+1 semana</button><button class="btn sm" data-d="${q(15)}">+15 días</button></div>${opts.confirmar ? `<div class="dpok"><button class="btn primary sm" data-ok ${sel ? "" : "disabled"}>${I("check")}Listo</button></div>` : ""}</div>`;
+      <div class="dpq"><button class="btn sm" data-d="${q(0)}">Hoy</button><button class="btn sm" data-d="${q(1)}">Mañana</button><button class="btn sm" data-d="${q(3)}">+3 días</button><button class="btn sm" data-d="${q(7)}">+1 semana</button><button class="btn sm" data-d="${q(15)}">+15 días</button>${opts.confirmar ? `<button class="btn primary sm dpokb" data-ok ${sel ? "" : "disabled"}>${I("check")}Listo</button>` : ""}</div></div>`;
   };
   ov.onclick = e => {
     if (e.target === ov) return close();
