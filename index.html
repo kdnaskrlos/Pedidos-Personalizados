@@ -780,6 +780,7 @@ table.mx{border-collapse:collapse;width:100%;font-size:13px}
 .hello h1{font-size:30px}
 /* v2.60 sin títulos de pantalla (la barra de íconos ya indica dónde estás); se mantiene el saludo de Resumen */
 .hello:not(.greet){display:none}
+.hello.greet .date{display:block}
 /* v2.61 botón Restaurar en verde crema (igual que Recordar) */
 .btn.listo.crema{background:#dcfce7;border-color:#bbf7d0;color:#15803d}
 :root[data-theme="dark"] .btn.listo.crema{background:#12311f;border-color:#1f4d31;color:#86efac}
@@ -886,7 +887,7 @@ import { initializeApp, deleteApp } from "https://www.gstatic.com/firebasejs/10.
 import { getAuth, onAuthStateChanged, signInWithEmailAndPassword, createUserWithEmailAndPassword, signOut, updatePassword, reauthenticateWithCredential, EmailAuthProvider } from "https://www.gstatic.com/firebasejs/10.12.2/firebase-auth.js";
 import { initializeFirestore, getFirestore, persistentLocalCache, persistentMultipleTabManager, doc, collection, query, where, onSnapshot, getDoc, setDoc, updateDoc, deleteDoc, writeBatch, runTransaction } from "https://www.gstatic.com/firebasejs/10.12.2/firebase-firestore.js";
 
-const VERSION = "v2.62";
+const VERSION = "v2.63";
 /* ================= Utilidades ================= */
 const $ = (s, r = document) => r.querySelector(s);
 const esc = s => String(s ?? "").replace(/[&<>"']/g, c => ({"&":"&amp;","<":"&lt;",">":"&gt;",'"':"&quot;","'":"&#39;"}[c]));
