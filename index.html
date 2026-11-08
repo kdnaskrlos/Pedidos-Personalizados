@@ -920,7 +920,7 @@ import { initializeApp, deleteApp } from "https://www.gstatic.com/firebasejs/10.
 import { getAuth, onAuthStateChanged, signInWithEmailAndPassword, createUserWithEmailAndPassword, signOut, updatePassword, reauthenticateWithCredential, EmailAuthProvider } from "https://www.gstatic.com/firebasejs/10.12.2/firebase-auth.js";
 import { initializeFirestore, getFirestore, persistentLocalCache, persistentMultipleTabManager, doc, collection, query, where, onSnapshot, getDoc, setDoc, updateDoc, deleteDoc, writeBatch, runTransaction } from "https://www.gstatic.com/firebasejs/10.12.2/firebase-firestore.js";
 
-const VERSION = "v2.77";
+const VERSION = "v2.78";
 /* ================= Utilidades ================= */
 const $ = (s, r = document) => r.querySelector(s);
 const esc = s => String(s ?? "").replace(/[&<>"']/g, c => ({"&":"&amp;","<":"&lt;",">":"&gt;",'"':"&quot;","'":"&#39;"}[c]));
@@ -1487,12 +1487,16 @@ function demoPedidos(){
   };
   const listo = (d, av, extra) => Object.assign({estado:"listo", listoEn:T(d), listoPor:yo, avisado:av != null}, av != null ? {avisadoEn:T(av), avisadoPor:yo} : {}, extra || {});
   const P = "personalizado", Sb = "sublimacion";
+  // Avisos de "Cambios del equipo" de ejemplo (se usan nombres de tus empleados si existen)
+  const emps = Object.values(S.usuarios || {}).filter(u => u.activo && u.rol !== "admin").map(u => u.usuario);
+  const emp = i => emps.length ? emps[i % emps.length] : ["yuri","andrea","luis"][i % 3];
+  const rev = (i, cambios, horas) => ({revisar:true, revisarCambios:cambios, revisarPor:emp(i), revisarEn:new Date(now - horas * 3600000).toISOString(), editadoPor:emp(i), editadoEn:new Date(now - horas * 3600000).toISOString()});
   return [
     mk(P, {tema:"Logo Panadería El Trigal", dias:-2, urg:true, serv:["DTF","Vinilo textil"], items:[["Franela","Blanco","M",6],["Franela","Blanco","L",4]], nota:"El logo va en el pecho izquierdo"}),
     mk(P, {tema:"Cumpleaños Valentina 15", dias:-5, items:[["Franela oversize","Rosado","S",3],["Franela oversize","Rosado","M",2]], abono:0}),
     mk(P, {tema:"Equipo de Kickingball", dias:0, urg:true, items:[["Franelilla","Negro","M",8,{nombre:"Ana",numero:"7"}],["Franelilla","Negro","L",4]], precios:[18000]}),
-    mk(P, {tema:"Promoción 5to año 2026", dias:1, serv:["Sublimación sencilla"], items:[["Chemise","Azul marino","M",12],["Chemise","Azul marino","L",10],["Suéter","Gris oscuro","L",3]], precios:[25000, 45000]}),
-    mk(P, {tema:"Gorra Taller Mecánico Ruiz", dias:2, items:[["Gorra","Negro","Única",15]], precios:[12000], prendaDe:"cliente"}),
+    mk(P, {extra:rev(0, ["Prendas","Precios"], 1), tema:"Promoción 5to año 2026", dias:1, serv:["Sublimación sencilla"], items:[["Chemise","Azul marino","M",12],["Chemise","Azul marino","L",10],["Suéter","Gris oscuro","L",3]], precios:[25000, 45000]}),
+    mk(P, {extra:rev(1, ["Fecha de entrega"], 3), tema:"Gorra Taller Mecánico Ruiz", dias:2, items:[["Gorra","Negro","Única",15]], precios:[12000], prendaDe:"cliente"}),
     mk(P, {tema:"Uniforme Farmacia La Salud", dias:6, serv:["Bordado"], items:[["Chemise","Blanco","S",4],["Chemise","Blanco","M",6]], abono:"total"}),
     mk(P, {tema:"Hoodie Graduación Ingeniería", dias:15, items:[["Hoodie","Vinotinto","M",5],["Hoodie","Vinotinto","XL",2]], precios:[55000]}),
     mk(P, {tema:"Franelas Día del Padre", dias:-1, items:[["Franela","Azul cielo","L",2],["Franela","Gris claro","XL",1]], extra:listo(-1)}),
@@ -1502,7 +1506,7 @@ function demoPedidos(){
     mk(P, {tema:"Uniforme Ferretería El Tornillo", dias:-10, items:[["Chemise","Rojo","L",6]], abono:"total", extra:{estado:"entregado", listoEn:T(-12), avisado:true, avisadoEn:T(-11), entregadoEn:T(-10)}}),
     mk(Sb, {tema:"Uniforme Los Halcones Sub-12", dias:-1, items:[["Uniforme completo","Fullprint","10",12,{nombre:"Sebastián",numero:"10"}],["Uniforme completo","Fullprint","12",6]], precios:[38000]}),
     mk(Sb, {tema:"Camisas Maratón 10K", dias:1, urg:true, items:[["Camisa deportiva","Fullprint","M",25],["Camisa deportiva","Fullprint","L",15]], precios:[16000]}),
-    mk(Sb, {tema:"Licras Academia de Baile", dias:4, items:[["Licra","Fullprint","S",10],["Short deportivo","Fullprint","S",10]], precios:[20000, 14000]}),
+    mk(Sb, {extra:rev(2, ["Diseño","Referencias","Nota"], 26), tema:"Licras Academia de Baile", dias:4, items:[["Licra","Fullprint","S",10],["Short deportivo","Fullprint","S",10]], precios:[20000, 14000]}),
     mk(Sb, {tema:"Selección Voleibol Femenino", dias:9, items:[["Camisa deportiva","Fullprint","S",8],["Short deportivo","Fullprint","S",8]], abono:0}),
     mk(Sb, {tema:"Franelas Evento Corporativo", dias:-1, items:[["Franela","Fullprint","M",30]], extra:listo(0)}),
     mk(Sb, {tema:"Trajes de baño Club Delfines", dias:-5, items:[["Traje de baño","Fullprint","10",10]], extra:listo(-6, -4)}),
@@ -1518,7 +1522,7 @@ function toggleDemo(){
     });
   }
   const lst = demoPedidos();
-  confirmar("Activar modo prueba", `Se agregarán ${lst.length} pedidos de ejemplo (urgentes, vencidos, próximos, por avisar, avisados y entregados). Para quitarlos, toca otra vez la píldora.`, "Cargar ejemplos", async () => {
+  confirmar("Activar modo prueba", `Se agregarán ${lst.length} pedidos de ejemplo (urgentes, vencidos, próximos, por avisar, avisados, entregados y algunos editados por el equipo). Para quitarlos, toca otra vez la píldora.`, "Cargar ejemplos", async () => {
     const b = writeBatch(S.db); lst.forEach(p => b.set(doc(collection(S.db, "pedidos")), p)); await b.commit(); toast("Pedidos cargados");
   });
 }
