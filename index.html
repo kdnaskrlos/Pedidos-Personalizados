@@ -717,7 +717,7 @@ import { initializeApp, deleteApp } from "https://www.gstatic.com/firebasejs/10.
 import { getAuth, onAuthStateChanged, signInWithEmailAndPassword, createUserWithEmailAndPassword, signOut, updatePassword, reauthenticateWithCredential, EmailAuthProvider } from "https://www.gstatic.com/firebasejs/10.12.2/firebase-auth.js";
 import { initializeFirestore, getFirestore, persistentLocalCache, persistentMultipleTabManager, doc, collection, query, where, onSnapshot, getDoc, setDoc, updateDoc, deleteDoc, writeBatch } from "https://www.gstatic.com/firebasejs/10.12.2/firebase-firestore.js";
 
-const VERSION = "v2.25";
+const VERSION = "v2.26";
 /* ================= Utilidades ================= */
 const $ = (s, r = document) => r.querySelector(s);
 const esc = s => String(s ?? "").replace(/[&<>"']/g, c => ({"&":"&amp;","<":"&lt;",">":"&gt;",'"':"&quot;","'":"&#39;"}[c]));
@@ -1249,7 +1249,7 @@ async function guardarListas(cat){
   catch(e) { console.warn(e); toast("No se pudo guardar: " + (e.code || e.message), true); }
 }
 function viewAjustes(){
-  const c = cfg();
+  const c = Object.assign({}, cfg(), S.cdraft || {});
   return `${adminTabs()}<div class="hello"><h1>Ajustes</h1><span class="date">${I("sliders")}Se aplican a todo el equipo</span></div>
     <div class="card">
       <div class="sec">${I("sliders")}General</div>
@@ -1263,7 +1263,7 @@ function viewAjustes(){
       <button class="btn primary" id="cSave" style="align-self:flex-start">${I("check")}Guardar</button>
     </div>
     <div class="card">
-      <div class="sec">${I("list")}Opciones de los pedidos <small>se guardan solas</small></div>
+      <div class="sec">${I("list")}Opciones de los pedidos</div>
       <div class="lists">${LISTAS.map(listaHTML).join("")}</div>
       <button class="btn" id="cReset" style="align-self:flex-start">${I("undo")}Restaurar opciones originales</button>
     </div>`;
@@ -1289,7 +1289,7 @@ function bindMain(){
     if (d.posponer) { const id = d.posponer; const man = new Date(); man.setDate(man.getDate() + 1); openCalendar(ymd(man), f => { if (daysUntil(f) <= 0) return toast("Elige una fecha a partir de mañana", true); updateDoc(doc(S.db, "pedidos/" + id), {posponerHasta:f}).then(() => toast(`Pospuesto hasta el ${fmtDate(f)}`)).catch(() => toast("No se pudo posponer", true)); }); return; }
     if (d.entregar) { updateDoc(doc(S.db, "pedidos/" + d.entregar), {estado:"entregado", entregadoEn:new Date().toISOString()}).then(() => toast("Pedido entregado")).catch(() => toast("No se pudo actualizar el pedido", true)); return; }
     if (d.open) return openDetail(d.open);
-    if (d.lst) { S.lopen = S.lopen === d.lst ? null : d.lst; render(); if (S.lopen) setTimeout(() => $("#lin")?.focus(), 50); return; }
+    if (d.lst) { S.lopen = S.lopen === d.lst ? null : d.lst; render(); return; }
     if (d.lrm) { const [k, i] = d.lrm.split("|"); const cat = JSON.parse(JSON.stringify(cfg().cat)); if (cat[k].length <= 1) return toast("La lista necesita al menos una opción", true); cat[k].splice(Number(i), 1); return guardarListas(cat); }
     if (d.ladd) { const k = d.ladd, v = ($("#lin").value || "").trim(); if (!v) return $("#lin").focus(); const cat = JSON.parse(JSON.stringify(cfg().cat)); const names = cat[k].map(x => norm(Array.isArray(x) ? x[0] : x)); if (names.includes(norm(v))) return toast("Esa opción ya existe", true); cat[k].push(k === "colores" ? [v, $("#lcol").value] : v); return guardarListas(cat); }
     if (d.utog) { S.uOpen = S.uOpen === d.utog ? null : d.utog; render(); return; }
@@ -1307,6 +1307,15 @@ function bindMain(){
     try { await updateDoc(doc(S.db, "usuarios/" + ch.dataset.uid), {[ch.dataset.perm]: ch.checked}); toast("Permiso actualizado"); }
     catch(e) { toast("No se pudo guardar el permiso", true); ch.checked = !ch.checked; }
   });
+  // Ajustes: conservar lo escrito y el tamaño de los cuadros de mensaje
+  const campos = {cNeg:"negocio", cDias:"dias", cDiasRet:"diasRetiro", cPl:"plantilla", cPlR:"plantillaRetiro"};
+  for (const [id, k] of Object.entries(campos)) { const el = document.getElementById(id); if (el) el.addEventListener("input", () => { S.cdraft = Object.assign({}, S.cdraft, {[k]: el.tagName === "SELECT" ? Number(el.value) : el.value}); }); }
+  ["cPl", "cPlR"].forEach(id => {
+    const el = document.getElementById(id); if (!el) return;
+    let hh = null; try { hh = (S.taH && S.taH[id]) || localStorage.getItem("cs-h-" + id); } catch(e) {}
+    if (hh) el.style.height = hh;
+    if (window.ResizeObserver) new ResizeObserver(() => { if (!el.isConnected || !el.offsetHeight) return; const v = el.offsetHeight + "px"; S.taH = Object.assign({}, S.taH, {[id]: v}); try { localStorage.setItem("cs-h-" + id, v); } catch(e) {} }).observe(el);
+  });
   const lin = $("#lin"); if (lin) lin.onkeydown = e => { if (e.key === "Enter") { e.preventDefault(); $("[data-ladd]").click(); } };
   if ($("#cSave")) {
     $("#cSave").onclick = saveCfg;
@@ -1316,6 +1325,7 @@ function bindMain(){
 }
 async function saveCfg(){
   const c0 = cfg().cat, cat = Object.assign({}, c0, {colores: c0.colores.map(x => ({n:x[0], h:x[1] || ""}))});
+  S.cdraft = null;
   try { await setDoc(doc(S.db, "config/ajustes"), {negocio:$("#cNeg").value.trim() || DEF.negocio, dias:Number($("#cDias").value), plantilla:$("#cPl").value.trim() || DEF.plantilla, diasRetiro:Number($("#cDiasRet").value), plantillaRetiro:$("#cPlR").value.trim() || DEF.plantillaRetiro, cat}); toast("Ajustes guardados"); }
   catch(e) { console.warn(e); toast("No se pudieron guardar los ajustes: " + (e.code || e.message), true); }
 }
