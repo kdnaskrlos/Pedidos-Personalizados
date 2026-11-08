@@ -871,7 +871,7 @@ import { initializeApp, deleteApp } from "https://www.gstatic.com/firebasejs/10.
 import { getAuth, onAuthStateChanged, signInWithEmailAndPassword, createUserWithEmailAndPassword, signOut, updatePassword, reauthenticateWithCredential, EmailAuthProvider } from "https://www.gstatic.com/firebasejs/10.12.2/firebase-auth.js";
 import { initializeFirestore, getFirestore, persistentLocalCache, persistentMultipleTabManager, doc, collection, query, where, onSnapshot, getDoc, setDoc, updateDoc, deleteDoc, writeBatch, runTransaction } from "https://www.gstatic.com/firebasejs/10.12.2/firebase-firestore.js";
 
-const VERSION = "v2.58";
+const VERSION = "v2.59";
 /* ================= Utilidades ================= */
 const $ = (s, r = document) => r.querySelector(s);
 const esc = s => String(s ?? "").replace(/[&<>"']/g, c => ({"&":"&amp;","<":"&lt;",">":"&gt;",'"':"&quot;","'":"&#39;"}[c]));
@@ -1204,6 +1204,7 @@ function alertas(){
 let renderQ = false;
 function render(){ if (renderQ) return; renderQ = true; requestAnimationFrame(() => { renderQ = false; doRender(); }); }
 function doRender(){
+  if (S.view !== "equipo") S.uOpen = null; // al salir de Equipo, los usuarios vuelven a verse compactos
   if (!S.me || !S.me.activo) return;
   const pr = perm(), a = alertas(), c = cfg();
   const nAv = a.vencidos.length + a.proximos.length + a.avisar.length + a.retiro.length;
