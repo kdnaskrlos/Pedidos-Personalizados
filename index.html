@@ -361,7 +361,9 @@ table.mx{border-collapse:collapse;width:100%;font-size:13px}
 .thalf b{font-size:26px;font-weight:800;letter-spacing:.04em}
 .thalf span:last-child{max-width:340px;color:var(--muted);font-weight:600;font-size:14px}
 .tq{position:absolute;top:18px;left:0;right:0;text-align:center;font-weight:800;font-size:13px;letter-spacing:.12em;text-transform:uppercase;color:var(--muted);pointer-events:none}
-.tclose{position:absolute;top:12px;right:12px;width:42px;height:42px;border-radius:50%;border:1px solid var(--line);background:var(--surface);display:grid;place-items:center;color:var(--ink)}
+.tclose{position:absolute;left:50%;bottom:calc(24px + env(safe-area-inset-bottom,0px));transform:translateX(-50%);width:56px;height:56px;border-radius:50%;border:1px solid rgba(255,255,255,.55);background:rgba(255,255,255,.45);-webkit-backdrop-filter:blur(10px);backdrop-filter:blur(10px);display:grid;place-items:center;color:var(--ink);box-shadow:0 6px 20px rgba(0,0,0,.12)}
+.tclose svg.i{width:24px;height:24px}
+:root[data-theme="dark"] .tclose{background:rgba(20,26,34,.5);border-color:rgba(255,255,255,.15)}
 
 /* avisos compactos */
 .asec{display:flex;flex-direction:column;gap:8px}
@@ -598,6 +600,37 @@ table.mx{border-collapse:collapse;width:100%;font-size:13px}
 .dcli b{font-size:20px;font-weight:800;line-height:1.2;min-width:0}
 .dwork h3{font-size:17px}
 
+.aday.info{color:var(--t-violet);background:color-mix(in srgb,var(--t-violet) 10%,var(--surface))}
+.arow.rt{flex-direction:column;align-items:stretch;gap:8px;cursor:default}
+.rt-top{display:flex;align-items:center;gap:10px;cursor:pointer;min-width:0}
+.rt-acts{display:grid;grid-template-columns:repeat(3,minmax(0,1fr));gap:6px}
+.rbtn{display:inline-flex;align-items:center;justify-content:center;gap:5px;min-height:36px;border-radius:9px;border:1px solid var(--line);background:var(--surface);font-size:12.5px;font-weight:700;color:var(--ink);text-decoration:none;padding:0 6px;white-space:nowrap}
+.rbtn svg.i{width:15px;height:15px}
+.rbtn.wa{color:#15803d;background:#dcfce7;border-color:#bbf7d0}
+.rbtn.ok{color:var(--accent);border-color:color-mix(in srgb,var(--accent) 35%,var(--line))}
+:root[data-theme="dark"] .rbtn.wa{color:#86efac;background:#12311f;border-color:#1f4d31}
+
+/* listas de opciones en Ajustes (v2.25) */
+.lists{display:flex;flex-direction:column;border:1px solid var(--line);border-radius:12px;overflow:hidden}
+.lst+.lst{border-top:1px solid var(--line)}
+.lst-h{width:100%;display:flex;align-items:center;gap:10px;border:0;background:var(--surface);padding:12px 14px;text-align:left;color:var(--ink)}
+.lst-h b{flex:1;font-size:14px;font-weight:700}
+.lst-n{font-size:12px;font-weight:800;color:var(--muted);background:var(--surface-2);border-radius:99px;padding:2px 8px}
+.lst-c{color:var(--muted);display:grid;transition:transform .15s}
+.lst-c svg.i{width:18px;height:18px}
+.lst.open .lst-c{transform:rotate(180deg)}
+.lst.open .lst-h{background:var(--surface-2)}
+.lst-b{padding:12px 14px;display:flex;flex-direction:column;gap:10px;background:var(--surface)}
+.lchips{display:flex;flex-wrap:wrap;gap:6px}
+.lchip{display:inline-flex;align-items:center;gap:6px;border:1px solid var(--line);border-radius:99px;padding:4px 4px 4px 11px;font-size:13px;font-weight:600;background:var(--surface)}
+.lchip i{width:14px;height:14px;border-radius:50%;border:1px solid #0002;margin-left:-4px}
+.lchip button{width:22px;height:22px;border:0;border-radius:50%;background:var(--surface-2);display:grid;place-items:center;color:var(--muted);padding:0}
+.lchip button:hover{background:color-mix(in srgb,var(--err) 14%,var(--surface));color:var(--err)}
+.lchip button svg.i{width:12px;height:12px}
+.ladd{display:flex;gap:6px}
+.ladd .inp{flex:1;min-width:0}
+.ladd input[type=color]{width:42px;height:40px;border:1px solid var(--line);border-radius:9px;padding:2px;background:var(--surface);flex:none}
+
 @media (max-width:1000px){
   .cols{grid-template-columns:minmax(0,1fr)}
   .tipotabs{display:flex}
@@ -684,7 +717,7 @@ import { initializeApp, deleteApp } from "https://www.gstatic.com/firebasejs/10.
 import { getAuth, onAuthStateChanged, signInWithEmailAndPassword, createUserWithEmailAndPassword, signOut, updatePassword, reauthenticateWithCredential, EmailAuthProvider } from "https://www.gstatic.com/firebasejs/10.12.2/firebase-auth.js";
 import { initializeFirestore, getFirestore, persistentLocalCache, persistentMultipleTabManager, doc, collection, query, where, onSnapshot, getDoc, setDoc, updateDoc, deleteDoc, writeBatch } from "https://www.gstatic.com/firebasejs/10.12.2/firebase-firestore.js";
 
-const VERSION = "v2.24";
+const VERSION = "v2.25";
 /* ================= Utilidades ================= */
 const $ = (s, r = document) => r.querySelector(s);
 const esc = s => String(s ?? "").replace(/[&<>"']/g, c => ({"&":"&amp;","<":"&lt;",">":"&gt;",'"':"&quot;","'":"&#39;"}[c]));
@@ -748,6 +781,8 @@ const I = (n, cls = "") => `<svg class="i ${cls}" viewBox="0 0 24 24" aria-hidde
 const DEF = {
   negocio: "Comic Shop", dias: 2, pais: "58",
   plantilla: "Hola {cliente} 👋, te escribimos de {negocio}.\nTu pedido {codigo} ({resumen}) ya está listo ✅\nSaldo pendiente: {saldo}\n¡Te esperamos!",
+  diasRetiro: 3,
+  plantillaRetiro: "Hola {cliente} 👋, te recordamos de {negocio} que tu pedido ({resumen}) está listo para retirar desde hace unos días.\nSaldo pendiente: {saldo}\n¡Te esperamos!",
   cat: {
     servicios: ["DTF","Vinilo textil","Sublimación sencilla","Bordado","Otro"],
     prendasPers: ["Franela","Franela oversize","Chemise","Suéter","Hoodie","Franelilla","Gorra","Otro"],
@@ -816,7 +851,7 @@ const cfg = () => {
   const r = S.cfgRaw || {}, cat = Object.assign({}, DEF.cat, r.cat || {});
   // Firestore no admite listas dentro de listas: los colores se guardan como {n, h}
   cat.colores = (cat.colores || []).map(x => Array.isArray(x) ? x : [x.n, x.h || ""]).filter(x => x[0]);
-  return {negocio:r.negocio || DEF.negocio, dias:(r.dias ?? DEF.dias), pais:r.pais || DEF.pais, plantilla:r.plantilla || DEF.plantilla, cat};
+  return {negocio:r.negocio || DEF.negocio, dias:(r.dias ?? DEF.dias), pais:"58", plantilla:r.plantilla || DEF.plantilla, diasRetiro:(r.diasRetiro ?? DEF.diasRetiro), plantillaRetiro:r.plantillaRetiro || DEF.plantillaRetiro, cat};
 };
 const loginEmail = (u, k) => `${u}.${k}@comicshop-pedidos.app`;
 const pinPass = pin => "cs-" + pin;
@@ -977,7 +1012,8 @@ function alertas(){
     pend: l.filter(p => (p.estado || "pendiente") === "pendiente"),
     vencidos: pend.filter(p => daysUntil(p.fechaEntrega) < 0).sort((a,b) => a.fechaEntrega.localeCompare(b.fechaEntrega)),
     proximos: pend.filter(p => { const n = daysUntil(p.fechaEntrega); return n >= 0 && n <= d; }).sort((a,b) => a.fechaEntrega.localeCompare(b.fechaEntrega)),
-    avisar: l.filter(p => p.estado === "listo" && !p.avisado)
+    avisar: l.filter(p => p.estado === "listo" && !p.avisado),
+    retiro: l.filter(p => p.estado === "listo" && p.avisado && p.avisadoEn && (Date.now() - Date.parse(p.avisadoEn)) / 86400000 >= cfg().diasRetiro && !(p.posponerHasta && daysUntil(p.posponerHasta) > 0)).sort((a, b) => String(a.avisadoEn).localeCompare(b.avisadoEn))
   };
 }
 let renderQ = false;
@@ -985,7 +1021,7 @@ function render(){ if (renderQ) return; renderQ = true; requestAnimationFrame(()
 function doRender(){
   if (!S.me || !S.me.activo) return;
   const pr = perm(), a = alertas(), c = cfg();
-  const nAv = a.vencidos.length + a.proximos.length + a.avisar.length;
+  const nAv = a.vencidos.length + a.proximos.length + a.avisar.length + a.retiro.length;
   const focusId = document.activeElement && document.activeElement.id;
   const sc = scrollY;
   const nav = (v, ic, t, n) => `<button class="nav" data-view="${v}" aria-current="${S.view === v}">${I(ic)}${t}${n ? `<span class="bdg">${n}</span>` : ""}</button>`;
@@ -1122,9 +1158,20 @@ function avisoRow(p, modo){
   const T = TIPOS[p.tipo], t = totales(p);
   const n = p.fechaEntrega ? daysUntil(p.fechaEntrega) : null;
   const cuando = n === null ? "" : n < 0 ? `vencido hace ${-n} d` : n === 0 ? "hoy" : n === 1 ? "mañana" : `en ${n} días`;
+  const hace = p.avisadoEn ? Math.floor((Date.now() - Date.parse(p.avisadoEn)) / 86400000) : 0;
   const right = modo === "avisar"
     ? `<a class="aw" href="${esc(waLink(p))}" target="_blank" rel="noopener" data-avisar="${esc(p._id)}" title="Avisar por WhatsApp">${I("msg")}</a><button class="ac2" data-ya="${esc(p._id)}" title="Ya le avisé">${I("check")}</button>`
+    : modo === "retiro"
+    ? `<span class="aday info">avisado hace ${hace} d</span>`
     : `<span class="aday ${n < 0 ? "err" : "warn"}">${cuando}</span>`;
+  if (modo === "retiro") return `<div class="arow rt" style="--c:${T.c}">
+    <div class="rt-top" data-open="${esc(p._id)}" role="button" tabindex="0"><div class="atx"><b>${esc(p.cliente.nombre)}</b><small>${t.piezas} pz${t.saldo > 0 ? ` · Saldo ${esc(money(t.saldo, p.moneda))}` : ""}</small></div>${right}</div>
+    <div class="rt-acts">
+      <a class="rbtn wa" href="${esc(waLink(p, cfg().plantillaRetiro))}" target="_blank" rel="noopener" data-recordar="${esc(p._id)}">${I("msg")}Recordar</a>
+      <button class="rbtn" data-posponer="${esc(p._id)}">${I("cal")}Posponer</button>
+      <button class="rbtn ok" data-entregar="${esc(p._id)}">${I("box")}Entregado</button>
+    </div>
+  </div>`;
   return `<div class="arow" style="--c:${T.c}" data-open="${esc(p._id)}" role="button" tabindex="0">
     <div class="atx"><b>${esc(p.cliente.nombre)}</b><small>${t.piezas} pz · ${fmtDate(p.fechaEntrega).slice(0, -5)}${t.saldo > 0 ? ` · Saldo ${esc(money(t.saldo, p.moneda))}` : ""}</small></div>
     ${right}
@@ -1136,18 +1183,19 @@ function viewAvisos(a){
   return `<div class="hello"><h1>Avisos</h1><span class="date">${I("bell")}Entregas con ${cfg().dias} día${cfg().dias == 1 ? "" : "s"} de anticipación</span></div>
     ${notifOK && Notification.permission !== "granted" ? `<div class="card tint" style="--c:var(--t-info);flex-direction:row;align-items:center;flex-wrap:wrap;padding:12px 14px"><p class="note" style="flex:1;min-width:200px">Activa las notificaciones para recibir un aviso diario al abrir la app.</p><button class="btn primary sm" id="notifBtn">${I("bell")}Activar</button></div>` : ""}
     ${sec("var(--t-info)","msg","Por avisar al cliente", a.avisar, "avisar")}
+    ${sec("var(--t-violet)","box","Avisados sin retirar", a.retiro, "retiro")}
     ${sec("var(--err)","alert","Entregas vencidas", a.vencidos, "fecha")}
     ${sec("var(--warn)","clock","Se entregan pronto", a.proximos, "fecha")}`;
 }
 function notifyIfNeeded(a){
   try {
     if (!("Notification" in window) || Notification.permission !== "granted") return;
-    const n = a.vencidos.length + a.proximos.length + a.avisar.length;
+    const n = a.vencidos.length + a.proximos.length + a.avisar.length + a.retiro.length;
     if (!n) return;
     const key = "cs-notif-" + ymd(new Date());
     if (localStorage.getItem(key)) return;
     localStorage.setItem(key, "1");
-    const body = [a.vencidos.length && `${a.vencidos.length} vencido(s)`, a.proximos.length && `${a.proximos.length} entrega(s) próximas`, a.avisar.length && `${a.avisar.length} cliente(s) por avisar`].filter(Boolean).join(" · ");
+    const body = [a.vencidos.length && `${a.vencidos.length} vencido(s)`, a.proximos.length && `${a.proximos.length} entrega(s) próximas`, a.avisar.length && `${a.avisar.length} cliente(s) por avisar`, a.retiro.length && `${a.retiro.length} avisado(s) sin retirar`].filter(Boolean).join(" · ");
     const opts = {body, icon:"icon-192.png", tag:"cs-avisos"};
     if (navigator.serviceWorker && navigator.serviceWorker.controller) navigator.serviceWorker.ready.then(r => r.showNotification("Comic Shop · Pedidos", opts));
     else new Notification("Comic Shop · Pedidos", opts);
@@ -1183,24 +1231,41 @@ function viewEquipo(){
 
 /* ---------- Ajustes (admin) ---------- */
 const adminTabs = () => `<div class="seg m-tabs"><button data-view="ajustes" aria-pressed="${S.view === "ajustes"}">Ajustes</button><button data-view="equipo" aria-pressed="${S.view === "equipo"}">Equipo</button></div>`;
+const LISTAS = [["servicios","Tipos de estampado"],["prendasPers","Prendas de Personalizado"],["prendasSub","Productos de Sublimación"],["colores","Colores"],["hormas","Hormas"],["marcas","Etiquetas"],["tallasNino","Tallas de niño"],["tallasAdulto","Tallas de adulto"]];
+function listaHTML([k, label]){
+  const items = cfg().cat[k] || [], open = S.lopen === k;
+  const chip = (v, i) => k === "colores"
+    ? `<span class="lchip"><i style="${swatchStyle(v[1])}"></i>${esc(v[0])}<button type="button" data-lrm="${k}|${i}" aria-label="Quitar">${I("x")}</button></span>`
+    : `<span class="lchip">${esc(v)}<button type="button" data-lrm="${k}|${i}" aria-label="Quitar">${I("x")}</button></span>`;
+  return `<div class="lst ${open ? "open" : ""}">
+    <button type="button" class="lst-h" data-lst="${k}"><b>${label}</b><span class="lst-n">${items.length}</span><span class="lst-c">${I("chev")}</span></button>
+    ${open ? `<div class="lst-b"><div class="lchips">${items.map(chip).join("")}</div>
+      <div class="ladd">${k === "colores" ? `<input type="color" id="lcol" value="#888888" aria-label="Color">` : ""}<input class="inp" id="lin" placeholder="Agregar ${k === "colores" ? "color" : "opción"}" autocomplete="off"><button type="button" class="btn primary" data-ladd="${k}">${I("plus")}Agregar</button></div></div>` : ""}
+  </div>`;
+}
+async function guardarListas(cat){
+  const out = Object.assign({}, cat, {colores: cat.colores.map(x => ({n:x[0], h:x[1] || ""}))});
+  try { await setDoc(doc(S.db, "config/ajustes"), Object.assign({}, S.cfgRaw || {}, {cat: out})); toast("Guardado"); }
+  catch(e) { console.warn(e); toast("No se pudo guardar: " + (e.code || e.message), true); }
+}
 function viewAjustes(){
-  const c = cfg(), k = c.cat;
-  const ta = (key, label) => `<div class="f"><label>${label}</label><textarea class="inp" data-cat="${key}" style="min-height:120px">${esc(k[key].join("\n"))}</textarea></div>`;
+  const c = cfg();
   return `${adminTabs()}<div class="hello"><h1>Ajustes</h1><span class="date">${I("sliders")}Se aplican a todo el equipo</span></div>
     <div class="card">
       <div class="sec">${I("sliders")}General</div>
       <div class="g3">
         <div class="f"><label>Nombre del negocio</label><input class="inp" id="cNeg" value="${esc(c.negocio)}"></div>
         <div class="f"><label>Avisar entregas con anticipación de</label><select class="inp" id="cDias">${[0,1,2,3,4,5,7,10,14].map(n => `<option value="${n}" ${n == c.dias ? "selected" : ""}>${n === 0 ? "Solo el mismo día" : n + " día" + (n > 1 ? "s" : "")}</option>`).join("")}</select></div>
-        <div class="f"><label>País por defecto de los teléfonos</label><select class="inp" id="cPais">${PAISES.filter(p => p.c).map(p => `<option value="${p.c}" ${p.c === c.pais ? "selected" : ""}>${p.f} ${p.n} (+${p.c})</option>`).join("")}</select></div>
+        <div class="f"><label>Avisar si un pedido avisado no se retira en</label><select class="inp" id="cDiasRet">${[1,2,3,4,5,7,10,15,30].map(n => `<option value="${n}" ${n == c.diasRetiro ? "selected" : ""}>${n} día${n > 1 ? "s" : ""}</option>`).join("")}</select></div>
       </div>
-      <div class="f"><label>Mensaje de WhatsApp cuando el pedido está listo</label><textarea class="inp" id="cPl" rows="4">${esc(c.plantilla)}</textarea><span class="msg mut">Puedes usar: {cliente} {negocio} {codigo} {resumen} {saldo} {total} {fecha}</span></div>
+      <div class="f"><label>Mensaje de WhatsApp cuando el pedido está listo</label><textarea class="inp" id="cPl" rows="4">${esc(c.plantilla)}</textarea></div>
+      <div class="f"><label>Mensaje de WhatsApp para recordar el retiro</label><textarea class="inp" id="cPlR" rows="3">${esc(c.plantillaRetiro)}</textarea><span class="msg mut">Puedes usar: {cliente} {negocio} {codigo} {resumen} {saldo} {total} {fecha}</span></div>
+      <button class="btn primary" id="cSave" style="align-self:flex-start">${I("check")}Guardar</button>
     </div>
     <div class="card">
-      <div class="sec">${I("list")}Listas de opciones <small>una por línea</small></div>
-      <div class="g3">${ta("servicios","Tipos de estampado")}${ta("prendasPers","Prendas · Personalizado")}${ta("prendasSub","Productos · Sublimación")}${ta("hormas","Hormas")}${ta("marcas","Etiquetas")}${ta("tallasAdulto","Tallas adulto")}${ta("tallasNino","Tallas niño")}</div>
-      <div class="f"><label>Colores (Nombre | #código; usa "full" para fullprint)</label><textarea class="inp" id="cCol" style="min-height:170px">${esc(k.colores.map(x => x[0] + " | " + x[1]).join("\n"))}</textarea></div>
-      <div style="display:flex;gap:8px;flex-wrap:wrap"><button class="btn primary" id="cSave">${I("check")}Guardar ajustes</button><button class="btn" id="cReset">${I("undo")}Restaurar listas originales</button></div>
+      <div class="sec">${I("list")}Opciones de los pedidos <small>se guardan solas</small></div>
+      <div class="lists">${LISTAS.map(listaHTML).join("")}</div>
+      <button class="btn" id="cReset" style="align-self:flex-start">${I("undo")}Restaurar opciones originales</button>
     </div>`;
 }
 
@@ -1208,7 +1273,7 @@ function viewAjustes(){
 function bindMain(){
   const app = $("#app");
   app.onclick = e => {
-    const b = e.target.closest("[data-view],[data-tab],[data-filtro],[data-act],[data-open],[data-avisar],[data-ya],[data-buscar],[data-nc],[data-tile],[data-reset],[data-deluser],[data-utog]");
+    const b = e.target.closest("[data-view],[data-tab],[data-filtro],[data-act],[data-open],[data-avisar],[data-ya],[data-recordar],[data-entregar],[data-posponer],[data-lst],[data-lrm],[data-ladd],[data-buscar],[data-nc],[data-tile],[data-reset],[data-deluser],[data-utog]");
     if (!b) return;
     const d = b.dataset;
     if (d.view) { setView(d.view); return; }
@@ -1220,7 +1285,13 @@ function bindMain(){
     if (d.act === "cuenta") return openCuenta();
     if (d.avisar) { marcarAvisado(d.avisar); return; }
     if (d.ya) return marcarAvisado(d.ya);
+    if (d.recordar) { updateDoc(doc(S.db, "pedidos/" + d.recordar), {avisadoEn:new Date().toISOString(), recordadoEn:new Date().toISOString(), posponerHasta:""}).then(() => toast(`Cliente recordado. Te aviso otra vez en ${cfg().diasRetiro} día${cfg().diasRetiro == 1 ? "" : "s"} si no lo retira`)).catch(() => {}); return; }
+    if (d.posponer) { const id = d.posponer; const man = new Date(); man.setDate(man.getDate() + 1); openCalendar(ymd(man), f => { if (daysUntil(f) <= 0) return toast("Elige una fecha a partir de mañana", true); updateDoc(doc(S.db, "pedidos/" + id), {posponerHasta:f}).then(() => toast(`Pospuesto hasta el ${fmtDate(f)}`)).catch(() => toast("No se pudo posponer", true)); }); return; }
+    if (d.entregar) { updateDoc(doc(S.db, "pedidos/" + d.entregar), {estado:"entregado", entregadoEn:new Date().toISOString()}).then(() => toast("Pedido entregado")).catch(() => toast("No se pudo actualizar el pedido", true)); return; }
     if (d.open) return openDetail(d.open);
+    if (d.lst) { S.lopen = S.lopen === d.lst ? null : d.lst; render(); if (S.lopen) setTimeout(() => $("#lin")?.focus(), 50); return; }
+    if (d.lrm) { const [k, i] = d.lrm.split("|"); const cat = JSON.parse(JSON.stringify(cfg().cat)); if (cat[k].length <= 1) return toast("La lista necesita al menos una opción", true); cat[k].splice(Number(i), 1); return guardarListas(cat); }
+    if (d.ladd) { const k = d.ladd, v = ($("#lin").value || "").trim(); if (!v) return $("#lin").focus(); const cat = JSON.parse(JSON.stringify(cfg().cat)); const names = cat[k].map(x => norm(Array.isArray(x) ? x[0] : x)); if (names.includes(norm(v))) return toast("Esa opción ya existe", true); cat[k].push(k === "colores" ? [v, $("#lcol").value] : v); return guardarListas(cat); }
     if (d.utog) { S.uOpen = S.uOpen === d.utog ? null : d.utog; render(); return; }
     if (d.reset) return resetPin(d.reset);
     if (d.deluser) { const u = S.usuarios[d.deluser]; return confirmar(`¿Eliminar a ${u.nombre}?`, "No podrá entrar más. Sus pedidos se conservan.", "Eliminar", async () => { const bt = writeBatch(S.db); bt.delete(doc(S.db, "usuarios/" + d.deluser)); bt.delete(doc(S.db, "logins/" + u.usuario)); await bt.commit(); toast("Usuario eliminado"); }); }
@@ -1236,6 +1307,7 @@ function bindMain(){
     try { await updateDoc(doc(S.db, "usuarios/" + ch.dataset.uid), {[ch.dataset.perm]: ch.checked}); toast("Permiso actualizado"); }
     catch(e) { toast("No se pudo guardar el permiso", true); ch.checked = !ch.checked; }
   });
+  const lin = $("#lin"); if (lin) lin.onkeydown = e => { if (e.key === "Enter") { e.preventDefault(); $("[data-ladd]").click(); } };
   if ($("#cSave")) {
     $("#cSave").onclick = saveCfg;
     $("#cReset").onclick = () => confirmar("¿Restaurar las listas originales?", "Se perderán las opciones que agregaste o quitaste.", "Restaurar", async () => { const r = Object.assign({}, S.cfgRaw || {}); delete r.cat; await setDoc(doc(S.db, "config/ajustes"), r); toast("Listas restauradas"); });
@@ -1243,11 +1315,8 @@ function bindMain(){
   loadFotos(app);
 }
 async function saveCfg(){
-  const cat = {};
-  document.querySelectorAll("[data-cat]").forEach(t => cat[t.dataset.cat] = t.value.split("\n").map(s => s.trim()).filter(Boolean));
-  cat.colores = $("#cCol").value.split("\n").map(l => l.split("|").map(s => s.trim())).filter(x => x[0]).map(x => ({n:x[0], h:x[1] || ""}));
-  for (const k in cat) if (!cat[k].length) return toast("Una lista no puede quedar vacía", true);
-  try { await setDoc(doc(S.db, "config/ajustes"), {negocio:$("#cNeg").value.trim() || DEF.negocio, dias:Number($("#cDias").value), pais:$("#cPais").value, plantilla:$("#cPl").value.trim() || DEF.plantilla, cat}); toast("Ajustes guardados"); }
+  const c0 = cfg().cat, cat = Object.assign({}, c0, {colores: c0.colores.map(x => ({n:x[0], h:x[1] || ""}))});
+  try { await setDoc(doc(S.db, "config/ajustes"), {negocio:$("#cNeg").value.trim() || DEF.negocio, dias:Number($("#cDias").value), plantilla:$("#cPl").value.trim() || DEF.plantilla, diasRetiro:Number($("#cDiasRet").value), plantillaRetiro:$("#cPlR").value.trim() || DEF.plantillaRetiro, cat}); toast("Ajustes guardados"); }
   catch(e) { console.warn(e); toast("No se pudieron guardar los ajustes: " + (e.code || e.message), true); }
 }
 
@@ -1868,11 +1937,11 @@ async function saveForm(ov, orig){
 }
 
 /* ================= Detalle ================= */
-function waLink(p){
+function waLink(p, plantilla){
   const c = cfg(), t = totales(p), pz = {};
   (p.items || []).forEach(i => pz[i.prenda] = (pz[i.prenda] || 0) + (i.cant || 1));
   const resumen = Object.entries(pz).map(([k, n]) => `${n} ${k}`).join(", ");
-  const msg = c.plantilla.replace(/\{cliente\}/g, (p.cliente.nombre || "").split(" ")[0]).replace(/\{negocio\}/g, c.negocio).replace(/\{codigo\}/g, p.codigo).replace(/\{resumen\}/g, resumen)
+  const msg = (plantilla || c.plantilla).replace(/\{cliente\}/g, (p.cliente.nombre || "").split(" ")[0]).replace(/\{negocio\}/g, c.negocio).replace(/\{codigo\}/g, p.codigo).replace(/\{resumen\}/g, resumen)
     .replace(/\{saldo\}/g, t.saldo > 0 ? money(t.saldo, p.moneda) : "ninguno, ¡ya está pagado!").replace(/\{total\}/g, money(t.total, p.moneda)).replace(/\{fecha\}/g, fmtDate(p.fechaEntrega));
   return `https://wa.me/${p.cliente.telefono}?text=${encodeURIComponent(msg)}`;
 }
