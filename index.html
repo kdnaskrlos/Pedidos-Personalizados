@@ -915,7 +915,7 @@ import { initializeApp, deleteApp } from "https://www.gstatic.com/firebasejs/10.
 import { getAuth, onAuthStateChanged, signInWithEmailAndPassword, createUserWithEmailAndPassword, signOut, updatePassword, reauthenticateWithCredential, EmailAuthProvider } from "https://www.gstatic.com/firebasejs/10.12.2/firebase-auth.js";
 import { initializeFirestore, getFirestore, persistentLocalCache, persistentMultipleTabManager, doc, collection, query, where, onSnapshot, getDoc, setDoc, updateDoc, deleteDoc, writeBatch, runTransaction } from "https://www.gstatic.com/firebasejs/10.12.2/firebase-firestore.js";
 
-const VERSION = "v2.75";
+const VERSION = "v2.76";
 /* ================= Utilidades ================= */
 const $ = (s, r = document) => r.querySelector(s);
 const esc = s => String(s ?? "").replace(/[&<>"']/g, c => ({"&":"&amp;","<":"&lt;",">":"&gt;",'"':"&quot;","'":"&#39;"}[c]));
@@ -2273,7 +2273,7 @@ function renderItems(){
     if (f === "nombre") it.nombre = e.target.value;
     if (e.target.hasAttribute("data-cant")) { e.target.value = e.target.value.replace(/\D/g, "").slice(0, 4); const n = parseInt(e.target.value) || 0; if (n > 0) { it.cant = n; renderTotals(); } }
   };
-  const onIn = e => { if (e.target.hasAttribute("data-cant")) { e.target.placeholder = e.target.value || "1"; e.target.value = ""; } };
+  const onIn = e => { if (e.target.hasAttribute("data-cant")) { e.target.placeholder = ""; e.target.value = ""; } };
   const onOut = e => {
     if (!e.target.hasAttribute("data-cant")) return;
     const row = e.target.closest("[data-i]"), it = F.items[Number(row.dataset.i)];
