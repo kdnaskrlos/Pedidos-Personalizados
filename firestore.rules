@@ -55,6 +55,11 @@ service cloud.firestore {
       allow read, write: if activo();
     }
 
+    // Estado de los respaldos (solo el administrador)
+    match /respaldos/{doc} {
+      allow read, write: if admin();
+    }
+
     match /clientes/{tel} {
       allow read, write: if activo();
     }

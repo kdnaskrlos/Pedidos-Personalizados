@@ -841,6 +841,15 @@ body.fixedv{scrollbar-width:none}
 .rvok{flex:none;margin-left:auto;width:30px;height:30px;border-radius:99px;display:grid;place-items:center;border:1px solid #bbf7d0;background:#dcfce7;color:#15803d;cursor:pointer;padding:0}
 .rvok svg.i{width:16px;height:16px;stroke-width:2.6}
 :root[data-theme="dark"] .rvok{background:#12311f;border-color:#1f4d31;color:#86efac}
+/* v2.84 respaldo */
+.rbtns{display:grid;grid-template-columns:repeat(auto-fit,minmax(180px,1fr));gap:8px}
+.rbtns .btn{width:100%}
+.rdrive{border-top:1px solid var(--line);padding-top:10px}
+.rdrive summary{cursor:pointer;font-weight:700;font-size:13.5px;color:var(--muted)}
+.rdrive[open] summary{margin-bottom:10px}
+.rdrive{display:flex;flex-direction:column;gap:8px}
+.revbar.resp{border-color:color-mix(in srgb,var(--t-info) 25%,var(--line));background:color-mix(in srgb,var(--t-info) 7%,var(--surface))}
+.revbar.resp svg.i,.revbar.resp em{color:var(--t-info)}
 @media (max-width:1000px){.hello{padding-bottom:8px;margin-top:-6px}.hello h1{font-size:25px}}
 @media (max-width:1000px){.tiles.t5>:last-child{grid-column:1/-1}}
 @media (max-width:1000px){.pill.demo .m-pr{display:inline}}
@@ -932,9 +941,9 @@ body.fixedv{scrollbar-width:none}
 import { firebaseConfig } from "./config.js";
 import { initializeApp, deleteApp } from "https://www.gstatic.com/firebasejs/10.12.2/firebase-app.js";
 import { getAuth, onAuthStateChanged, signInWithEmailAndPassword, createUserWithEmailAndPassword, signOut, updatePassword, reauthenticateWithCredential, EmailAuthProvider } from "https://www.gstatic.com/firebasejs/10.12.2/firebase-auth.js";
-import { initializeFirestore, getFirestore, persistentLocalCache, persistentMultipleTabManager, doc, collection, query, where, onSnapshot, getDoc, setDoc, updateDoc, deleteDoc, writeBatch, runTransaction } from "https://www.gstatic.com/firebasejs/10.12.2/firebase-firestore.js";
+import { initializeFirestore, getFirestore, persistentLocalCache, persistentMultipleTabManager, doc, collection, query, where, onSnapshot, getDoc, getDocs, setDoc, updateDoc, deleteDoc, writeBatch, runTransaction } from "https://www.gstatic.com/firebasejs/10.12.2/firebase-firestore.js";
 
-const VERSION = "v2.83";
+const VERSION = "v2.84";
 /* ================= Utilidades ================= */
 const $ = (s, r = document) => r.querySelector(s);
 const esc = s => String(s ?? "").replace(/[&<>"']/g, c => ({"&":"&amp;","<":"&lt;",">":"&gt;",'"':"&quot;","'":"&#39;"}[c]));
@@ -988,6 +997,9 @@ const P = {
   clock:'<circle cx="12" cy="12" r="10"/><path d="M12 6v6l4 2"/>',
   shirt:'<path d="M20.38 3.46 16 2a4 4 0 0 1-8 0L3.62 3.46a2 2 0 0 0-1.34 2.23l.58 3.47a1 1 0 0 0 .99.84H6v10c0 1.1.9 2 2 2h8a2 2 0 0 0 2-2V10h2.15a1 1 0 0 0 .99-.84l.58-3.47a2 2 0 0 0-1.34-2.23z"/>',
   key:'<circle cx="7.5" cy="15.5" r="5.5"/><path d="m21 2-9.6 9.6M15.5 7.5l3 3L22 7l-3-3"/>',
+  drive:'<path d="M8.5 3h7l6 10.5-3.5 6h-12L2.5 13.5z"/><path d="M8.5 3l6 10.5h7M15.5 3l-9.5 16.5M2.5 13.5h12"/>',
+  upload:'<path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4"/><path d="m17 8-5-5-5 5M12 3v12"/>',
+  shield:'<path d="M12 3 4 6v6c0 5 3.5 8 8 9 4.5-1 8-4 8-9V6z"/><path d="m9 12 2 2 4-4"/>',
   download:'<path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4M7 10l5 5 5-5M12 15V3"/>',
   user:'<circle cx="12" cy="8" r="4"/><path d="M4 21a8 8 0 0 1 16 0"/>',
   palette:'<circle cx="13.5" cy="6.5" r=".5"/><circle cx="17.5" cy="10.5" r=".5"/><circle cx="8.5" cy="7.5" r=".5"/><circle cx="6.5" cy="12.5" r=".5"/><path d="M12 2a10 10 0 0 0 0 20c.93 0 1.5-.75 1.5-1.66 0-.43-.17-.83-.44-1.12a1.64 1.64 0 0 1 1.22-2.72H16a6 6 0 0 0 6-6C22 6 17.5 2 12 2z"/>',
@@ -1168,6 +1180,7 @@ function startData(){
     if (!perm().admin) return; // los empleados no ven avisos técnicos de permisos
     toast("No se pudo leer: " + S.errores.join(", ") + " (" + (e.code || e.message) + ")", true);
   };
+  if (perm().admin) add(onSnapshot(doc(S.db, "respaldos/estado"), s => { S.resp = s.exists() ? s.data() : null; render(); }, e => console.warn("respaldo", e)));
   add(onSnapshot(doc(S.db, "config/ajustes"), s => { S.cfgRaw = s.exists() ? s.data() : null; render(); }, err("ajustes")));
   add(onSnapshot(collection(S.db, "usuarios"), s => { const o = {}; s.forEach(d => o[d.id] = d.data()); S.usuarios = o; render(); }, err("usuarios")));
   add(onSnapshot(collection(S.db, "clientes"), s => { const o = {}; s.forEach(d => o[d.id] = d.data()); S.clientes = o; }, err("clientes")));
@@ -1337,6 +1350,146 @@ function filtrar(tipo){
   const key = p => (p.fechaEntrega || "9999") + (p.urgente ? "0" : "1");
   l.sort((a, b) => f === "entregados" ? String(b.entregadoEn || "").localeCompare(a.entregadoEn || "") : key(a).localeCompare(key(b)));
   return l;
+}
+/* ===== Respaldo (solo administrador) ===== */
+const RESP_LOCAL = "cs-respaldo-ultimo";
+function respaldoInfo(){
+  let loc = null; try { loc = JSON.parse(localStorage.getItem(RESP_LOCAL) || "null"); } catch(e) {}
+  const r = S.resp || {};
+  const ult = [r.ultimo, loc && loc.en].filter(Boolean).sort().pop() || "";
+  return {ult, dest:ult && r.ultimo === ult ? r.destino : loc && loc.destino, cada:Number(r.cada) || 7, clientId:r.driveClientId || ""};
+}
+function respaldoPendiente(){
+  if (!perm().admin) return "";
+  const i = respaldoInfo();
+  if (!i.ult) return "Aún no tienes respaldos";
+  const d = Math.floor((Date.now() - new Date(i.ult).getTime()) / 86400000);
+  return d >= i.cada ? `Último respaldo hace ${d} días` : "";
+}
+function respaldoCard(){
+  const i = respaldoInfo();
+  return `<div class="card">
+      <div class="sec">${I("shield")}Respaldo de datos</div>
+      <p class="note">${i.ult ? `Último respaldo: <b>${esc(fmtDT(i.ult))}</b>${i.dest ? ` · ${i.dest === "drive" ? "en Google Drive" : "en este dispositivo"}` : ""}` : "Todavía no has hecho ningún respaldo."}</p>
+      <div class="f"><label>Recordarme hacer un respaldo cada</label><select class="inp" id="rCada">${[3,7,15,30].map(n => `<option value="${n}" ${n === i.cada ? "selected" : ""}>${n} días</option>`).join("")}</select></div>
+      <div class="rbtns">
+        <button class="btn" id="rLocal">${I("download")}Guardar en el dispositivo</button>
+        <button class="btn primary" id="rDrive">${I("drive")}Subir a Google Drive</button>
+        <button class="btn" id="rRest">${I("upload")}Restaurar un respaldo</button>
+      </div>
+      <details class="rdrive"${i.clientId ? "" : " open"}><summary>Conexión con Google Drive${i.clientId ? " · configurada" : " · sin configurar"}</summary>
+        <div class="f"><label>ID de cliente de Google (OAuth)</label><input class="inp" id="rCid" value="${esc(i.clientId)}" placeholder="xxxxxxxx.apps.googleusercontent.com"></div>
+        <button class="btn sm" id="rCidSave" style="align-self:flex-end">${I("check")}Guardar</button>
+      </details>
+      <input type="file" id="rFile" accept=".json,application/json" hidden>
+    </div>`;
+}
+function bindRespaldo(){
+  const g = id => document.getElementById(id);
+  if (!g("rLocal")) return;
+  const i = respaldoInfo();
+  if (i.clientId) cargarGIS().catch(() => {});
+  g("rCada").onchange = e => setDoc(doc(S.db, "respaldos/estado"), {cada:Number(e.target.value)}, {merge:true}).then(() => toast("Guardado")).catch(() => toast("Error al guardar", true));
+  g("rCidSave").onclick = () => setDoc(doc(S.db, "respaldos/estado"), {driveClientId:g("rCid").value.trim()}, {merge:true}).then(() => toast("Guardado")).catch(() => toast("Error al guardar", true));
+  g("rLocal").onclick = () => respaldoLocal();
+  g("rDrive").onclick = () => respaldoDrive();
+  g("rRest").onclick = () => g("rFile").click();
+  g("rFile").onchange = e => { const f = e.target.files[0]; e.target.value = ""; if (f) restaurarArchivo(f); };
+}
+function openRespaldo(){
+  const ov = modal(`<div class="mh"><h2>Respaldo de datos</h2><button class="ib" data-close>${I("x")}</button></div>
+    <div class="mb"><p class="note">${esc(respaldoPendiente() || "Guarda una copia de tus pedidos, clientes, fotos y ajustes.")}</p>
+      <div class="rbtns"><button class="btn" id="mrLocal">${I("download")}Guardar en el dispositivo</button><button class="btn primary" id="mrDrive">${I("drive")}Subir a Google Drive</button></div></div>`, "sm pop");
+  if (respaldoInfo().clientId) cargarGIS().catch(() => {});
+  $("#mrLocal", ov).onclick = () => { ov.close(); respaldoLocal(); };
+  $("#mrDrive", ov).onclick = () => { ov.close(); respaldoDrive(); };
+}
+async function armarRespaldo(){
+  const leer = async n => { const o = {}; (await getDocs(collection(S.db, n))).forEach(d => o[d.id] = d.data()); return o; };
+  const data = {app:"comicshop-pedidos", formato:1, version:VERSION, creado:new Date().toISOString(), por:S.me.usuario, colecciones:{}};
+  for (const n of ["pedidos","clientes","fotos","config","contadores"]) data.colecciones[n] = await leer(n);
+  // Equipo: solo los datos visibles (los PIN los guarda Firebase y no se pueden copiar)
+  data.colecciones.usuarios = await leer("usuarios");
+  return data;
+}
+const nombreRespaldo = () => { const d = new Date(), z = n => String(n).padStart(2, "0"); return `respaldo-comicshop-${d.getFullYear()}-${z(d.getMonth() + 1)}-${z(d.getDate())}-${z(d.getHours())}${z(d.getMinutes())}.json`; };
+async function marcarRespaldo(destino){
+  const en = new Date().toISOString();
+  try { localStorage.setItem(RESP_LOCAL, JSON.stringify({en, destino})); } catch(e) {}
+  await setDoc(doc(S.db, "respaldos/estado"), {ultimo:en, destino, por:S.me.usuario}, {merge:true}).catch(e => console.warn("respaldo estado", e));
+  render();
+}
+async function respaldoLocal(){
+  if (!perm().admin) return;
+  toast("Preparando respaldo…");
+  try {
+    const data = await armarRespaldo();
+    const blob = new Blob([JSON.stringify(data)], {type:"application/json"}), url = URL.createObjectURL(blob);
+    const a = document.createElement("a"); a.href = url; a.download = nombreRespaldo(); document.body.appendChild(a); a.click(); a.remove();
+    setTimeout(() => URL.revokeObjectURL(url), 30000);
+    await marcarRespaldo("local"); toast("Respaldo guardado");
+  } catch(e) { console.warn(e); toast("Error al respaldar: " + (e.code || e.message), true); }
+}
+function cargarGIS(){
+  if (window.google && google.accounts && google.accounts.oauth2) return Promise.resolve();
+  if (S._gis) return S._gis;
+  return S._gis = new Promise((res, rej) => { const s = document.createElement("script"); s.src = "https://accounts.google.com/gsi/client"; s.async = true; s.onload = () => res(); s.onerror = () => { S._gis = null; rej(new Error("No se pudo cargar Google")); }; document.head.appendChild(s); });
+}
+function respaldoDrive(){
+  if (!perm().admin) return;
+  const cid = respaldoInfo().clientId;
+  if (!cid) { toast("Configura Google Drive primero", true); const d = document.querySelector(".rdrive"); if (d) { d.open = true; d.scrollIntoView({block:"center"}); } else setView("ajustes"); return; }
+  const pedir = () => {
+    if (S.driveTok && S.driveTok.exp > Date.now() + 60000) return subirDrive(S.driveTok.t);
+    const tc = google.accounts.oauth2.initTokenClient({client_id:cid, scope:"https://www.googleapis.com/auth/drive.file",
+      callback:r => { if (r.error) return toast("Google no dio permiso", true); S.driveTok = {t:r.access_token, exp:Date.now() + (Number(r.expires_in) || 3000) * 1000}; subirDrive(r.access_token); },
+      error_callback:() => toast("Conexión con Google cancelada", true)});
+    tc.requestAccessToken();
+  };
+  if (window.google && google.accounts && google.accounts.oauth2) pedir();
+  else cargarGIS().then(pedir).catch(() => toast("No se pudo conectar con Google", true));
+}
+async function subirDrive(tok){
+  toast("Subiendo a Drive…");
+  const H = {Authorization:"Bearer " + tok};
+  try {
+    const data = await armarRespaldo(), body = JSON.stringify(data);
+    // Carpeta "Comic Shop · Respaldos" (la crea la primera vez)
+    const qf = encodeURIComponent("name='Comic Shop · Respaldos' and mimeType='application/vnd.google-apps.folder' and trashed=false");
+    let r = await fetch(`https://www.googleapis.com/drive/v3/files?q=${qf}&fields=files(id)&spaces=drive`, {headers:H});
+    if (!r.ok) throw new Error("Drive " + r.status);
+    let folder = ((await r.json()).files || [])[0];
+    if (!folder) {
+      r = await fetch("https://www.googleapis.com/drive/v3/files?fields=id", {method:"POST", headers:Object.assign({"Content-Type":"application/json"}, H), body:JSON.stringify({name:"Comic Shop · Respaldos", mimeType:"application/vnd.google-apps.folder"})});
+      if (!r.ok) throw new Error("Drive " + r.status); folder = await r.json();
+    }
+    r = await fetch("https://www.googleapis.com/upload/drive/v3/files?uploadType=resumable", {method:"POST", headers:Object.assign({"Content-Type":"application/json; charset=UTF-8", "X-Upload-Content-Type":"application/json"}, H), body:JSON.stringify({name:nombreRespaldo(), parents:[folder.id], mimeType:"application/json"})});
+    if (!r.ok) throw new Error("Drive " + r.status);
+    const loc = r.headers.get("Location"); if (!loc) throw new Error("Drive sin dirección de subida");
+    r = await fetch(loc, {method:"PUT", headers:{"Content-Type":"application/json"}, body});
+    if (!r.ok) throw new Error("Drive " + r.status);
+    await marcarRespaldo("drive"); toast("Respaldo subido a Drive");
+  } catch(e) { console.warn(e); if (/401/.test(e.message)) S.driveTok = null; toast("Error al subir: " + e.message, true); }
+}
+async function restaurarArchivo(f){
+  if (!perm().admin) return;
+  let data;
+  try { data = JSON.parse(await f.text()); } catch(e) { return toast("Archivo no válido", true); }
+  if (!data || data.app !== "comicshop-pedidos" || !data.colecciones) return toast("No es un respaldo de la app", true);
+  const C = data.colecciones, n = k => Object.keys(C[k] || {}).length;
+  confirmar("¿Restaurar este respaldo?", `${fmtDT(data.creado)} · ${n("pedidos")} pedidos, ${n("clientes")} clientes, ${n("fotos")} fotos y ajustes. Lo que ya existe se reemplaza con el respaldo; no se borra nada más.`, "Restaurar", async () => {
+    toast("Restaurando…");
+    const ops = [];
+    for (const k of ["config","contadores","clientes","fotos","pedidos"]) for (const [id, v] of Object.entries(C[k] || {})) ops.push([k + "/" + id, v]);
+    let b = writeBatch(S.db), peso = 0, cnt = 0;
+    for (const [path, v] of ops) {
+      const t = JSON.stringify(v).length;
+      if (cnt && (cnt >= 400 || peso + t > 8e6)) { await b.commit(); b = writeBatch(S.db); peso = 0; cnt = 0; }
+      b.set(doc(S.db, path), v); peso += t; cnt++;
+    }
+    if (cnt) await b.commit();
+    toast("Respaldo restaurado");
+  });
 }
 /* ===== Cambios del equipo (solo administrador) ===== */
 const revisarList = () => pedidosList().filter(p => p.revisar).sort((a, b) => String(b.revisarEn).localeCompare(String(a.revisarEn)));
@@ -1576,7 +1729,8 @@ function avisoRow(p, modo){
 function viewAvisos(a){
   const notifOK = "Notification" in window;
   const sec = (c, ic, t, l, modo) => `<div class="asec" style="--c:${c}"><div class="sec">${I(ic)}${t} <small>${l.length}</small></div>${l.length ? `<div class="alist">${l.map(p => avisoRow(p, modo)).join("")}</div>` : `<div class="aempty">Nada por aquí</div>`}</div>`;
-  return `<div class="hello"><h1>Avisos</h1><span class="date">${I("bell")}Entregas con ${cfg().dias} día${cfg().dias == 1 ? "" : "s"} de anticipación</span></div>
+  const rv = respaldoPendiente();
+  return `${rv ? `<button class="revbar resp" data-act="respaldo">${I("shield")}<span>${rv}</span><em>Respaldar</em></button>` : ""}<div class="hello"><h1>Avisos</h1><span class="date">${I("bell")}Entregas con ${cfg().dias} día${cfg().dias == 1 ? "" : "s"} de anticipación</span></div>
     ${notifOK && Notification.permission !== "granted" ? `<div class="card tint" style="--c:var(--t-info);flex-direction:row;align-items:center;flex-wrap:wrap;padding:12px 14px"><p class="note" style="flex:1;min-width:200px">Activa las notificaciones para recibir un aviso diario al abrir la app.</p><button class="btn primary sm" id="notifBtn">${I("bell")}Activar</button></div>` : ""}
     ${sec("var(--t-info)","msg","Por avisar al cliente", a.avisar, "avisar")}
     ${sec("var(--t-violet)","box","Avisados sin retirar", a.retiro, "retiro")}
@@ -1664,7 +1818,8 @@ function viewAjustes(){
       <div class="f"><label>Mensaje de WhatsApp cuando el pedido está listo</label><textarea class="inp" id="cPl" rows="4">${esc(c.plantilla)}</textarea></div>
       <div class="f"><label>Mensaje de WhatsApp para recordar el retiro</label><textarea class="inp" id="cPlR" rows="3">${esc(c.plantillaRetiro)}</textarea><span class="msg mut">Puedes usar: {cliente} {negocio} {codigo} {resumen} {saldo} {total} {fecha}</span></div>
       <button class="btn primary" id="cSave2" style="align-self:flex-end">${I("check")}Guardar</button>
-    </div>`;
+    </div>
+    ${respaldoCard()}`;
 }
 
 /* ---------- Eventos ---------- */
@@ -1680,6 +1835,7 @@ function bindMain(){
     if (d.filtro) { S.filtro = d.filtro; autoTab(); render(); return; }
     if (d.act === "nuevo") return nuevoPedido(d.tipo);
     if (d.act === "revisar" || d.tile === "revisar") return openRevisar();
+    if (d.act === "respaldo") return openRespaldo();
     if (d.act === "mipin") return cambiarMiPin();
     if (d.act === "cuenta") return openCuenta();
     if (d.avisar) { marcarAvisado(d.avisar); return; }
@@ -1719,6 +1875,7 @@ function bindMain(){
   const lin = $("#lin"); if (lin) lin.onkeydown = e => { if (e.key === "Enter") { e.preventDefault(); $("[data-ladd]").click(); } };
   if ($("#cSave")) {
     $("#cSave").onclick = saveCfg; if ($("#cSave2")) $("#cSave2").onclick = saveCfg;
+    bindRespaldo();
     $("#cReset").onclick = () => confirmar("¿Restaurar las listas originales?", "Se perderán las opciones que agregaste o quitaste.", "Restaurar", async () => { const r = Object.assign({}, S.cfgRaw || {}); delete r.cat; await setDoc(doc(S.db, "config/ajustes"), r); toast("Restaurado"); });
   }
   loadFotos(app);
