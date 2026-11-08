@@ -761,10 +761,17 @@ table.mx{border-collapse:collapse;width:100%;font-size:13px}
 /* v2.53 pronta entrega en amarillo */
 :root{--soon:#ca8a04}
 :root[data-theme="dark"]{--soon:#facc15}
-.pddate:not(.err):not(.ok):not(.info){background:#fff8d6;border-color:#f3dc7c}
-.pddate:not(.err):not(.ok):not(.info) .pdrel,.pddate:not(.err):not(.ok):not(.info) .pdcal small{color:#a16207}
-:root[data-theme="dark"] .pddate:not(.err):not(.ok):not(.info){background:color-mix(in srgb,var(--soon) 12%,var(--surface));border-color:color-mix(in srgb,var(--soon) 30%,var(--line))}
-:root[data-theme="dark"] .pddate:not(.err):not(.ok):not(.info) .pdrel,:root[data-theme="dark"] .pddate:not(.err):not(.ok):not(.info) .pdcal small{color:var(--soon)}
+.pddate:not(.err):not(.ok):not(.info):not(.vio){background:#fff8d6;border-color:#f3dc7c}
+.pddate:not(.err):not(.ok):not(.info):not(.vio) .pdrel,.pddate:not(.err):not(.ok):not(.info):not(.vio) .pdcal small{color:#a16207}
+:root[data-theme="dark"] .pddate:not(.err):not(.ok):not(.info):not(.vio){background:color-mix(in srgb,var(--soon) 12%,var(--surface));border-color:color-mix(in srgb,var(--soon) 30%,var(--line))}
+:root[data-theme="dark"] .pddate:not(.err):not(.ok):not(.info):not(.vio) .pdrel,:root[data-theme="dark"] .pddate:not(.err):not(.ok):not(.info):not(.vio) .pdcal small{color:var(--soon)}
+/* v2.55 Sin retirar en morado */
+.oc2-due.vio,.aday.vio{border-color:#d9c9fb;background:#f3eefe;color:var(--t-violet)}
+.pddate.vio{background:#f5f0ff;border-color:#d9c9fb}
+.pddate.vio .pdrel,.pddate.vio .pdcal small{color:var(--t-violet)}
+.pdst.vio{background:color-mix(in srgb,var(--t-violet) 12%,var(--surface));color:var(--t-violet)}
+:root[data-theme="dark"] .oc2-due.vio,:root[data-theme="dark"] .aday.vio{border-color:color-mix(in srgb,var(--t-violet) 30%,var(--line));background:color-mix(in srgb,var(--t-violet) 12%,var(--surface))}
+:root[data-theme="dark"] .pddate.vio{background:color-mix(in srgb,var(--t-violet) 12%,var(--surface));border-color:color-mix(in srgb,var(--t-violet) 30%,var(--line))}
 @media (max-width:1000px){.pill.demo .m-pr{display:inline}}
 .pill.demo.on{border-style:solid;border-color:#f59e0b;background:#fff4dc;color:#b45309}
 [data-theme="dark"] .pill.demo.on{background:#3a2a0a;color:#fbbf24}
@@ -856,7 +863,7 @@ import { initializeApp, deleteApp } from "https://www.gstatic.com/firebasejs/10.
 import { getAuth, onAuthStateChanged, signInWithEmailAndPassword, createUserWithEmailAndPassword, signOut, updatePassword, reauthenticateWithCredential, EmailAuthProvider } from "https://www.gstatic.com/firebasejs/10.12.2/firebase-auth.js";
 import { initializeFirestore, getFirestore, persistentLocalCache, persistentMultipleTabManager, doc, collection, query, where, onSnapshot, getDoc, setDoc, updateDoc, deleteDoc, writeBatch, runTransaction } from "https://www.gstatic.com/firebasejs/10.12.2/firebase-firestore.js";
 
-const VERSION = "v2.54";
+const VERSION = "v2.55";
 /* ================= Utilidades ================= */
 const $ = (s, r = document) => r.querySelector(s);
 const esc = s => String(s ?? "").replace(/[&<>"']/g, c => ({"&":"&amp;","<":"&lt;",">":"&gt;",'"':"&quot;","'":"&#39;"}[c]));
@@ -1314,7 +1321,7 @@ function totales(p){
 }
 function dueShort(p){
   if (p.estado === "entregado") return {t:"Entregado", c:"ok"};
-  if (p.estado === "listo") return p.avisado ? {t:"Avisado", c:"ok"} : {t:"Por avisar", c:"info"};
+  if (p.estado === "listo") return p.avisado ? {t:"Sin retirar", c:"vio"} : {t:"Por avisar", c:"info"};
   if (!p.fechaEntrega) return {t:"", c:""};
   const n = daysUntil(p.fechaEntrega), d = cfg().dias;
   return {t: n < 0 ? `Vencido ${-n} d` : n === 0 ? "Hoy" : n === 1 ? "Mañana" : `En ${n} días`, c: n < 0 ? "err" : n <= d ? "warn" : ""};
@@ -1436,7 +1443,7 @@ function avisoRow(p, modo){
   const right = modo === "avisar"
     ? `<a class="aw" href="${esc(waLink(p))}" target="_blank" rel="noopener" data-avisar="${esc(p._id)}" title="Avisar por WhatsApp">${I("msg")}</a><button class="ac2" data-ya="${esc(p._id)}" title="Ya le avisé">${I("check")}</button>`
     : modo === "retiro"
-    ? `<span class="aday info">avisado hace ${hace} d</span>`
+    ? `<span class="aday vio">avisado hace ${hace} d</span>`
     : `<span class="aday ${n < 0 ? "err" : "warn"}">${cuando}</span>`;
   if (modo === "retiro") return `<div class="arow rt" style="--c:${T.c}">
     <div class="rt-top" data-open="${esc(p._id)}" role="button" tabindex="0"><div class="atx"><b>${esc(p.cliente.nombre)}</b><small>${esc(p.tema || "Sin nombre de diseño")}</small></div>${right}</div>
@@ -2281,14 +2288,14 @@ function openDetail(id){
   const fd = p.fechaEntrega ? parseYmd(p.fechaEntrega) : null;
   const fecha = fd ? `${DIAS[fd.getDay()][0].toUpperCase() + DIAS[fd.getDay()].slice(1)} ${fd.getDate()} de ${MESES[fd.getMonth()]}` : "Sin fecha";
   const due = dueShort(p);
-  const estTxt = est === "pendiente" ? "En producción" : est === "listo" ? (p.avisado ? "Avisado" : "Listo") : "Entregado";
+  const estTxt = est === "pendiente" ? "En producción" : est === "listo" ? (p.avisado ? "Sin retirar" : "Listo") : "Entregado";
   const ini = (p.cliente.nombre || "?").trim().split(/\s+/).slice(0, 2).map(w => w[0]).join("").toUpperCase();
   const extra = [...servsDe(p), p.tipo === "personalizado" ? (p.prendaDe === "cliente" ? "Prenda del cliente" : p.prendaDe === "tienda" ? "Prenda de la tienda" : "") : ""].filter(Boolean);
   const ov = modal(`
     <div class="mh pdh" style="--c:${T.c}">
       <button class="pdback" data-close aria-label="Volver">${I("back")}</button>
       <div class="pdt"><small>PEDIDO ${esc(p.codigo || "")}</small><h2>${T.label.toUpperCase()}</h2></div>
-      <span class="pdst ${est}">${estTxt}</span>
+      <span class="pdst ${est}${est === "listo" && p.avisado ? " vio" : ""}">${estTxt}</span>
     </div>
     <div class="mb pdb">
       <div class="pdcard pddate ${due.c || "warn"}">
