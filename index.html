@@ -677,7 +677,7 @@ import { initializeApp, deleteApp } from "https://www.gstatic.com/firebasejs/10.
 import { getAuth, onAuthStateChanged, signInWithEmailAndPassword, createUserWithEmailAndPassword, signOut, updatePassword, reauthenticateWithCredential, EmailAuthProvider } from "https://www.gstatic.com/firebasejs/10.12.2/firebase-auth.js";
 import { initializeFirestore, getFirestore, persistentLocalCache, persistentMultipleTabManager, doc, collection, query, where, onSnapshot, getDoc, setDoc, updateDoc, deleteDoc, writeBatch } from "https://www.gstatic.com/firebasejs/10.12.2/firebase-firestore.js";
 
-const VERSION = "v2.20";
+const VERSION = "v2.21";
 /* ================= Utilidades ================= */
 const $ = (s, r = document) => r.querySelector(s);
 const esc = s => String(s ?? "").replace(/[&<>"']/g, c => ({"&":"&amp;","<":"&lt;",">":"&gt;",'"':"&quot;","'":"&#39;"}[c]));
@@ -990,7 +990,7 @@ function doRender(){
     ${nav("pedidos","list","Pedidos")}
     <button class="nav new" data-act="nuevo" aria-label="Nuevo pedido" title="Nuevo pedido"><span class="ring">${I("plus")}</span></button>
     ${nav("avisos","bell","Avisos", nAv)}
-    ${pr.admin ? `<span class="d-only">${nav("ajustes","sliders","Ajustes")}${nav("equipo","shield","Equipo")}</span><button class="nav m-only" data-view="equipo" aria-current="${S.view === "equipo" || S.view === "ajustes"}">${I("shield")}Admin</button>`
+    ${pr.admin ? `<span class="d-only">${nav("ajustes","sliders","Ajustes")}${nav("equipo","shield","Equipo")}</span><button class="nav m-only" data-view="ajustes" aria-current="${S.view === "equipo" || S.view === "ajustes"}">${I("shield")}Admin</button>`
       : `<button class="nav m-only" data-act="cuenta">${I("user")}Cuenta</button>`}
     <div class="grow"></div>
     <button class="theme" id="themeBtn" title="Cambiar tema">${I("sun","sun")}${I("moon","moon")}</button>
