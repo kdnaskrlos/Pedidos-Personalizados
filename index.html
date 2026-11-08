@@ -173,6 +173,7 @@ textarea.inp{min-height:70px;resize:vertical;font-weight:500}
 .opt{border:1px solid var(--line);background:var(--surface);border-radius:9px;padding:7px 12px;font-weight:700;font-size:13px;color:var(--ink)}
 .opt:hover{border-color:var(--ink)}
 .opt[aria-pressed="true"]{border-color:var(--accent);background:var(--accent-soft);color:var(--accent)}
+.opt.deny[aria-pressed="true"]{border-color:var(--err);background:color-mix(in srgb,var(--err) 10%,var(--surface));color:var(--err)}
 .phone{display:flex;border:1px solid var(--line);border-radius:9px;overflow:hidden;background:var(--surface-2)}
 .phone select{border:0;border-right:1px solid var(--line);background-color:var(--surface);padding:0 8px;outline:0;max-width:118px;font-weight:700}
 .phone input{border:0;outline:0;background:none;padding:9px 11px;flex:1;min-width:0;font-size:16px;font-weight:700;letter-spacing:.02em}
@@ -745,6 +746,11 @@ table.mx{border-collapse:collapse;width:100%;font-size:13px}
 .pdwho b{font-size:19px}
 .pdwa{min-height:52px;font-size:16.5px;gap:10px}
 .pdwa svg.i{width:20px;height:20px}
+/* v2.49 tarjetas: urgente solo ícono arriba a la derecha, vencido/hoy abajo a la derecha */
+.oc2-urgi{flex:none;margin-left:auto;display:grid;place-items:center;width:24px;height:24px;border-radius:99px;background:#ef1f1f;color:#fff;box-shadow:0 2px 8px rgba(239,31,31,.4);animation:urgc 1.6s ease-in-out infinite}
+.oc2-urgi svg.i{width:13px;height:13px;stroke-width:2.6}
+@media (prefers-reduced-motion:reduce){.oc2-urgi{animation:none}}
+.oc2-meta .oc2-due{margin-left:auto}
 @media (max-width:1000px){.pill.demo .m-pr{display:inline}}
 .pill.demo.on{border-style:solid;border-color:#f59e0b;background:#fff4dc;color:#b45309}
 [data-theme="dark"] .pill.demo.on{background:#3a2a0a;color:#fbbf24}
@@ -836,7 +842,7 @@ import { initializeApp, deleteApp } from "https://www.gstatic.com/firebasejs/10.
 import { getAuth, onAuthStateChanged, signInWithEmailAndPassword, createUserWithEmailAndPassword, signOut, updatePassword, reauthenticateWithCredential, EmailAuthProvider } from "https://www.gstatic.com/firebasejs/10.12.2/firebase-auth.js";
 import { initializeFirestore, getFirestore, persistentLocalCache, persistentMultipleTabManager, doc, collection, query, where, onSnapshot, getDoc, setDoc, updateDoc, deleteDoc, writeBatch, runTransaction } from "https://www.gstatic.com/firebasejs/10.12.2/firebase-firestore.js";
 
-const VERSION = "v2.48";
+const VERSION = "v2.49";
 /* ================= Utilidades ================= */
 const $ = (s, r = document) => r.querySelector(s);
 const esc = s => String(s ?? "").replace(/[&<>"']/g, c => ({"&":"&amp;","<":"&lt;",">":"&gt;",'"':"&quot;","'":"&#39;"}[c]));
@@ -1399,9 +1405,9 @@ function cardHTML(p){
   return `<div class="oc2" role="button" tabindex="0" style="--c:${T.c}" data-open="${esc(p._id)}">
     <div class="oc2-side"><span class="oc2-code">${esc(p.codigo || "")}</span>${im ? `<img class="oc2-img" data-foto="${esc(im)}" alt="">` : `<span class="oc2-img oc2-noimg">${I(T.icon)}</span>`}</div>
     <div class="oc2-main">
-      <div class="oc2-top"><b class="oc2-name">${esc(p.cliente && p.cliente.nombre)}</b>${p.urgente ? `<span class="oc2-urg">${I("alert")}Urgente</span>` : ""}${due.t ? `<span class="oc2-due ${due.c}">${esc(due.t)}</span>` : ""}</div>
+      <div class="oc2-top"><b class="oc2-name">${esc(p.cliente && p.cliente.nombre)}</b>${p.urgente ? `<span class="oc2-urgi" title="Urgente" aria-label="Urgente">${I("alert")}</span>` : ""}</div>
       <div class="oc2-items">${esc(p.tema || "Sin nombre de diseño")}</div>
-      <div class="oc2-meta">${p.servicio ? `<span class="sv">${esc(p.servicio)}</span>` : ""}<span>${t.piezas} pz</span>${(p.asignados || []).length ? `<span>${I("lock")}</span>` : ""}${t.saldo > 0 ? `<span class="saldo">Saldo ${esc(money(t.saldo, p.moneda))}</span>` : `<span class="pag">Pagado</span>`}</div>
+      <div class="oc2-meta">${p.servicio ? `<span class="sv">${esc(p.servicio)}</span>` : ""}<span>${t.piezas} pz</span>${(p.asignados || []).length || (p.denegados || []).length ? `<span>${I("lock")}</span>` : ""}${due.t ? `<span class="oc2-due ${due.c}">${esc(due.t)}</span>` : ""}</div>
     </div>
   </div>`;
 }
@@ -1478,7 +1484,7 @@ function viewEquipo(){
     </div>`;
   };
   return `<div class="hello"><h1>Equipo</h1><span class="date">${us.length} usuario${us.length === 1 ? "" : "s"}</span></div>${adminTabs()}
-    <button class="btn primary newu" id="newUser">${I("plus")}Nuevo usuario</button>
+    <button class="btn listo newu" id="newUser">${I("plus")}Nuevo usuario</button>
     <div class="ulist">${us.map(card).join("")}</div>`;
 }
 
@@ -1827,6 +1833,8 @@ function openForm(id, tipo, cliente){
   F.step = 0; F.visto = [true, false, false, false];
   const marcas = c.cat.marcas.includes(F.etiqueta) || !F.etiqueta ? c.cat.marcas : [...c.cat.marcas, F.etiqueta];
   const empleados = Object.values(S.usuarios).filter(u => u.activo && u.rol !== "admin");
+  // Pedidos antiguos con "quién puede verlo": se convierten a "acceso denegado" (los que no estaban asignados)
+  F.denegados = Array.isArray(F.denegados) ? [...F.denegados] : (F.asignados || []).length ? empleados.map(u => u.usuario).filter(u => !F.asignados.includes(u)) : [];
   const ov = modal(`
     <div class="mh"><span class="chip" style="--c:${T.c}">${I(T.icon)}</span><h2 class="up">${T.label.toUpperCase()}${orig ? ` <small>${esc(orig.codigo)}</small>` : ""}</h2><button class="ib" data-cerrar>${I("x")}</button></div>
     <div class="steps" style="--c:${T.c}">${PASOS.map(([ic, t], i) => `<button type="button" data-go="${i}"><span class="n">${i + 1}</span>${t}</button>`).join("")}</div>
@@ -1883,8 +1891,8 @@ function openForm(id, tipo, cliente){
         <div class="fsec"><div class="sec">${I("note")}Nota / información adicional</div>
           <textarea class="inp" id="in-nota" rows="3">${esc(F.nota)}</textarea>
         </div>
-        ${pr.admin ? `<div class="fsec"><div class="sec">${I("lock")}¿Quién puede verlo?</div>
-          <div class="opts">${empleados.map(u => `<button type="button" class="opt" data-asig="${esc(u.usuario)}" aria-pressed="${(F.asignados || []).includes(u.usuario)}">${esc(u.nombre)}</button>`).join("") || `<span class="note">Aún no hay personas en el equipo.</span>`}</div></div>` : ""}
+        ${pr.admin ? `<div class="fsec"><div class="sec">${I("lock")}Acceso denegado para</div>
+          <div class="opts">${empleados.map(u => `<button type="button" class="opt deny" data-deny="${esc(u.usuario)}" aria-pressed="${F.denegados.includes(u.usuario)}">${esc(u.nombre)}</button>`).join("") || `<span class="note">Aún no hay personas en el equipo.</span>`}</div></div>` : ""}
         <p class="hist">${orig ? `Registrado el ${fmtDT(orig.creadoEn)} por ${esc(nameOf(orig.creadoPor))}${orig.editadoEn ? ` · Última edición ${fmtDT(orig.editadoEn)} por ${esc(nameOf(orig.editadoPor))}` : ""}` : `Fecha de registro: ${fmtDate(ymd(new Date()))} (se guarda sola y no cambia al editar)`}</p>
       </section>
     </div>
@@ -1951,7 +1959,7 @@ function openForm(id, tipo, cliente){
     if (d.servicio !== undefined) { const k = F.servicios.indexOf(d.servicio); k >= 0 ? F.servicios.splice(k, 1) : F.servicios.push(d.servicio); F.servicios.sort((a, b) => c.cat.servicios.indexOf(a) - c.cat.servicios.indexOf(b)); F.servicio = F.servicios.join(", "); b.setAttribute("aria-pressed", k < 0); clearErr("f-servicio"); }
     if (d.prendade !== undefined) { F.prendaDe = d.prendade; single(); clearErr("f-prendade"); }
     if (d.urg !== undefined) { F.urgente = d.urg === "1"; single(); }
-    if (d.asig !== undefined) { F.asignados = F.asignados || []; const i = F.asignados.indexOf(d.asig); i >= 0 ? F.asignados.splice(i, 1) : F.asignados.push(d.asig); b.setAttribute("aria-pressed", i < 0); }
+    if (d.deny !== undefined) { const i = F.denegados.indexOf(d.deny); i >= 0 ? F.denegados.splice(i, 1) : F.denegados.push(d.deny); b.setAttribute("aria-pressed", i < 0); }
   });
   const drawFecha = () => { const s = $("#in-fecha .d", ov); if (F.fechaEntrega) { const n = daysUntil(F.fechaEntrega); s.innerHTML = esc(fmtDate(F.fechaEntrega)) + ` <span class="ph">(${n < 0 ? "hace " + (-n) + " días" : n === 0 ? "hoy" : n === 1 ? "mañana" : "en " + n + " días"})</span>`; } else s.innerHTML = `<span class="ph">Elegir en el calendario</span>`; };
   $("#in-fecha", ov).onclick = () => openCalendar(F.fechaEntrega, d => { F.fechaEntrega = d; clearErr("f-fecha"); drawFecha(); const m = $("#f-fecha .msg", ov); m.className = "msg warn"; m.textContent = daysUntil(d) < 0 ? "⚠ La fecha elegida ya pasó" : ""; });
@@ -2049,7 +2057,7 @@ function pickPopup({title, kind, options, sections, current, otro, onPick}){
 
 /* ---- Lista del pedido: cada fila con botones que abren la ventana de opciones ---- */
 const blankItem = prev => ({etiqueta: prev ? prev.etiqueta : "", prenda: prev ? prev.prenda : "", color: prev ? prev.color : "", horma: prev ? prev.horma : "", talla:"", cant:1, nombre:"", numero:""});
-const reqItem = () => F && F.tipo === "sublimacion" ? ["prenda", "talla"] : ["etiqueta", "prenda", "color", "talla"];
+const reqItem = () => F && F.tipo === "sublimacion" ? ["prenda", "talla", "horma"] : ["etiqueta", "prenda", "color", "talla", "horma"];
 const itemVacio = i => !i.etiqueta && !i.prenda && !i.color && !i.talla && !i.nombre;
 function renderItems(){
   const ov = F._ov, c = cfg().cat;
@@ -2200,7 +2208,17 @@ async function saveForm(ov, orig){
     editadoEn:now, editadoPor:S.me.usuario
   };
   const creador = orig ? orig.creadoPor : S.me.usuario;
-  if (pr.admin) { const asig = F.asignados || []; data.asignados = asig; data.publico = asig.length === 0; data.lectores = [...new Set([creador, ...asig])]; }
+  if (pr.admin) {
+    // Sin denegados: lo ven todos los que tienen permiso para ese tipo. Con denegados: se guarda la lista de quienes sí pueden verlo.
+    const den = F.denegados.filter(u => u !== creador);
+    data.denegados = den; data.asignados = [];
+    if (!den.length) { data.publico = true; data.lectores = [creador]; }
+    else {
+      const tipoK = F.tipo === "sublimacion" ? "verSublimacion" : "verPersonalizado";
+      const pueden = Object.values(S.usuarios).filter(u => u.activo && (u.rol === "admin" || (u[tipoK] === true && !u.soloAsignados)) && !den.includes(u.usuario)).map(u => u.usuario);
+      data.publico = false; data.lectores = [...new Set([creador, S.me.usuario, ...pueden])];
+    }
+  }
   const btn = $("#save", ov); btn.disabled = true;
   try {
     if (orig) await updateDoc(doc(S.db, "pedidos/" + orig._id), data);
