@@ -796,8 +796,8 @@ table.mx{border-collapse:collapse;width:100%;font-size:13px}
 /* v2.64 botones de acción alineados a la derecha */
 .uacts,.uacts.one{display:flex;justify-content:flex-end;flex-wrap:wrap;gap:8px}
 .uacts .btn{width:auto;min-height:40px}
-.credf{display:flex;justify-content:flex-end}
-.credf .btn{width:auto}
+.credf{display:grid;grid-template-columns:1fr 1fr 1.3fr}
+.credf .btn{width:100%}
 /* v2.71 Resumen: se puede desplazar, sin barra visible */
 html:has(body.fixedv){scrollbar-width:none}
 html:has(body.fixedv)::-webkit-scrollbar,body.fixedv::-webkit-scrollbar{display:none;width:0;height:0}
@@ -895,7 +895,7 @@ import { initializeApp, deleteApp } from "https://www.gstatic.com/firebasejs/10.
 import { getAuth, onAuthStateChanged, signInWithEmailAndPassword, createUserWithEmailAndPassword, signOut, updatePassword, reauthenticateWithCredential, EmailAuthProvider } from "https://www.gstatic.com/firebasejs/10.12.2/firebase-auth.js";
 import { initializeFirestore, getFirestore, persistentLocalCache, persistentMultipleTabManager, doc, collection, query, where, onSnapshot, getDoc, setDoc, updateDoc, deleteDoc, writeBatch, runTransaction } from "https://www.gstatic.com/firebasejs/10.12.2/firebase-firestore.js";
 
-const VERSION = "v2.71";
+const VERSION = "v2.72";
 /* ================= Utilidades ================= */
 const $ = (s, r = document) => r.querySelector(s);
 const esc = s => String(s ?? "").replace(/[&<>"']/g, c => ({"&":"&amp;","<":"&lt;",">":"&gt;",'"':"&quot;","'":"&#39;"}[c]));
@@ -1670,7 +1670,7 @@ function showCred(nombre, u, pin){
   const t = credText(nombre, u, pin);
   const ov = modal(`<div class="mh"><h2>Datos de acceso</h2><button class="ib" data-close>${I("x")}</button></div>
     <div class="mb"><p class="note">Envíale estos datos a ${esc(nombre)}. El PIN no se vuelve a mostrar: si lo pierde, generas uno nuevo.</p><div class="cred">${esc(t)}</div></div>
-    <div class="mf credf"><button class="btn primary" id="cs">${I("share")}Compartir</button><button class="btn" id="cc">${I("copy")}Copiar</button><button class="btn" data-close>Listo</button></div>`, "sm");
+    <div class="mf credf"><button class="btn" data-close>Listo</button><button class="btn" id="cc">${I("copy")}Copiar</button><button class="btn primary" id="cs">${I("share")}Compartir</button></div>`, "sm");
   $("#cc", ov).onclick = async () => { try { await navigator.clipboard.writeText(t); toast("Copiado"); } catch(e) { toast("Error al copiar", true); } };
   $("#cs", ov).onclick = async () => {
     // En el celular abre el menú de compartir (WhatsApp, Telegram…); si no está disponible, abre WhatsApp con el texto
