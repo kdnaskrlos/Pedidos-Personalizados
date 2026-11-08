@@ -50,6 +50,11 @@ service cloud.firestore {
       allow write: if admin();
     }
 
+    // Contadores para numerar los pedidos (P-0001, S-0001…)
+    match /contadores/{tipo} {
+      allow read, write: if activo();
+    }
+
     match /clientes/{tel} {
       allow read, write: if activo();
     }

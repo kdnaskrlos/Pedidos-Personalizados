@@ -720,6 +720,20 @@ table.mx{border-collapse:collapse;width:100%;font-size:13px}
 .irow3{background:var(--surface);border:1px solid var(--line);border-radius:16px;padding:12px;gap:8px;margin-bottom:12px;box-shadow:0 1px 2px rgba(16,24,40,.04),0 4px 14px rgba(16,24,40,.05)}
 .irow3 .pbtn,.irow3 .inp,.irow3 .qty{background:var(--surface-2)}
 .irow3 .qin{background:none}
+/* v2.32 tarjetas de pedido */
+.oc2-side{flex:none;display:flex;flex-direction:column;align-items:center;gap:4px;width:56px}
+.oc2-code{font-size:10.5px;font-weight:800;letter-spacing:0;color:var(--muted);white-space:nowrap;font-variant-numeric:tabular-nums}
+.oc2-side .oc2-img{width:52px;height:52px;border-radius:10px}
+.oc2-noimg{display:grid;place-items:center;color:var(--c);background:color-mix(in srgb,var(--c) 10%,var(--surface))!important}
+.oc2-noimg svg.i{width:22px;height:22px}
+.oc2-items{font-weight:600}
+.oc2-meta .sv{min-width:0;overflow:hidden;text-overflow:ellipsis}
+.oc2-meta .saldo,.oc2-meta .pag{margin-left:auto;flex:none;font-weight:800}
+.oc2-meta .saldo{color:var(--err)}
+.oc2-urg{display:inline-flex;align-items:center;gap:3px;background:linear-gradient(135deg,#ff3b30,#ff7a00);color:#fff;border-radius:99px;padding:3px 9px 3px 7px;box-shadow:0 2px 8px rgba(255,59,48,.4);animation:urgp 1.6s ease-in-out infinite}
+.oc2-urg svg.i{width:12px;height:12px;stroke-width:2.6}
+@keyframes urgp{50%{box-shadow:0 2px 14px rgba(255,59,48,.7)}}
+@media (prefers-reduced-motion:reduce){.oc2-urg{animation:none}}
 @media (max-width:1000px){
   .cols{grid-template-columns:minmax(0,1fr)}
   .tipotabs{display:flex}
@@ -806,9 +820,9 @@ table.mx{border-collapse:collapse;width:100%;font-size:13px}
 import { firebaseConfig } from "./config.js";
 import { initializeApp, deleteApp } from "https://www.gstatic.com/firebasejs/10.12.2/firebase-app.js";
 import { getAuth, onAuthStateChanged, signInWithEmailAndPassword, createUserWithEmailAndPassword, signOut, updatePassword, reauthenticateWithCredential, EmailAuthProvider } from "https://www.gstatic.com/firebasejs/10.12.2/firebase-auth.js";
-import { initializeFirestore, getFirestore, persistentLocalCache, persistentMultipleTabManager, doc, collection, query, where, onSnapshot, getDoc, setDoc, updateDoc, deleteDoc, writeBatch } from "https://www.gstatic.com/firebasejs/10.12.2/firebase-firestore.js";
+import { initializeFirestore, getFirestore, persistentLocalCache, persistentMultipleTabManager, doc, collection, query, where, onSnapshot, getDoc, setDoc, updateDoc, deleteDoc, writeBatch, runTransaction } from "https://www.gstatic.com/firebasejs/10.12.2/firebase-firestore.js";
 
-const VERSION = "v2.31";
+const VERSION = "v2.32";
 /* ================= Utilidades ================= */
 const $ = (s, r = document) => r.querySelector(s);
 const esc = s => String(s ?? "").replace(/[&<>"']/g, c => ({"&":"&amp;","<":"&lt;",">":"&gt;",'"':"&quot;","'":"&#39;"}[c]));
@@ -1021,6 +1035,7 @@ function startData(){
   const sub = (key, q) => add(onSnapshot(q, { includeMetadataChanges: true }, s => {
     const m = {}; s.forEach(d => m[d.id] = Object.assign({_id: d.id}, d.data())); parts[key] = m;
     S.cache = !!(s.metadata && s.metadata.fromCache); if (!S.cache) S.reintento = false; merge();
+    if (key === "todo" && !S.cache) migrarCodigos();
   }, err("pedidos-" + key)));
   const col = collection(S.db, "pedidos");
   if (pr.admin) sub("todo", col);
@@ -1240,15 +1255,45 @@ function dueShort(p){
   const n = daysUntil(p.fechaEntrega), d = cfg().dias;
   return {t: n < 0 ? `Vencido ${-n} d` : n === 0 ? "Hoy" : n === 1 ? "Mañana" : `En ${n} días`, c: n < 0 ? "err" : n <= d ? "warn" : ""};
 }
+const fmtCodigo = (tipo, n) => TIPOS[tipo].pre + "-" + String(n).padStart(4, "0");
+async function siguienteCodigo(tipo){
+  const ref = doc(S.db, "contadores/" + tipo);
+  try {
+    const n = await Promise.race([
+      runTransaction(S.db, async tx => { const s = await tx.get(ref); const n = ((s.exists() && s.data().n) || 0) + 1; tx.set(ref, {n}); return n; }),
+      new Promise((_, r) => setTimeout(() => r(new Error("sin conexión")), 8000))
+    ]);
+    return fmtCodigo(tipo, n);
+  } catch(e) {
+    console.warn("contador", e);
+    const re = new RegExp("^" + TIPOS[tipo].pre + "-(\\d{4,})$");
+    const max = Object.values(S.pedidos).reduce((m, p) => { const x = re.exec(p.codigo || ""); return x ? Math.max(m, Number(x[1])) : m; }, 0);
+    return fmtCodigo(tipo, max + 1);
+  }
+}
+// Una sola vez (administrador): numera los pedidos antiguos como P-0001, P-0002… por fecha de creación
+async function migrarCodigos(){
+  if (S.migrando || !perm().admin) return; S.migrando = true;
+  try {
+    for (const t of Object.keys(TIPOS)) {
+      const ref = doc(S.db, "contadores/" + t), s = await getDoc(ref);
+      if (s.exists()) continue;
+      const re = new RegExp("^" + TIPOS[t].pre + "-\\d{4,}$");
+      const lst = Object.values(S.pedidos).filter(p => p.tipo === t).sort((a, b) => String(a.creadoEn).localeCompare(String(b.creadoEn)));
+      const b = writeBatch(S.db); let n = 0;
+      lst.forEach(p => { n++; const c = fmtCodigo(t, n); if (p.codigo !== c && !re.test(p.codigo || "")) b.update(doc(S.db, "pedidos/" + p._id), {codigo:c}); });
+      b.set(ref, {n}); await b.commit();
+    }
+  } catch(e) { console.warn("migrar códigos", e); }
+}
 function cardHTML(p){
   const T = TIPOS[p.tipo], t = totales(p), im = (p.imagenes || [])[0], due = dueShort(p);
-  const items = (p.items || []).map(i => `${i.prenda} ${i.color} ${i.talla}${i.cant > 1 ? " ×" + i.cant : ""}`).join(", ");
   return `<div class="oc2" role="button" tabindex="0" style="--c:${T.c}" data-open="${esc(p._id)}">
-    ${im ? `<img class="oc2-img" data-foto="${esc(im)}" alt="">` : ""}
+    <div class="oc2-side"><span class="oc2-code">${esc(p.codigo || "")}</span>${im ? `<img class="oc2-img" data-foto="${esc(im)}" alt="">` : `<span class="oc2-img oc2-noimg">${I(T.icon)}</span>`}</div>
     <div class="oc2-main">
-      <div class="oc2-top"><b class="oc2-name">${esc(p.cliente && p.cliente.nombre)}</b>${p.urgente ? `<span class="oc2-urg">Urgente</span>` : ""}${due.t ? `<span class="oc2-due ${due.c}">${esc(due.t)}</span>` : ""}</div>
-      <div class="oc2-items">${esc(items)}</div>
-      <div class="oc2-meta">${p.servicio ? `<span>${esc(p.servicio)}</span>` : ""}<span>${t.piezas} pz</span>${t.saldo > 0 ? `<span class="saldo">Saldo ${esc(money(t.saldo, p.moneda))}</span>` : `<span class="pag">Pagado</span>`}${(p.asignados || []).length ? `<span>${I("lock")}</span>` : ""}</div>
+      <div class="oc2-top"><b class="oc2-name">${esc(p.cliente && p.cliente.nombre)}</b>${p.urgente ? `<span class="oc2-urg">${I("alert")}Urgente</span>` : ""}${due.t ? `<span class="oc2-due ${due.c}">${esc(due.t)}</span>` : ""}</div>
+      <div class="oc2-items">${esc(p.tema || "Sin nombre de diseño")}</div>
+      <div class="oc2-meta">${p.servicio ? `<span class="sv">${esc(p.servicio)}</span>` : ""}<span>${t.piezas} pz</span>${(p.asignados || []).length ? `<span>${I("lock")}</span>` : ""}${t.saldo > 0 ? `<span class="saldo">Saldo ${esc(money(t.saldo, p.moneda))}</span>` : `<span class="pag">Pagado</span>`}</div>
     </div>
   </div>`;
 }
@@ -2050,7 +2095,7 @@ async function saveForm(ov, orig){
     if (orig) await updateDoc(doc(S.db, "pedidos/" + orig._id), data);
     else {
       if (!pr.admin) Object.assign(data, {asignados:[], publico:true, lectores:[creador]});
-      Object.assign(data, {tipo:F.tipo, codigo:TIPOS[F.tipo].pre + "-" + ymd(new Date()).slice(2).replace(/-/g, "") + "-" + rand(3), creadoEn:now, creadoPor:creador, estado:"pendiente", avisado:false});
+      Object.assign(data, {tipo:F.tipo, codigo:await siguienteCodigo(F.tipo), creadoEn:now, creadoPor:creador, estado:"pendiente", avisado:false});
       delete data.editadoEn; delete data.editadoPor;
       await setDoc(doc(collection(S.db, "pedidos")), data);
     }
