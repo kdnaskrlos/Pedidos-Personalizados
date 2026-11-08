@@ -488,69 +488,11 @@ table.mx{border-collapse:collapse;width:100%;font-size:13px}
 .pk.np.ok{background:var(--accent);border-color:var(--accent);color:var(--accent-ink)}
 .pk.np.ok svg.i{width:24px;height:24px}
 
-/* ================= Revisión de diseño v2.15 =================
-   Una sola pieza protagonista (el número de pendientes); el resto, sobrio.
-   Espaciado en múltiplos de 4. Etiquetas en frase normal, sin mayúsculas espaciadas. */
-:root{--s1:4px;--s2:8px;--s3:12px;--s4:16px;--s5:24px;--s6:32px;--ink-2:#374151}
-:root[data-theme="dark"]{--ink-2:#c7d0db}
-.main{gap:var(--s5);padding-top:var(--s5);max-width:1280px}
-.hello2{display:flex;flex-direction:column;gap:2px}
-.hello2 h1{font-size:30px;line-height:1.15;font-weight:800;letter-spacing:-.02em;margin:0}
-.hello2 p{margin:0;font-size:14px;color:var(--muted);font-weight:500;text-transform:none}
-.hero2{display:flex;flex-wrap:wrap;align-items:stretch;gap:var(--s3);border-radius:16px;background:var(--accent-soft);padding:var(--s5)}
-.hero2-main{flex:1 1 220px;display:flex;flex-direction:column;align-items:flex-start;gap:2px;border:0;background:none;padding:0;text-align:left;color:var(--ink)}
-.hero2-v{font-size:72px;line-height:.95;font-weight:800;letter-spacing:-.04em;color:color-mix(in srgb,var(--accent) 70%,var(--ink))}
-.hero2-l{font-size:16px;font-weight:600;color:var(--ink-2)}
-.hero2-split{flex:1 1 240px;display:flex;flex-direction:column;justify-content:flex-end;gap:var(--s2)}
-.hero2-t{display:flex;align-items:center;gap:var(--s2);border:0;border-radius:10px;background:var(--surface);padding:10px var(--s3);font-weight:600;font-size:14px;color:var(--ink);text-align:left}
-.hero2-t i{width:10px;height:10px;border-radius:50%;background:var(--c);flex:none}
-.hero2-t span{flex:1}
-.hero2-t b{font-size:16px;font-weight:800}
-.hero2-t:hover{outline:1px solid color-mix(in srgb,var(--c) 45%,transparent)}
-.kpis{display:grid;grid-template-columns:repeat(3,minmax(0,1fr));gap:var(--s3)}
-.kpi{display:flex;flex-direction:column;align-items:flex-start;gap:2px;border:1px solid var(--line);border-radius:12px;background:var(--surface);padding:var(--s4);text-align:left;color:var(--ink)}
-.kpi:hover{border-color:color-mix(in srgb,var(--c) 50%,var(--line))}
-.kpi-h{display:flex;align-items:center;gap:6px;font-size:13px;font-weight:600;color:var(--ink-2)}
-.kpi-h svg.i{width:15px;height:15px;color:var(--c)}
-.kpi-v{font-size:28px;font-weight:800;line-height:1.1;margin-top:var(--s1)}
-.kpi-s{font-size:12px;color:var(--muted);font-weight:500}
-.appver{text-align:left;margin:0;opacity:1;color:var(--muted);font-size:11px}
-/* etiquetas y encabezados en frase normal */
-.sec{font-size:15px;font-weight:700;letter-spacing:0;text-transform:none;gap:var(--s2)}
-.sec svg.i{display:none}
-.sec small{font-size:13px;font-weight:600;color:var(--muted)}
-.fsec>.sec{font-size:15px}
-.f>label,.lbl{font-size:13px;text-transform:none;letter-spacing:0;font-weight:600;color:var(--ink-2)}
-.tot small,.tally thead th,.pksec{text-transform:none;letter-spacing:0;font-size:12.5px;font-weight:600}
-.colhead h2{font-size:15px;letter-spacing:0;text-transform:none;font-weight:800}
-.colhead{padding:var(--s3) var(--s4);border-radius:12px}
-.tq{text-transform:none;letter-spacing:0;font-size:14px;font-weight:600}
-/* superficies planas: sin degradados ni sombras repetidas */
-.gate{background:var(--surface-2)}
-.thalf{background:color-mix(in srgb,var(--c) 9%,var(--surface))}
-.thalf .tic{box-shadow:none}
-.pk,.pkc{box-shadow:none}
-.addfirst{box-shadow:none}
-.tile .bg{display:none}
-/* formularios: ritmo vertical de 16 */
-.fsec{gap:var(--s4);padding:var(--s4)}
-.mb{gap:var(--s3)}
-.f{gap:6px}
-/* listas */
-.oc{padding:var(--s3) var(--s4)}
-.atx small{display:flex;gap:var(--s3)}
-.atx small span{white-space:nowrap}
-
-.tipotabs button{text-transform:none;letter-spacing:0;font-size:13.5px;font-weight:700}
-.tipotabs button b{margin-left:4px}
-.atx small{flex-wrap:wrap;row-gap:0}
-
 @media (max-width:1000px){
   .cols{grid-template-columns:minmax(0,1fr)}
   .tipotabs{display:flex}
   .cols .col.off{display:none}
   .colhead .add{display:none}
-  .tipotabs~.cols .colhead{display:none}
 }
 @media (max-width:760px){
   .side{inset:auto 0 0 0;width:auto;height:auto;flex-direction:row;justify-content:space-around;padding:6px max(4px,env(safe-area-inset-right,0px)) calc(6px + env(safe-area-inset-bottom,0px)) max(4px,env(safe-area-inset-left,0px));border-right:0;border-top:1px solid var(--line)}
@@ -602,17 +544,6 @@ table.mx{border-collapse:collapse;width:100%;font-size:13px}
   .m-tabs button{padding:9px}
   .irow3 .tl{width:82px}
   .ov.popup.pick .md{max-height:86%}
-  .hello2 h1{font-size:24px}
-  .hero2{padding:var(--s4)}
-  .hero2-v{font-size:60px}
-  .kpis{grid-template-columns:repeat(3,minmax(0,1fr));gap:var(--s2)}
-  .kpi{padding:var(--s3)}
-  .kpi-h{font-size:11.5px;gap:4px}
-  .kpi-h svg.i{display:none}
-  .kpi-v{font-size:24px}
-  .kpi-s{display:none}
-  .main{gap:var(--s4)}
-  .fsec{padding:var(--s2) 0 var(--s4)}
   .ov{padding:0}
   .md{border-radius:0;height:100%;max-width:none;border:0}
   .mh,.mf{border-radius:0}
@@ -636,7 +567,7 @@ import { initializeApp, deleteApp } from "https://www.gstatic.com/firebasejs/10.
 import { getAuth, onAuthStateChanged, signInWithEmailAndPassword, createUserWithEmailAndPassword, signOut, updatePassword, reauthenticateWithCredential, EmailAuthProvider } from "https://www.gstatic.com/firebasejs/10.12.2/firebase-auth.js";
 import { initializeFirestore, getFirestore, persistentLocalCache, persistentMultipleTabManager, doc, collection, query, where, onSnapshot, getDoc, setDoc, updateDoc, deleteDoc, writeBatch } from "https://www.gstatic.com/firebasejs/10.12.2/firebase-firestore.js";
 
-const VERSION = "v2.15";
+const VERSION = "v2.16";
 /* ================= Utilidades ================= */
 const $ = (s, r = document) => r.querySelector(s);
 const esc = s => String(s ?? "").replace(/[&<>"']/g, c => ({"&":"&amp;","<":"&lt;",">":"&gt;",'"':"&quot;","'":"&#39;"}[c]));
@@ -958,9 +889,10 @@ function doRender(){
   <div class="shell">
     <div class="topbar">
       <span class="pill st ${S.online && !S.cache ? "ok" : "bad"}"><i></i>${S.online ? (S.cache ? "Sincronizando…" : "En línea") : "Sin conexión · se guardará al volver"}</span>
+      <span class="pill hide-m">${I("cal")}${DIAS[d.getDay()]} ${d.getDate()} de ${MESES[d.getMonth()]}</span>
       <span class="sp"></span>
       ${S.installEvt ? `<button class="pill" id="instBtn">${I("download")}<span class="hide-m">Instalar app</span></button>` : ""}
-      <button class="pill" id="meBtn">${I("user")}${esc((S.me.nombre || S.me.usuario).split(" ")[0])}</button>
+      <button class="pill" id="meBtn">${I("user")}${esc(S.me.nombre || S.me.usuario)}${pr.admin ? " · Admin" : ""}</button>
     </div>
     <main class="main">
       ${S.view === "avisos" ? viewAvisos(a) : S.view === "pedidos" ? viewPedidos(a, pr) : S.view === "equipo" && pr.admin ? viewEquipo() : S.view === "ajustes" && pr.admin ? viewAjustes() : viewResumen(a, pr)}
@@ -991,22 +923,21 @@ function filtrar(tipo){
   return l;
 }
 function viewResumen(a, pr){
-  const d = new Date(), hr = d.getHours();
+  const d = new Date(), h = d.getHours();
   const tipos = ["personalizado","sublimacion"].filter(t => pr.ver[t]);
+  const tile = (c, ic, lb, v, sub, act) => `<button class="tile tint" style="--c:${c}" data-tile="${act}"><span class="bg">${I(ic)}</span><span class="lb"><span class="chip sm">${I(ic)}</span>${lb}</span><span class="v num">${v}</span><span class="sub">${sub}</span></button>`;
   const pendTipo = t => pedidosList().filter(p => p.tipo === t && (p.estado || "pendiente") === "pendiente").length;
-  const mini = (c, ic, lb, v, sub, act) => `<button class="kpi" style="--c:${c}" data-tile="${act}"><span class="kpi-h">${I(ic)}${lb}</span><span class="kpi-v num">${v}</span><span class="kpi-s">${sub}</span></button>`;
   return `
-    <header class="hello2"><h1>${hr < 12 ? "Buenos días" : hr < 19 ? "Buenas tardes" : "Buenas noches"}, ${esc((S.me.nombre || S.me.usuario).split(" ")[0])}</h1><p>${DIAS[d.getDay()]} ${d.getDate()} de ${MESES[d.getMonth()]}</p></header>
-    <section class="hero2">
-      <button class="hero2-main" data-tile="pendientes"><span class="hero2-v num">${a.pend.length}</span><span class="hero2-l">${a.pend.length === 1 ? "pedido por producir" : "pedidos por producir"}</span></button>
-      ${tipos.length > 1 ? `<div class="hero2-split">${tipos.map(t => `<button class="hero2-t" style="--c:${TIPOS[t].c}" data-tile="tipo-${t}"><i></i><span>${TIPOS[t].label}</span><b class="num">${pendTipo(t)}</b></button>`).join("")}</div>` : ""}
-    </section>
-    <div class="kpis">
-      ${mini("var(--warn)","clock","Entregas pronto", a.proximos.length, `en ${cfg().dias} día${cfg().dias == 1 ? "" : "s"} o menos`, "avisos")}
-      ${mini("var(--err)","alert","Vencidos", a.vencidos.length, a.vencidos.length ? "revisar hoy" : "ninguno", "avisos")}
-      ${mini("var(--t-info)","msg","Por avisar", a.avisar.length, "pedidos listos", "avisar")}
+    <div class="hello"><h1>${h < 12 ? "Buenos días" : h < 19 ? "Buenas tardes" : "Buenas noches"}, <span>${esc((S.me.nombre || S.me.usuario).split(" ")[0])}</span></h1><span class="date">${I("cal")}${DIAS[d.getDay()]} ${d.getDate()} de ${MESES[d.getMonth()]} ${d.getFullYear()}</span></div>
+    <div class="tiles">
+      ${tile("var(--accent)","box","Pendientes", a.pend.length, "por producir", "pendientes")}
+      ${tile("var(--warn)","clock","Entregas pronto", a.proximos.length, `próximos ${cfg().dias} días`, "avisos")}
+      ${tile("var(--err)","alert","Vencidos", a.vencidos.length, a.vencidos.length ? "revisar hoy" : "todo al día", "avisos")}
+      ${tile("var(--t-info)","msg","Por avisar", a.avisar.length, "clientes con pedido listo", "avisar")}
     </div>
-    <p class="appver">Versión ${VERSION}</p>`;
+    ${tipos.length ? `<div class="sec">${I("list")}Pendientes por tipo</div>
+    <div class="tiles">${tipos.map(t => tile(TIPOS[t].c, TIPOS[t].icon, TIPOS[t].label, pendTipo(t), "ver pedidos", "tipo-" + t)).join("")}</div>` : ""}
+    <p class="appver">${esc(cfg().negocio)} · Pedidos · versión ${VERSION}</p>`;
 }
 function viewPedidos(a, pr){
   const tipos = ["personalizado","sublimacion"].filter(t => pr.ver[t]);
@@ -1021,12 +952,12 @@ function viewPedidos(a, pr){
     </section>`;
   };
   return `
-    <header class="hello2"><h1>Pedidos</h1><p>${pedidosList().length} en total</p></header>
+    <div class="hello"><h1>Pedidos</h1><span class="date">${I("list")}${pedidosList().length} pedido${pedidosList().length === 1 ? "" : "s"} en total</span></div>
     <div class="toolbar">
       <label class="search">${I("search")}<input id="q" placeholder="Buscar cliente, código o nombre en la prenda…" value="${esc(S.q)}" autocomplete="off"></label>
       <div class="seg">${fl.map(([k, t]) => `<button data-filtro="${k}" aria-pressed="${S.filtro === k}">${t}</button>`).join("")}</div>
     </div>
-    ${tipos.length > 1 ? `<div class="tipotabs">${tipos.map(t => `<button style="--c:${TIPOS[t].c}" data-tab="${t}" aria-pressed="${S.tab === t}">${TIPOS[t].label} <b class="num">${filtrar(t).length}</b></button>`).join("")}</div>` : ""}
+    ${tipos.length > 1 ? `<div class="tipotabs">${tipos.map(t => `<button style="--c:${TIPOS[t].c}" data-tab="${t}" aria-pressed="${S.tab === t}">${TIPOS[t].label.toUpperCase()} · ${filtrar(t).length}</button>`).join("")}</div>` : ""}
     <div class="cols" style="${tipos.length === 1 ? "grid-template-columns:minmax(0,1fr)" : ""}">${tipos.map(col).join("")}</div>`;
 }
 function dueTag(p){
@@ -1035,7 +966,7 @@ function dueTag(p){
   if (!p.fechaEntrega) return "";
   const n = daysUntil(p.fechaEntrega), d = cfg().dias;
   const t = n < 0 ? `Vencido hace ${-n} día${n === -1 ? "" : "s"}` : n === 0 ? "Entrega HOY" : n === 1 ? "Entrega mañana" : `En ${n} días`;
-  return `<span class="tag ${n < 0 ? "c err" : n <= d ? "c warn" : ""}" title="${esc(fmtDate(p.fechaEntrega))}">${I("cal")}${n > 1 ? `${t}, ${fmtDate(p.fechaEntrega).slice(0, -5)}` : t}</span>`;
+  return `<span class="tag ${n < 0 ? "c err" : n <= d ? "c warn" : ""}">${I("cal")}${t} · ${fmtDate(p.fechaEntrega).slice(0, -5)}</span>`;
 }
 const itemLine = i => `${i.prenda} ${i.color} ${i.talla}${i.nombre ? " — " + i.nombre : ""}${i.numero ? " #" + i.numero : ""}`;
 function grupos(p){
@@ -1070,14 +1001,14 @@ function avisoRow(p, modo){
     ? `<a class="aw" href="${esc(waLink(p))}" target="_blank" rel="noopener" data-avisar="${esc(p._id)}" title="Avisar por WhatsApp">${I("msg")}</a><button class="ac2" data-ya="${esc(p._id)}" title="Ya le avisé">${I("check")}</button>`
     : `<span class="aday ${n < 0 ? "err" : "warn"}">${cuando}</span>`;
   return `<div class="arow" style="--c:${T.c}" data-open="${esc(p._id)}" role="button" tabindex="0">
-    <div class="atx"><b>${esc(p.cliente.nombre)}</b><small><span>${esc(p.codigo)}</span><span>${t.piezas} pz</span><span>${fmtDate(p.fechaEntrega).slice(0, -5)}</span>${t.saldo > 0 ? `<span>Saldo ${esc(money(t.saldo, p.moneda))}</span>` : ""}</small></div>
+    <div class="atx"><b>${esc(p.cliente.nombre)}</b><small>${esc(p.codigo)} · ${t.piezas} pz · ${fmtDate(p.fechaEntrega).slice(0, -5)}${t.saldo > 0 ? ` · Saldo ${esc(money(t.saldo, p.moneda))}` : ""}</small></div>
     ${right}
   </div>`;
 }
 function viewAvisos(a){
   const notifOK = "Notification" in window;
   const sec = (c, ic, t, l, modo) => `<div class="asec" style="--c:${c}"><div class="sec">${I(ic)}${t} <small>${l.length}</small></div>${l.length ? `<div class="alist">${l.map(p => avisoRow(p, modo)).join("")}</div>` : `<div class="aempty">Nada por aquí</div>`}</div>`;
-  return `<header class="hello2"><h1>Avisos</h1><p>Recordatorio con ${cfg().dias} día${cfg().dias == 1 ? "" : "s"} de anticipación</p></header>
+  return `<div class="hello"><h1>Avisos</h1><span class="date">${I("bell")}Entregas con ${cfg().dias} día${cfg().dias == 1 ? "" : "s"} de anticipación</span></div>
     ${notifOK && Notification.permission !== "granted" ? `<div class="card tint" style="--c:var(--t-info);flex-direction:row;align-items:center;flex-wrap:wrap;padding:12px 14px"><p class="note" style="flex:1;min-width:200px">Activa las notificaciones para recibir un aviso diario al abrir la app.</p><button class="btn primary sm" id="notifBtn">${I("bell")}Activar</button></div>` : ""}
     ${sec("var(--t-info)","msg","Por avisar al cliente", a.avisar, "avisar")}
     ${sec("var(--err)","alert","Entregas vencidas", a.vencidos, "fecha")}
@@ -1102,7 +1033,7 @@ function notifyIfNeeded(a){
 function viewEquipo(){
   const us = Object.entries(S.usuarios).sort((a, b) => (a[1].rol === "admin" ? -1 : 1) - (b[1].rol === "admin" ? -1 : 1) || String(a[1].nombre).localeCompare(b[1].nombre));
   const tg = (uid, k, t, v) => `<label class="tg"><input type="checkbox" data-perm="${k}" data-uid="${esc(uid)}" ${v ? "checked" : ""}>${t}</label>`;
-  return `${adminTabs()}<header class="hello2"><h1>Equipo</h1><p>${us.length} usuario${us.length === 1 ? "" : "s"}</p></header>
+  return `${adminTabs()}<div class="hello"><h1>Equipo</h1><span class="date">${I("shield")}${us.length} usuario${us.length === 1 ? "" : "s"}</span></div>
     <div class="card"><div class="toolbar"><div class="sec">${I("users")}Usuarios</div><button class="btn primary" id="newUser">${I("plus")}Nuevo usuario</button></div>
       <p class="note">Tú creas el usuario y su PIN. "Solo sus asignados" hace que la persona vea únicamente los pedidos que tú le asignes o que ella misma registre. Si un pedido tiene personas asignadas, solo ellas (y tú) lo ven.</p>
       <div>${us.map(([uid, u]) => `<div class="urow"><span class="av" style="--c:${u.rol === "admin" ? "var(--accent)" : "var(--t-info)"}">${esc((u.nombre || u.usuario).slice(0,1).toUpperCase())}</span>
@@ -1119,7 +1050,7 @@ const adminTabs = () => `<div class="seg m-tabs"><button data-view="equipo" aria
 function viewAjustes(){
   const c = cfg(), k = c.cat;
   const ta = (key, label) => `<div class="f"><label>${label}</label><textarea class="inp" data-cat="${key}" style="min-height:120px">${esc(k[key].join("\n"))}</textarea></div>`;
-  return `${adminTabs()}<header class="hello2"><h1>Ajustes</h1><p>Se aplican a todo el equipo</p></header>
+  return `${adminTabs()}<div class="hello"><h1>Ajustes</h1><span class="date">${I("sliders")}Se aplican a todo el equipo</span></div>
     <div class="card">
       <div class="sec">${I("sliders")}General</div>
       <div class="g3">
@@ -1340,7 +1271,7 @@ function chooseTipo(cliente){
   const el = document.createElement("div");
   el.className = "tsplit";
   el.innerHTML = tipos.map(t => `<button class="thalf" style="--c:${TIPOS[t].c}" data-t="${t}"><span class="tic">${I(TIPOS[t].icon)}</span><b>${TIPOS[t].label.toUpperCase()}</b><span>${info[t]}</span></button>`).join("")
-    + `<div class="tq">¿Qué tipo de pedido vas a registrar?</div><button class="tclose" data-close aria-label="Cerrar">${I("x")}</button>`;
+    + `<div class="tq">¿Qué tipo de pedido es?</div><button class="tclose" data-close aria-label="Cerrar">${I("x")}</button>`;
   overlay(el);
   el.onclick = e => {
     if (e.target.closest("[data-close]")) return el.close();
