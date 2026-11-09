@@ -951,7 +951,7 @@ import { initializeApp, deleteApp } from "https://www.gstatic.com/firebasejs/10.
 import { getAuth, onAuthStateChanged, signInWithEmailAndPassword, createUserWithEmailAndPassword, signOut, updatePassword, reauthenticateWithCredential, EmailAuthProvider } from "https://www.gstatic.com/firebasejs/10.12.2/firebase-auth.js";
 import { initializeFirestore, getFirestore, persistentLocalCache, persistentMultipleTabManager, doc, collection, query, where, onSnapshot, getDoc, getDocs, setDoc, updateDoc, deleteDoc, writeBatch, runTransaction } from "https://www.gstatic.com/firebasejs/10.12.2/firebase-firestore.js";
 
-const VERSION = "v2.93";
+const VERSION = "v2.94";
 /* ================= Utilidades ================= */
 const $ = (s, r = document) => r.querySelector(s);
 const esc = s => String(s ?? "").replace(/[&<>"']/g, c => ({"&":"&amp;","<":"&lt;",">":"&gt;",'"':"&quot;","'":"&#39;"}[c]));
@@ -1023,6 +1023,7 @@ const DEF = {
   negocio: "Comic Shop", dias: 2, pais: "58",
   plantilla: "Hola {cliente} 👋, te escribimos de {negocio}.\nTu pedido {codigo} ({resumen}) ya está listo ✅\nSaldo pendiente: {saldo}\n¡Te esperamos!",
   diasRetiro: 3,
+  plantillaSaludo: "Hola {cliente} 👋, te saludamos de {negocio}. Ya estamos registrando tu pedido de {tema}. Te avisaremos por aquí cuando esté listo.",
   plantillaRetiro: "Hola {cliente} 👋, te recordamos de {negocio} que tu pedido ({resumen}) está listo para retirar desde hace unos días.\nSaldo pendiente: {saldo}\n¡Te esperamos!",
   cat: {
     servicios: ["DTF","Vinilo textil","Sublimación sencilla","Bordado","Otro"],
@@ -1118,7 +1119,7 @@ const cfg = () => {
   const r = S.cfgRaw || {}, cat = Object.assign({}, DEF.cat, r.cat || {});
   // Firestore no admite listas dentro de listas: los colores se guardan como {n, h}
   cat.colores = (cat.colores || []).map(x => Array.isArray(x) ? x : [x.n, x.h || ""]).filter(x => x[0]);
-  return {negocio:DEF.negocio, dias:(r.dias ?? DEF.dias), pais:"58", plantilla:r.plantilla || DEF.plantilla, diasRetiro:(r.diasRetiro ?? DEF.diasRetiro), plantillaRetiro:r.plantillaRetiro || DEF.plantillaRetiro, cat};
+  return {negocio:DEF.negocio, dias:(r.dias ?? DEF.dias), pais:"58", plantilla:r.plantilla || DEF.plantilla, diasRetiro:(r.diasRetiro ?? DEF.diasRetiro), plantillaRetiro:r.plantillaRetiro || DEF.plantillaRetiro, plantillaSaludo:r.plantillaSaludo || DEF.plantillaSaludo, cat};
 };
 const loginEmail = (u, k) => `${u}.${k}@comicshop-pedidos.app`;
 const pinPass = pin => "cs-" + pin;
@@ -1851,6 +1852,7 @@ function viewAjustes(){
     </div>
     <div class="card">
       <div class="sec">${I("msg")}Mensajes de WhatsApp</div>
+      <div class="f"><label>Mensaje de saludo al registrar al cliente</label><textarea class="inp" id="cPlS" rows="3">${esc(c.plantillaSaludo)}</textarea><span class="msg mut">Puedes usar: {cliente} {negocio} {tema}</span></div>
       <div class="f"><label>Mensaje de WhatsApp cuando el pedido está listo</label><textarea class="inp" id="cPl" rows="4">${esc(c.plantilla)}</textarea></div>
       <div class="f"><label>Mensaje de WhatsApp para recordar el retiro</label><textarea class="inp" id="cPlR" rows="3">${esc(c.plantillaRetiro)}</textarea><span class="msg mut">Puedes usar: {cliente} {negocio} {codigo} {resumen} {saldo} {total} {fecha}</span></div>
       <button class="btn primary" id="cSave2" style="align-self:flex-end">${I("check")}Guardar</button>
@@ -1900,9 +1902,9 @@ function bindMain(){
     catch(e) { toast("Error al guardar", true); ch.checked = !ch.checked; }
   });
   // Ajustes: conservar lo escrito y el tamaño de los cuadros de mensaje
-  const campos = {cDias:"dias", cDiasRet:"diasRetiro", cPl:"plantilla", cPlR:"plantillaRetiro"};
+  const campos = {cDias:"dias", cDiasRet:"diasRetiro", cPl:"plantilla", cPlR:"plantillaRetiro", cPlS:"plantillaSaludo"};
   for (const [id, k] of Object.entries(campos)) { const el = document.getElementById(id); if (el) el.addEventListener("input", () => { S.cdraft = Object.assign({}, S.cdraft, {[k]: el.tagName === "SELECT" ? Number(el.value) : el.value}); }); }
-  ["cPl", "cPlR"].forEach(id => {
+  ["cPl", "cPlR", "cPlS"].forEach(id => {
     const el = document.getElementById(id); if (!el) return;
     let hh = null; try { hh = (S.taH && S.taH[id]) || localStorage.getItem("cs-h-" + id); } catch(e) {}
     if (hh) el.style.height = hh;
@@ -1919,7 +1921,7 @@ function bindMain(){
 async function saveCfg(){
   const c0 = cfg().cat, cat = Object.assign({}, c0, {colores: c0.colores.map(x => ({n:x[0], h:x[1] || ""}))});
   S.cdraft = null;
-  try { await setDoc(doc(S.db, "config/ajustes"), {negocio:DEF.negocio, dias:Number($("#cDias").value), plantilla:$("#cPl").value.trim() || DEF.plantilla, diasRetiro:Number($("#cDiasRet").value), plantillaRetiro:$("#cPlR").value.trim() || DEF.plantillaRetiro, cat}); toast("Guardado"); }
+  try { await setDoc(doc(S.db, "config/ajustes"), {negocio:DEF.negocio, dias:Number($("#cDias").value), plantilla:$("#cPl").value.trim() || DEF.plantilla, diasRetiro:Number($("#cDiasRet").value), plantillaRetiro:$("#cPlR").value.trim() || DEF.plantillaRetiro, plantillaSaludo:$("#cPlS").value.trim() || DEF.plantillaSaludo, cat}); toast("Guardado"); }
   catch(e) { console.warn(e); toast("No se pudieron guardar los ajustes: " + (e.code || e.message), true); }
 }
 
@@ -2340,9 +2342,13 @@ function openForm(id, tipo, cliente, borrador){
     }
     box.classList.add("okf");
     const ex = null, otro = false;
-    const html = (r.warn ? `<span class="ti warn">${esc(r.warn)}</span>` : "") + `<a class="ti wa" href="https://wa.me/${esc(r.e164)}" target="_blank" rel="noopener">${I("msg")}Probar en WhatsApp</a>`
+    const html = (r.warn ? `<span class="ti warn">${esc(r.warn)}</span>` : "") + `<a class="ti wa" id="saludo" href="https://wa.me/${esc(r.e164)}" target="_blank" rel="noopener">${I("msg")}Enviar saludo</a>`
       + (otro ? `<div class="tiw">${I("user")}<span>Ya existe como <b>${esc(ex.nombre)}</b></span><button type="button" class="pillb" id="usarNom">Usar ese nombre</button></div>` : "");
-    // Solo se redibuja si cambió: así el primer toque en "Probar" no se pierde al salir del campo
+    // El mensaje se arma al tocar, con el nombre y el tema que haya en ese momento
+    msg.onclick = e => { const a = e.target.closest("#saludo"); if (!a) return; const c = cfg();
+      const t = c.plantillaSaludo.replace(/\{cliente\}/g, (F.cliente.nombre || "").trim().split(" ")[0]).replace(/\{negocio\}/g, c.negocio).replace(/\{tema\}/g, (F.tema || "").trim() || "tu pedido").replace(/\s+([.,])/g, "$1");
+      a.href = `https://wa.me/${r.e164}?text=${encodeURIComponent(t)}`; };
+    // Solo se redibuja si cambió: así el primer toque en el botón no se pierde al salir del campo
     if (msg._h !== html) {
       msg.innerHTML = html; msg._h = html;
       const u = $("#usarNom", ov); if (u) u.onclick = () => { F.cliente.nombre = ex.nombre; inNom.value = ex.nombre; clearErr("f-nombre"); checkTel(); };
