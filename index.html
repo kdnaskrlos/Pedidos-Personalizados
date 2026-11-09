@@ -951,7 +951,7 @@ import { initializeApp, deleteApp } from "https://www.gstatic.com/firebasejs/10.
 import { getAuth, onAuthStateChanged, signInWithEmailAndPassword, createUserWithEmailAndPassword, signOut, updatePassword, reauthenticateWithCredential, EmailAuthProvider } from "https://www.gstatic.com/firebasejs/10.12.2/firebase-auth.js";
 import { initializeFirestore, getFirestore, persistentLocalCache, persistentMultipleTabManager, doc, collection, query, where, onSnapshot, getDoc, getDocs, setDoc, updateDoc, deleteDoc, writeBatch, runTransaction } from "https://www.gstatic.com/firebasejs/10.12.2/firebase-firestore.js";
 
-const VERSION = "v2.88";
+const VERSION = "v2.89";
 /* ================= Utilidades ================= */
 const $ = (s, r = document) => r.querySelector(s);
 const esc = s => String(s ?? "").replace(/[&<>"']/g, c => ({"&":"&amp;","<":"&lt;",">":"&gt;",'"':"&quot;","'":"&#39;"}[c]));
@@ -2609,13 +2609,13 @@ async function saveForm(ov, orig){
   const creador = orig ? orig.creadoPor : S.me.usuario;
   if (pr.admin) {
     // Sin denegados: lo ven todos los que tienen permiso para ese tipo. Con denegados: se guarda la lista de quienes sí pueden verlo.
-    const den = F.denegados.filter(u => u !== creador);
+    const den = F.denegados.filter(u => u !== S.me.usuario); // se le puede negar incluso a quien lo registró
     data.denegados = den; data.asignados = [];
-    if (!den.length) { data.publico = true; data.lectores = [creador]; }
+    if (!den.length) { data.publico = true; data.lectores = [creador]; } // al desmarcar todos, vuelve a verse como antes
     else {
       const tipoK = F.tipo === "sublimacion" ? "verSublimacion" : "verPersonalizado";
       const pueden = Object.values(S.usuarios).filter(u => u.activo && (u.rol === "admin" || (u[tipoK] === true && !u.soloAsignados)) && !den.includes(u.usuario)).map(u => u.usuario);
-      data.publico = false; data.lectores = [...new Set([creador, S.me.usuario, ...pueden])];
+      data.publico = false; data.lectores = [...new Set([...(den.includes(creador) ? [] : [creador]), S.me.usuario, ...pueden])];
     }
   }
   if (orig && !pr.admin) {
