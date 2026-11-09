@@ -990,7 +990,7 @@ import { initializeApp, deleteApp } from "https://www.gstatic.com/firebasejs/10.
 import { getAuth, onAuthStateChanged, signInWithEmailAndPassword, createUserWithEmailAndPassword, signOut, updatePassword, reauthenticateWithCredential, EmailAuthProvider } from "https://www.gstatic.com/firebasejs/10.12.2/firebase-auth.js";
 import { initializeFirestore, getFirestore, persistentLocalCache, persistentMultipleTabManager, doc, collection, query, where, onSnapshot, getDoc, getDocs, setDoc, updateDoc, deleteDoc, writeBatch, runTransaction } from "https://www.gstatic.com/firebasejs/10.12.2/firebase-firestore.js";
 
-const VERSION = "v3.6";
+const VERSION = "v3.7";
 /* ================= Utilidades ================= */
 const $ = (s, r = document) => r.querySelector(s);
 const esc = s => String(s ?? "").replace(/[&<>"']/g, c => ({"&":"&amp;","<":"&lt;",">":"&gt;",'"':"&quot;","'":"&#39;"}[c]));
@@ -1428,6 +1428,8 @@ function filtrar(tipo){
   return l;
 }
 /* ===== Avisos informativos (los crea el administrador) ===== */
+const DUR_AV = [[1,"1 hora"],[3,"3 horas"],[6,"6 horas"],[12,"12 horas"],[24,"1 día"],[48,"2 días"],[72,"3 días"],[168,"1 semana"],[0,"Sin límite"]];
+const durDe = a => a && a.duracion !== undefined && a.duracion !== null ? Number(a.duracion) : (Number(cfg().duracionAvisos) || 24);
 const anVigente = a => a.activo && (!a.hasta || new Date(a.hasta).getTime() > Date.now());
 function anunciosHTML(){
   const adm = perm().admin;
@@ -1451,13 +1453,20 @@ function editarAnuncio(id){
     return;
   }
   const ov = modal(`<div class="mh"><h2>${a ? "Editar aviso" : "Crear aviso"}</h2><button class="ib" data-close>${I("x")}</button></div>
-    <div class="mb"><div class="f"><label>Mensaje</label><textarea class="inp" id="anT" rows="3" maxlength="240" placeholder="Ej.: Mañana el taller abre a las 10 am">${esc(a ? a.texto : "")}</textarea></div></div>
+    <div class="mb"><div class="f"><label>Mensaje</label><textarea class="inp" id="anT" rows="3" maxlength="240" placeholder="Ej.: Mañana el taller abre a las 10 am">${esc(a ? a.texto : "")}</textarea></div>
+      <div class="f"><label>Mostrar al equipo durante</label><select class="inp" id="anD">${DUR_AV.map(([v, t]) => `<option value="${v}" ${v == durDe(a) ? "selected" : ""}>${t}</option>`).join("")}</select></div></div>
     <div class="mf">${a ? `<button class="btn danger" id="anDel">${I("trash")}Eliminar</button>` : ""}<button class="btn primary" id="anOk">${I("check")}Guardar</button></div>`, "sm pop");
   $("#anOk", ov).onclick = async () => {
     const t = $("#anT", ov).value.trim(); if (!t) return toast("Escribe el mensaje", true);
+    const dur = Number($("#anD", ov).value) || 0;
     try {
-      if (a) await updateDoc(doc(S.db, "anuncios/" + id), {texto:t});
-      else await setDoc(doc(collection(S.db, "anuncios")), {texto:t, activo:false, hasta:null, creadoEn:new Date().toISOString(), creadoPor:S.me.usuario});
+      if (a) {
+        const upd = {texto:t, duracion:dur};
+        // Si ya está visible y cambias el tiempo, se cuenta de nuevo desde ahora
+        if (anVigente(a) && dur !== durDe(a)) upd.hasta = dur ? new Date(Date.now() + dur * 3600000).toISOString() : null;
+        await updateDoc(doc(S.db, "anuncios/" + id), upd);
+      }
+      else await setDoc(doc(collection(S.db, "anuncios")), {texto:t, duracion:dur, activo:false, hasta:null, creadoEn:new Date().toISOString(), creadoPor:S.me.usuario});
       ov.close(); toast("Guardado");
     } catch(e) { console.warn(e); toast(/permission/i.test(String(e.code || e.message)) ? "Falta publicar las reglas nuevas de Firebase" : "Error al guardar", true); }
   };
@@ -1465,7 +1474,7 @@ function editarAnuncio(id){
 }
 async function alternarAnuncio(id){
   const a = (S.anuncios || {})[id]; if (!a || !perm().admin) return;
-  const h = Number(cfg().duracionAvisos) || 0;
+  const h = durDe(a);
   const data = anVigente(a) ? {activo:false} : {activo:true, hasta:h ? new Date(Date.now() + h * 3600000).toISOString() : null};
   try { await updateDoc(doc(S.db, "anuncios/" + id), data); toast(data.activo ? "Visible para el equipo" : "Oculto"); } catch(e) { toast("Error al guardar", true); }
 }
@@ -1836,8 +1845,8 @@ function toggleDemo(){
   confirmar("Activar modo prueba", `Se agregarán ${lst.length} pedidos de ejemplo (urgentes, vencidos, próximos, por avisar, avisados, entregados y algunos editados por el equipo). Para quitarlos, toca otra vez la píldora.`, "Cargar ejemplos", async () => {
     const b = writeBatch(S.db); lst.forEach(p => b.set(doc(collection(S.db, "pedidos")), p));
     // Un aviso informativo de ejemplo, ya activo, para ver la animación en Resumen
-    const ahora = new Date().toISOString(), hh = Number(cfg().duracionAvisos) || 24;
-    b.set(doc(collection(S.db, "anuncios")), {texto:"Aviso de prueba: mañana el taller abre a las 10 am", activo:true, hasta:new Date(Date.now() + hh * 3600000).toISOString(), creadoEn:ahora, creadoPor:S.me.usuario, demo:true});
+    const ahora = new Date().toISOString(), hh = 24;
+    b.set(doc(collection(S.db, "anuncios")), {texto:"Aviso de prueba: mañana el taller abre a las 10 am", activo:true, duracion:hh, hasta:new Date(Date.now() + hh * 3600000).toISOString(), creadoEn:ahora, creadoPor:S.me.usuario, demo:true});
     await b.commit(); toast("Pedidos cargados");
   });
 }
@@ -1942,7 +1951,6 @@ function viewAjustes(){
       <div class="g3">
         <div class="f"><label>Avisar entregas con anticipación de</label><select class="inp" id="cDias">${[0,1,2,3,4,5,7,10,14].map(n => `<option value="${n}" ${n == c.dias ? "selected" : ""}>${n === 0 ? "Solo el mismo día" : n + " día" + (n > 1 ? "s" : "")}</option>`).join("")}</select></div>
         <div class="f"><label>Avisar si un pedido avisado no se retira en</label><select class="inp" id="cDiasRet">${[1,2,3,4,5,7,10,15,30].map(n => `<option value="${n}" ${n == c.diasRetiro ? "selected" : ""}>${n} día${n > 1 ? "s" : ""}</option>`).join("")}</select></div>
-        <div class="f"><label>Los avisos informativos se muestran durante</label><select class="inp" id="cDurAv">${[[1,"1 hora"],[3,"3 horas"],[6,"6 horas"],[12,"12 horas"],[24,"1 día"],[48,"2 días"],[72,"3 días"],[168,"1 semana"],[0,"Sin límite"]].map(([v, t]) => `<option value="${v}" ${v == c.duracionAvisos ? "selected" : ""}>${t}</option>`).join("")}</select></div>
       </div>
       <button class="btn primary" id="cSave" style="align-self:flex-end">${I("check")}Guardar</button>
     </div>
@@ -2005,7 +2013,7 @@ function bindMain(){
     catch(e) { toast("Error al guardar", true); ch.checked = !ch.checked; }
   });
   // Ajustes: conservar lo escrito y el tamaño de los cuadros de mensaje
-  const campos = {cDias:"dias", cDiasRet:"diasRetiro", cDurAv:"duracionAvisos", cPl:"plantilla", cPlR:"plantillaRetiro", cPlS:"plantillaSaludo"};
+  const campos = {cDias:"dias", cDiasRet:"diasRetiro", cPl:"plantilla", cPlR:"plantillaRetiro", cPlS:"plantillaSaludo"};
   for (const [id, k] of Object.entries(campos)) { const el = document.getElementById(id); if (el) el.addEventListener("input", () => { S.cdraft = Object.assign({}, S.cdraft, {[k]: el.tagName === "SELECT" ? Number(el.value) : el.value}); }); }
   ["cPl", "cPlR", "cPlS"].forEach(id => {
     const el = document.getElementById(id); if (!el) return;
@@ -2025,7 +2033,7 @@ function bindMain(){
 async function saveCfg(){
   const c0 = cfg().cat, cat = Object.assign({}, c0, {colores: c0.colores.map(x => ({n:x[0], h:x[1] || ""}))});
   S.cdraft = null;
-  try { await setDoc(doc(S.db, "config/ajustes"), {negocio:DEF.negocio, dias:Number($("#cDias").value), plantilla:$("#cPl").value.trim() || DEF.plantilla, diasRetiro:Number($("#cDiasRet").value), duracionAvisos:Number($("#cDurAv").value), plantillaRetiro:$("#cPlR").value.trim() || DEF.plantillaRetiro, plantillaSaludo:$("#cPlS").value.trim() || DEF.plantillaSaludo, cat}); toast("Guardado"); }
+  try { await setDoc(doc(S.db, "config/ajustes"), {negocio:DEF.negocio, dias:Number($("#cDias").value), plantilla:$("#cPl").value.trim() || DEF.plantilla, diasRetiro:Number($("#cDiasRet").value), plantillaRetiro:$("#cPlR").value.trim() || DEF.plantillaRetiro, plantillaSaludo:$("#cPlS").value.trim() || DEF.plantillaSaludo, cat}); toast("Guardado"); }
   catch(e) { console.warn(e); toast("No se pudieron guardar los ajustes: " + (e.code || e.message), true); }
 }
 
