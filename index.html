@@ -850,6 +850,7 @@ body.fixedv{scrollbar-width:none}
 .rdrive{display:flex;flex-direction:column;gap:8px}
 .revbar.resp{border-color:color-mix(in srgb,var(--t-info) 25%,var(--line));background:color-mix(in srgb,var(--t-info) 7%,var(--surface))}
 .revbar.resp svg.i,.revbar.resp em{color:var(--t-info)}
+.pdtema{font-size:21px;font-weight:800;letter-spacing:-.01em;line-height:1.2;color:var(--ink)}
 @media (max-width:1000px){.hello{padding-bottom:8px;margin-top:-6px}.hello h1{font-size:25px}}
 @media (max-width:1000px){.tiles.t5>:last-child{grid-column:1/-1}}
 @media (max-width:1000px){.pill.demo .m-pr{display:inline}}
@@ -943,7 +944,7 @@ import { initializeApp, deleteApp } from "https://www.gstatic.com/firebasejs/10.
 import { getAuth, onAuthStateChanged, signInWithEmailAndPassword, createUserWithEmailAndPassword, signOut, updatePassword, reauthenticateWithCredential, EmailAuthProvider } from "https://www.gstatic.com/firebasejs/10.12.2/firebase-auth.js";
 import { initializeFirestore, getFirestore, persistentLocalCache, persistentMultipleTabManager, doc, collection, query, where, onSnapshot, getDoc, getDocs, setDoc, updateDoc, deleteDoc, writeBatch, runTransaction } from "https://www.gstatic.com/firebasejs/10.12.2/firebase-firestore.js";
 
-const VERSION = "v2.86";
+const VERSION = "v2.87";
 /* ================= Utilidades ================= */
 const $ = (s, r = document) => r.querySelector(s);
 const esc = s => String(s ?? "").replace(/[&<>"']/g, c => ({"&":"&amp;","<":"&lt;",">":"&gt;",'"':"&quot;","'":"&#39;"}[c]));
@@ -2658,7 +2659,7 @@ function openDetail(id){
         <a class="pdwa" href="https://wa.me/${esc(p.cliente.telefono)}" target="_blank" rel="noopener">${I("msg")}${esc(prettyPhone(p.cliente.telefono))}</a>
       </div>
       <div class="pdcard">
-        <div class="pdlbl">DISEÑO: ${esc((p.tema || "Sin tema").toUpperCase())}</div>
+        <div class="pdtema">${esc(p.tema || "Sin nombre de diseño")}</div>
         ${extra.length ? `<div class="pdextra">${extra.map(x => `<span>${esc(x)}</span>`).join("")}</div>` : ""}
         <hr>
         <div class="pdrow"><span class="pdlbl">PRENDAS</span><span class="pdmut">${t.piezas} ${t.piezas === 1 ? "pieza" : "piezas"}</span></div>
