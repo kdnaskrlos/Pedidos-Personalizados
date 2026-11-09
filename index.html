@@ -951,7 +951,7 @@ import { initializeApp, deleteApp } from "https://www.gstatic.com/firebasejs/10.
 import { getAuth, onAuthStateChanged, signInWithEmailAndPassword, createUserWithEmailAndPassword, signOut, updatePassword, reauthenticateWithCredential, EmailAuthProvider } from "https://www.gstatic.com/firebasejs/10.12.2/firebase-auth.js";
 import { initializeFirestore, getFirestore, persistentLocalCache, persistentMultipleTabManager, doc, collection, query, where, onSnapshot, getDoc, getDocs, setDoc, updateDoc, deleteDoc, writeBatch, runTransaction } from "https://www.gstatic.com/firebasejs/10.12.2/firebase-firestore.js";
 
-const VERSION = "v2.94";
+const VERSION = "v2.95";
 /* ================= Utilidades ================= */
 const $ = (s, r = document) => r.querySelector(s);
 const esc = s => String(s ?? "").replace(/[&<>"']/g, c => ({"&":"&amp;","<":"&lt;",">":"&gt;",'"':"&quot;","'":"&#39;"}[c]));
@@ -1151,8 +1151,26 @@ function boot(){
   addEventListener("online", () => { S.online = true; render(); });
   addEventListener("offline", () => { S.online = false; render(); });
   addEventListener("beforeinstallprompt", e => { e.preventDefault(); S.installEvt = e; render(); });
-  if ("serviceWorker" in navigator && location.protocol === "https:") navigator.serviceWorker.register("sw.js").catch(() => {});
+  if ("serviceWorker" in navigator && location.protocol === "https:") actualizacionSilenciosa();
   setInterval(() => { const d = ymd(new Date()); if (d !== S._day) { S._day = d; render(); } }, 60000); S._day = ymd(new Date());
+}
+// Si hay una versión nueva, se instala sola y la app se recarga sin avisar cuando no estás en medio de algo
+function actualizacionSilenciosa(){
+  let pendiente = false;
+  const ocupado = () => !!(F || document.querySelector(".ov,.md,.lbx") || (document.activeElement && /INPUT|TEXTAREA|SELECT/.test(document.activeElement.tagName)));
+  const recargar = () => { if (ocupado()) { pendiente = true; return; } location.reload(); };
+  const habia = !!navigator.serviceWorker.controller;
+  navigator.serviceWorker.addEventListener("controllerchange", () => { if (habia) recargar(); });
+  navigator.serviceWorker.register("sw.js").then(reg => {
+    const buscar = () => reg.update().catch(() => {});
+    document.addEventListener("visibilitychange", () => {
+      if (document.visibilityState !== "visible") return;
+      if (pendiente) { pendiente = false; return recargar(); }
+      buscar();
+    });
+    setInterval(buscar, 30 * 60000);
+  }).catch(() => {});
+  setInterval(() => { if (pendiente && !ocupado()) location.reload(); }, 5000);
 }
 function route(){
   if (S.sistema === undefined) return;
@@ -1335,7 +1353,6 @@ function doRender(){
   scrollTo(0, sc);
   if (focusId) { const el = document.getElementById(focusId); if (el && el.tagName === "INPUT") { el.focus(); try { el.setSelectionRange(el.value.length, el.value.length); } catch(e) {} } }
   bindMain();
-  notifyIfNeeded(a);
 }
 
 /* ---------- Pedidos ---------- */
@@ -1764,31 +1781,14 @@ function avisoRow(p, modo){
   </div>`;
 }
 function viewAvisos(a){
-  const notifOK = "Notification" in window;
   const sec = (c, ic, t, l, modo) => `<div class="asec" style="--c:${c}"><div class="sec">${I(ic)}${t} <small>${l.length}</small></div>${l.length ? `<div class="alist">${l.map(p => avisoRow(p, modo)).join("")}</div>` : `<div class="aempty">Nada por aquí</div>`}</div>`;
   const rv = respaldoPendiente();
   return `${rv ? `<button class="revbar resp" data-act="respaldo">${I("shield")}<span>${rv}</span><em>Respaldar</em></button>` : ""}<div class="hello"><h1>Avisos</h1><span class="date">${I("bell")}Entregas con ${cfg().dias} día${cfg().dias == 1 ? "" : "s"} de anticipación</span></div>
-    ${notifOK && Notification.permission !== "granted" ? `<div class="card tint" style="--c:var(--t-info);flex-direction:row;align-items:center;flex-wrap:wrap;padding:12px 14px"><p class="note" style="flex:1;min-width:200px">Activa las notificaciones para recibir un aviso diario al abrir la app.</p><button class="btn primary sm" id="notifBtn">${I("bell")}Activar</button></div>` : ""}
     ${sec("var(--t-info)","msg","Por avisar al cliente", a.avisar, "avisar")}
     ${sec("var(--t-violet)","box","Avisados sin retirar", a.retiro, "retiro")}
     ${sec("var(--err)","alert","Entregas vencidas", a.vencidos, "fecha")}
     ${sec("var(--soon)","clock","Se entregan pronto", a.proximos, "fecha")}`;
 }
-function notifyIfNeeded(a){
-  try {
-    if (!("Notification" in window) || Notification.permission !== "granted") return;
-    const n = a.vencidos.length + a.proximos.length + a.avisar.length + a.retiro.length;
-    if (!n) return;
-    const key = "cs-notif-" + ymd(new Date());
-    if (localStorage.getItem(key)) return;
-    localStorage.setItem(key, "1");
-    const body = [a.vencidos.length && `${a.vencidos.length} vencido(s)`, a.proximos.length && `${a.proximos.length} entrega(s) próximas`, a.avisar.length && `${a.avisar.length} cliente(s) por avisar`, a.retiro.length && `${a.retiro.length} avisado(s) sin retirar`].filter(Boolean).join(" · ");
-    const opts = {body, icon:"icono-192.png", tag:"cs-avisos"};
-    if (navigator.serviceWorker && navigator.serviceWorker.controller) navigator.serviceWorker.ready.then(r => r.showNotification("Comic Shop · Pedidos", opts));
-    else new Notification("Comic Shop · Pedidos", opts);
-  } catch(e) {}
-}
-
 /* ---------- Equipo (admin) ---------- */
 function viewEquipo(){
   const us = Object.entries(S.usuarios).sort((a, b) => (a[1].rol === "admin" ? -1 : 1) - (b[1].rol === "admin" ? -1 : 1) || String(a[1].nombre).localeCompare(b[1].nombre));
@@ -1895,7 +1895,6 @@ function bindMain(){
   $("#meBtn").onclick = openCuenta;
   if ($("#demoBtn")) $("#demoBtn").onclick = toggleDemo;
   if ($("#instBtn")) $("#instBtn").onclick = async () => { S.installEvt.prompt(); await S.installEvt.userChoice; S.installEvt = null; render(); };
-  if ($("#notifBtn")) $("#notifBtn").onclick = async () => { const r = await Notification.requestPermission(); toast(r === "granted" ? "Notificaciones activas" : "Notificaciones no activadas", r !== "granted"); render(); };
   if ($("#newUser")) $("#newUser").onclick = nuevoUsuario;
   app.querySelectorAll("[data-perm]").forEach(ch => ch.onchange = async () => {
     try { await updateDoc(doc(S.db, "usuarios/" + ch.dataset.uid), {[ch.dataset.perm]: ch.checked}); toast("Permiso guardado"); }
