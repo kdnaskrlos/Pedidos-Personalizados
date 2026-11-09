@@ -81,8 +81,12 @@ service cloud.firestore {
             && request.resource.data.creadoPor == resource.data.creadoPor
             && request.resource.data.codigo == resource.data.codigo
             && request.resource.data.tipo == resource.data.tipo
-            && request.resource.data.lectores == resource.data.lectores
-            && request.resource.data.publico == resource.data.publico);
+            && ((request.resource.data.lectores == resource.data.lectores
+                 && request.resource.data.publico == resource.data.publico)
+                // "Bloquear pedidos": quien lo creó puede decidir qué empleados no lo ven
+                || (me().bloquear == true
+                    && resource.data.creadoPor == me().usuario
+                    && me().usuario in request.resource.data.lectores)));
       allow delete: if admin() || (puedeVer(resource.data) && me().eliminar == true);
     }
   }
