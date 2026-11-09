@@ -988,7 +988,7 @@ import { initializeApp, deleteApp } from "https://www.gstatic.com/firebasejs/10.
 import { getAuth, onAuthStateChanged, signInWithEmailAndPassword, createUserWithEmailAndPassword, signOut, updatePassword, reauthenticateWithCredential, EmailAuthProvider } from "https://www.gstatic.com/firebasejs/10.12.2/firebase-auth.js";
 import { initializeFirestore, getFirestore, persistentLocalCache, persistentMultipleTabManager, doc, collection, query, where, onSnapshot, getDoc, getDocs, setDoc, updateDoc, deleteDoc, writeBatch, runTransaction } from "https://www.gstatic.com/firebasejs/10.12.2/firebase-firestore.js";
 
-const VERSION = "v3.3";
+const VERSION = "v3.4";
 /* ================= Utilidades ================= */
 const $ = (s, r = document) => r.querySelector(s);
 const esc = s => String(s ?? "").replace(/[&<>"']/g, c => ({"&":"&amp;","<":"&lt;",">":"&gt;",'"':"&quot;","'":"&#39;"}[c]));
@@ -1821,12 +1821,18 @@ function toggleDemo(){
   if (hayDemo()) {
     const ids = Object.values(S.pedidos).filter(p => p.demo).map(p => p._id);
     return confirmar("Quitar modo prueba", `Se borrarán los ${ids.length} pedidos de ejemplo. Tus pedidos reales no se tocan.`, "Quitar ejemplos", async () => {
-      const b = writeBatch(S.db); ids.forEach(id => b.delete(doc(S.db, "pedidos/" + id))); await b.commit(); toast("Ejemplos quitados");
+      const b = writeBatch(S.db); ids.forEach(id => b.delete(doc(S.db, "pedidos/" + id)));
+      Object.values(S.anuncios || {}).filter(x => x.demo).forEach(x => b.delete(doc(S.db, "anuncios/" + x._id)));
+      await b.commit(); toast("Ejemplos quitados");
     });
   }
   const lst = demoPedidos();
   confirmar("Activar modo prueba", `Se agregarán ${lst.length} pedidos de ejemplo (urgentes, vencidos, próximos, por avisar, avisados, entregados y algunos editados por el equipo). Para quitarlos, toca otra vez la píldora.`, "Cargar ejemplos", async () => {
-    const b = writeBatch(S.db); lst.forEach(p => b.set(doc(collection(S.db, "pedidos")), p)); await b.commit(); toast("Pedidos cargados");
+    const b = writeBatch(S.db); lst.forEach(p => b.set(doc(collection(S.db, "pedidos")), p));
+    // Un aviso informativo de ejemplo, ya activo, para ver la animación en Resumen
+    const ahora = new Date().toISOString(), hh = Number(cfg().duracionAvisos) || 24;
+    b.set(doc(collection(S.db, "anuncios")), {texto:"Aviso de prueba: mañana el taller abre a las 10 am", activo:true, hasta:new Date(Date.now() + hh * 3600000).toISOString(), creadoEn:ahora, creadoPor:S.me.usuario, demo:true});
+    await b.commit(); toast("Pedidos cargados");
   });
 }
 function cardHTML(p){
