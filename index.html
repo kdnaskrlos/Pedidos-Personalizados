@@ -982,7 +982,7 @@ import { initializeApp, deleteApp } from "https://www.gstatic.com/firebasejs/10.
 import { getAuth, onAuthStateChanged, signInWithEmailAndPassword, createUserWithEmailAndPassword, signOut, updatePassword, reauthenticateWithCredential, EmailAuthProvider } from "https://www.gstatic.com/firebasejs/10.12.2/firebase-auth.js";
 import { initializeFirestore, getFirestore, persistentLocalCache, persistentMultipleTabManager, doc, collection, query, where, onSnapshot, getDoc, getDocs, setDoc, updateDoc, deleteDoc, writeBatch, runTransaction } from "https://www.gstatic.com/firebasejs/10.12.2/firebase-firestore.js";
 
-const VERSION = "v3.0";
+const VERSION = "v3.1";
 /* ================= Utilidades ================= */
 const $ = (s, r = document) => r.querySelector(s);
 const esc = s => String(s ?? "").replace(/[&<>"']/g, c => ({"&":"&amp;","<":"&lt;",">":"&gt;",'"':"&quot;","'":"&#39;"}[c]));
@@ -1423,7 +1423,7 @@ function anunciosHTML(){
   const queda = a => { if (!a.hasta || !anVigente(a)) return ""; const m = Math.round((new Date(a.hasta) - Date.now()) / 60000); return m >= 1440 ? `${Math.round(m / 1440)} d` : m >= 60 ? `${Math.round(m / 60)} h` : `${Math.max(1, m)} min`; };
   return (l.length || adm) ? `<div class="anlist">${l.map(a => `<div class="revbar anun ${anVigente(a) ? "on" : "off"}">
       <button type="button" class="antx" data-anver="${esc(a._id)}">${I("alert")}<span>${esc(a.texto)}</span></button>
-      ${adm ? `${queda(a) ? `<small class="anq">${queda(a)}</small>` : ""}<button type="button" class="anchk" data-anon="${esc(a._id)}" aria-pressed="${anVigente(a)}" title="${anVigente(a) ? "Visible para el equipo" : "Mostrar al equipo"}">${I("check")}</button>` : ""}
+      ${adm ? `<button type="button" class="anchk" data-anon="${esc(a._id)}" aria-pressed="${anVigente(a)}" title="${anVigente(a) ? "Visible para el equipo" : "Mostrar al equipo"}">${I("check")}</button>` : ""}
     </div>`).join("")}${adm ? `<button type="button" class="revbar ancrear" data-act="anuncio">${I("plus")}<span>Crear aviso</span></button>` : ""}</div>` : "";
 }
 function editarAnuncio(id){
