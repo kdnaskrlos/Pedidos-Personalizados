@@ -951,7 +951,7 @@ import { initializeApp, deleteApp } from "https://www.gstatic.com/firebasejs/10.
 import { getAuth, onAuthStateChanged, signInWithEmailAndPassword, createUserWithEmailAndPassword, signOut, updatePassword, reauthenticateWithCredential, EmailAuthProvider } from "https://www.gstatic.com/firebasejs/10.12.2/firebase-auth.js";
 import { initializeFirestore, getFirestore, persistentLocalCache, persistentMultipleTabManager, doc, collection, query, where, onSnapshot, getDoc, getDocs, setDoc, updateDoc, deleteDoc, writeBatch, runTransaction } from "https://www.gstatic.com/firebasejs/10.12.2/firebase-firestore.js";
 
-const VERSION = "v2.89";
+const VERSION = "v2.90";
 /* ================= Utilidades ================= */
 const $ = (s, r = document) => r.querySelector(s);
 const esc = s => String(s ?? "").replace(/[&<>"']/g, c => ({"&":"&amp;","<":"&lt;",">":"&gt;",'"':"&quot;","'":"&#39;"}[c]));
@@ -1191,7 +1191,6 @@ function startData(){
   if (perm().admin) add(onSnapshot(doc(S.db, "respaldos/estado"), s => { S.resp = s.exists() ? s.data() : null; render(); }, e => console.warn("respaldo", e)));
   add(onSnapshot(doc(S.db, "config/ajustes"), s => { S.cfgRaw = s.exists() ? s.data() : null; render(); }, err("ajustes")));
   add(onSnapshot(collection(S.db, "usuarios"), s => { const o = {}; s.forEach(d => o[d.id] = d.data()); S.usuarios = o; render(); }, err("usuarios")));
-  add(onSnapshot(collection(S.db, "clientes"), s => { const o = {}; s.forEach(d => o[d.id] = d.data()); S.clientes = o; }, err("clientes")));
   const pr = perm();
   const parts = {};
   const merge = () => { const all = {}; Object.values(parts).forEach(m => Object.assign(all, m)); Object.keys(BORRAR).forEach(id => delete all[id]); S.pedidos = all; render(); };
@@ -1406,7 +1405,7 @@ function bindRespaldo(){
 }
 function openRespaldo(){
   const ov = modal(`<div class="mh"><h2>Respaldo de datos</h2><button class="ib" data-close>${I("x")}</button></div>
-    <div class="mb"><p class="note">${esc(respaldoPendiente() || "Guarda una copia de tus pedidos, clientes, fotos y ajustes.")}</p>
+    <div class="mb"><p class="note">${esc(respaldoPendiente() || "Guarda una copia de tus pedidos, fotos y ajustes.")}</p>
       <div class="rbtns"><button class="btn" id="mrLocal">${I("download")}Guardar en el dispositivo</button><button class="btn primary" id="mrDrive">${I("drive")}Subir a Google Drive</button></div></div>`, "sm pop");
   if (respaldoInfo().clientId) cargarGIS().catch(() => {});
   $("#mrLocal", ov).onclick = () => { ov.close(); respaldoLocal(); };
@@ -2306,11 +2305,7 @@ function openForm(id, tipo, cliente, borrador){
   inNom.addEventListener("input", () => mayus(inNom, true));
   inNom.oninput = () => {
     F.cliente.nombre = inNom.value; clearErr("f-nombre");
-    const q = norm(inNom.value.trim());
-    if (q.length < 2) { acl.innerHTML = ""; return; }
-    const hits = Object.entries(S.clientes).filter(([, c]) => norm(c.nombre).includes(q)).slice(0, 6);
-    acl.innerHTML = hits.length ? `<div class="acl">${hits.map(([t, c]) => `<button type="button" data-pick="${esc(t)}"><b>${esc(c.nombre)}</b><small>${esc(prettyPhone(t))}</small></button>`).join("")}</div>` : "";
-  };
+  }; // la app no sugiere ni recuerda clientes anteriores
   inNom.onblur = () => setTimeout(() => acl.innerHTML = "", 200);
   acl.onmousedown = e => e.preventDefault();
   acl.onclick = e => { const b = e.target.closest("[data-pick]"); if (!b) return; const cl = S.clientes[b.dataset.pick]; F.cliente.nombre = cl.nombre; inNom.value = cl.nombre; inTel.value = prettyPhone(b.dataset.pick); inPais.value = ccOf(b.dataset.pick) || "58"; checkTel(); acl.innerHTML = ""; clearErr("f-nombre"); };
@@ -2325,8 +2320,7 @@ function openForm(id, tipo, cliente, borrador){
       return r;
     }
     box.classList.add("okf");
-    const ex = S.clientes[r.e164];
-    const otro = ex && ex.nombre && F.cliente.nombre && norm(ex.nombre).trim() !== norm(F.cliente.nombre).trim();
+    const ex = null, otro = false;
     const html = (r.warn ? `<span class="ti warn">${esc(r.warn)}</span>` : "") + `<a class="ti wa" href="https://wa.me/${esc(r.e164)}" target="_blank" rel="noopener">${I("msg")}Probar en WhatsApp</a>`
       + (otro ? `<div class="tiw">${I("user")}<span>Ya existe como <b>${esc(ex.nombre)}</b></span><button type="button" class="pillb" id="usarNom">Usar ese nombre</button></div>` : "");
     // Solo se redibuja si cambió: así el primer toque en "Probar" no se pierde al salir del campo
@@ -2636,7 +2630,7 @@ async function saveForm(ov, orig){
       delete data.editadoEn; delete data.editadoPor;
       await setDoc(doc(collection(S.db, "pedidos")), data);
     }
-    setDoc(doc(S.db, "clientes/" + tel.e164), {nombre, telefono:tel.e164, actualizadoEn:now}).catch(() => {});
+    // (los clientes ya no se guardan aparte: cada pedido lleva su propio nombre y teléfono)
     S.tab = F.tipo;
     if (F._nuevo) borrarBorrador();
     ov.close(); F = null;
