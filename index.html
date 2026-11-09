@@ -16,7 +16,7 @@
 <link rel="modulepreload" href="https://www.gstatic.com/firebasejs/10.12.2/firebase-app.js">
 <link rel="modulepreload" href="https://www.gstatic.com/firebasejs/10.12.2/firebase-auth.js">
 <link rel="modulepreload" href="https://www.gstatic.com/firebasejs/10.12.2/firebase-firestore.js">
-<link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Plus+Jakarta+Sans:wght@400;500;600;700;800&display=swap" media="print" onload="this.media='all'">
+<link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Plus+Jakarta+Sans:wght@400;500;600;700;800&display=block">
 <script>try{const t=localStorage.getItem("cs-tema");if(t)document.documentElement.dataset.theme=t;}catch(e){}</script>
 <style>
 /* Estilo Comic Shop: Plus Jakarta Sans, acento verde, superficies blancas con bordes suaves,
@@ -858,6 +858,11 @@ body.fixedv{scrollbar-width:none}
 .revbar.resp svg.i,.revbar.resp em{color:var(--t-info)}
 .pdtema{font-size:21px;font-weight:800;letter-spacing:-.01em;line-height:1.2;color:var(--ink)}
 .pdwho b{font-size:21px;font-weight:800;letter-spacing:-.01em;line-height:1.2;color:var(--accent)}
+/* v2.96 sin saltos al abrir: la barra superior nunca pasa a dos líneas */
+.topbar{flex-wrap:nowrap;min-height:52px;box-sizing:border-box}
+.topbar .pill{flex-shrink:0;white-space:nowrap}
+.topbar .pill.st{flex-shrink:1;min-width:0;overflow:hidden;text-overflow:ellipsis}
+.topbar #meBtn{flex-shrink:1;min-width:0;overflow:hidden;text-overflow:ellipsis}
 @media (max-width:1000px){.hello{padding-bottom:8px;margin-top:-6px}.hello h1{font-size:25px}}
 @media (max-width:1000px){.tiles.t5>:last-child{grid-column:1/-1}}
 @media (max-width:1000px){.pill.demo .m-pr{display:inline}}
@@ -951,7 +956,7 @@ import { initializeApp, deleteApp } from "https://www.gstatic.com/firebasejs/10.
 import { getAuth, onAuthStateChanged, signInWithEmailAndPassword, createUserWithEmailAndPassword, signOut, updatePassword, reauthenticateWithCredential, EmailAuthProvider } from "https://www.gstatic.com/firebasejs/10.12.2/firebase-auth.js";
 import { initializeFirestore, getFirestore, persistentLocalCache, persistentMultipleTabManager, doc, collection, query, where, onSnapshot, getDoc, getDocs, setDoc, updateDoc, deleteDoc, writeBatch, runTransaction } from "https://www.gstatic.com/firebasejs/10.12.2/firebase-firestore.js";
 
-const VERSION = "v2.95";
+const VERSION = "v2.96";
 /* ================= Utilidades ================= */
 const $ = (s, r = document) => r.querySelector(s);
 const esc = s => String(s ?? "").replace(/[&<>"']/g, c => ({"&":"&amp;","<":"&lt;",">":"&gt;",'"':"&quot;","'":"&#39;"}[c]));
@@ -1140,6 +1145,8 @@ function nameOf(usuario){
 const pedidosList = () => Object.values(S.pedidos);
 
 /* ================= Arranque ================= */
+// Evita saltos al abrir: siempre empieza arriba y no se restaura un desplazamiento viejo
+try { history.scrollRestoration = "manual"; } catch(e) {}
 function boot(){
   if (!firebaseConfig || !firebaseConfig.apiKey || firebaseConfig.apiKey.startsWith("PEGA")) return gateMsg("lock", "Falta conectar Firebase", "Abre el archivo config.js del repositorio y pega los datos de tu proyecto de Firebase. Los pasos están en GUIA.md.");
   S.app = initializeApp(firebaseConfig);
