@@ -876,7 +876,8 @@ body.fixedv{scrollbar-width:none}
 .revbar .anchk svg.i{width:15px;height:15px;stroke-width:2.8;color:inherit}
 .temacard{padding:6px 16px!important}
 .temacard .swr span{display:inline-flex;align-items:center;gap:8px;font-weight:700}
-.anchk[aria-pressed="true"]{background:#16a34a;border-color:#16a34a;color:#fff}
+.anchk[aria-pressed="true"]{background:#ca8a04;border-color:#ca8a04;color:#fff}
+:root[data-theme="dark"] .anchk[aria-pressed="true"]{background:var(--soon);border-color:var(--soon);color:#1a1405}
 :root[data-theme="dark"] .revbar.anun{border-color:color-mix(in srgb,var(--soon) 30%,var(--line));background:color-mix(in srgb,var(--soon) 12%,var(--surface))}
 :root[data-theme="dark"] .revbar.anun .antx svg.i,:root[data-theme="dark"] .revbar.anun .anq{color:var(--soon)}
 .revbar.ancrear{max-width:none;justify-content:center;background:#dcfce7;border-color:#bbf7d0;color:#15803d;font-weight:800}
@@ -979,7 +980,7 @@ import { initializeApp, deleteApp } from "https://www.gstatic.com/firebasejs/10.
 import { getAuth, onAuthStateChanged, signInWithEmailAndPassword, createUserWithEmailAndPassword, signOut, updatePassword, reauthenticateWithCredential, EmailAuthProvider } from "https://www.gstatic.com/firebasejs/10.12.2/firebase-auth.js";
 import { initializeFirestore, getFirestore, persistentLocalCache, persistentMultipleTabManager, doc, collection, query, where, onSnapshot, getDoc, getDocs, setDoc, updateDoc, deleteDoc, writeBatch, runTransaction } from "https://www.gstatic.com/firebasejs/10.12.2/firebase-firestore.js";
 
-const VERSION = "v2.98";
+const VERSION = "v2.99";
 /* ================= Utilidades ================= */
 const $ = (s, r = document) => r.querySelector(s);
 const esc = s => String(s ?? "").replace(/[&<>"']/g, c => ({"&":"&amp;","<":"&lt;",">":"&gt;",'"':"&quot;","'":"&#39;"}[c]));
