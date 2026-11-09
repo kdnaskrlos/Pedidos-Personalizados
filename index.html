@@ -865,7 +865,7 @@ body.fixedv{scrollbar-width:none}
 .topbar #meBtn{flex-shrink:1;min-width:0;overflow:hidden;text-overflow:ellipsis}
 /* v2.97 avisos informativos, fecha arriba, prueba solo ícono */
 .hello.greet .date{display:none}
-.anlist{display:flex;flex-direction:column;gap:8px;margin-bottom:4px}
+.anlist{display:flex;flex-direction:column;gap:8px}
 .revbar.anun{padding:0 6px 0 0;gap:6px;border-color:#f3dc7c;background:#fff7d1;max-width:none;cursor:default}
 .revbar.anun .antx{flex:1;min-width:0;display:flex;align-items:center;gap:8px;border:0;background:none;font:inherit;color:inherit;padding:0 0 0 11px;min-height:38px;cursor:pointer;text-align:left}
 .revbar.anun .antx svg.i{color:#ca8a04}
@@ -982,7 +982,7 @@ import { initializeApp, deleteApp } from "https://www.gstatic.com/firebasejs/10.
 import { getAuth, onAuthStateChanged, signInWithEmailAndPassword, createUserWithEmailAndPassword, signOut, updatePassword, reauthenticateWithCredential, EmailAuthProvider } from "https://www.gstatic.com/firebasejs/10.12.2/firebase-auth.js";
 import { initializeFirestore, getFirestore, persistentLocalCache, persistentMultipleTabManager, doc, collection, query, where, onSnapshot, getDoc, getDocs, setDoc, updateDoc, deleteDoc, writeBatch, runTransaction } from "https://www.gstatic.com/firebasejs/10.12.2/firebase-firestore.js";
 
-const VERSION = "v3.1";
+const VERSION = "v3.2";
 /* ================= Utilidades ================= */
 const $ = (s, r = document) => r.querySelector(s);
 const esc = s => String(s ?? "").replace(/[&<>"']/g, c => ({"&":"&amp;","<":"&lt;",">":"&gt;",'"':"&quot;","'":"&#39;"}[c]));
@@ -1636,8 +1636,9 @@ function viewResumen(a, pr){
   const tipos = ["personalizado","sublimacion"].filter(t => pr.ver[t]);
   const tile = (c, ic, lb, v, sub, act) => `<button class="tile tint" style="--c:${c}" data-tile="${act}"><span class="bg">${I(ic)}</span><span class="lb"><span class="chip sm">${I(ic)}</span>${lb}</span><span class="v num">${v}</span><span class="sub">${sub}</span></button>`;
   const pendTipo = t => pedidosList().filter(p => p.tipo === t && (p.estado || "pendiente") === "pendiente").length;
-  return `${anunciosHTML()}
+  return `
     <div class="hello greet"><h1>${h < 12 ? "Buenos días" : h < 19 ? "Buenas tardes" : "Buenas noches"}, <span>${esc((S.me.nombre || S.me.usuario).split(" ")[0])}</span></h1><span class="date">${I("cal")}${DIAS[d.getDay()]} ${d.getDate()} de ${MESES[d.getMonth()]} ${d.getFullYear()}</span></div>
+    ${anunciosHTML()}
     <div class="tiles ${pr.admin ? "t6" : "t5"}">
       ${tile("var(--accent)","box","Pendientes", a.pend.length, "por producir", "pendientes")}
       ${tile("var(--soon)","clock","Entregas pronto", a.proximos.length, `próximos ${cfg().dias} días`, "avisos")}
