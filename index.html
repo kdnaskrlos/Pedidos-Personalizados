@@ -887,6 +887,8 @@ body.fixedv{scrollbar-width:none}
 :root[data-theme="dark"] .revbar.ancrear svg.i{color:#86efac}
 .antxt{font-size:16px;line-height:1.45;white-space:pre-wrap}
 .pill.demo .m-pr{display:none!important}
+.tdate{display:inline-flex;align-items:center;gap:6px;font-size:13.5px;font-weight:600;color:var(--muted);white-space:nowrap;flex-shrink:0;padding:0 4px}
+.tdate svg.i{width:16px;height:16px}
 @media (max-width:1000px){.hello{padding-bottom:8px;margin-top:-6px}.hello h1{font-size:25px}}
 @media (max-width:1000px){.tiles.t5>:last-child{grid-column:1/-1}}
 @media (max-width:1000px){.pill.demo .m-pr{display:inline}}
@@ -980,7 +982,7 @@ import { initializeApp, deleteApp } from "https://www.gstatic.com/firebasejs/10.
 import { getAuth, onAuthStateChanged, signInWithEmailAndPassword, createUserWithEmailAndPassword, signOut, updatePassword, reauthenticateWithCredential, EmailAuthProvider } from "https://www.gstatic.com/firebasejs/10.12.2/firebase-auth.js";
 import { initializeFirestore, getFirestore, persistentLocalCache, persistentMultipleTabManager, doc, collection, query, where, onSnapshot, getDoc, getDocs, setDoc, updateDoc, deleteDoc, writeBatch, runTransaction } from "https://www.gstatic.com/firebasejs/10.12.2/firebase-firestore.js";
 
-const VERSION = "v2.99";
+const VERSION = "v3.0";
 /* ================= Utilidades ================= */
 const $ = (s, r = document) => r.querySelector(s);
 const esc = s => String(s ?? "").replace(/[&<>"']/g, c => ({"&":"&amp;","<":"&lt;",">":"&gt;",'"':"&quot;","'":"&#39;"}[c]));
@@ -1373,10 +1375,10 @@ function doRender(){
     <div class="topbar">
       <span class="pill st ${S.online && !S.cache ? "ok" : "bad"}"><i></i>${S.online ? (S.cache ? "Sincronizando…" : "En línea") : "Sin conexión · se guardará al volver"}</span>
       ${pr.admin && S.me && S.me.rol === "admin" && S.view === "resumen" ? `<button class="pill demo ${hayDemo() ? "on" : ""}" id="demoBtn" title="Modo prueba" aria-label="Modo prueba">${I("flask")}</button>` : ""}
-      ${!(S.view === "resumen" || (pr.admin && (S.view === "ajustes" || S.view === "equipo"))) ? `<span class="pill hide-m">${I("cal")}${DIAS[d.getDay()]} ${d.getDate()} de ${MESES[d.getMonth()]}</span>` : ""}
+      ${!(S.view === "resumen" || (pr.admin && (S.view === "ajustes" || S.view === "equipo"))) ? `<span class="tdate hide-m">${I("cal")}${DIAS[d.getDay()]} ${d.getDate()} de ${MESES[d.getMonth()]}</span>` : ""}
       <span class="sp"></span>
       ${S.installEvt ? `<button class="pill" id="instBtn">${I("download")}<span class="hide-m">Instalar app</span></button>` : ""}
-      ${S.view === "resumen" || (pr.admin && (S.view === "ajustes" || S.view === "equipo")) ? `<span class="pill">${I("cal")}${DIAS[d.getDay()]} ${d.getDate()} de ${MESES[d.getMonth()]}</span>` : `<button class="pill" id="meBtn">${I("user")}${esc(S.me.nombre || S.me.usuario)}${pr.admin ? " · Admin" : ""}</button>`}
+      ${S.view === "resumen" || (pr.admin && (S.view === "ajustes" || S.view === "equipo")) ? `<span class="tdate">${I("cal")}${DIAS[d.getDay()]} ${d.getDate()} de ${MESES[d.getMonth()]}</span>` : `<button class="pill" id="meBtn">${I("user")}${esc(S.me.nombre || S.me.usuario)}${pr.admin ? " · Admin" : ""}</button>`}
     </div>
     <main class="main">
       ${pr.admin && S.view === "avisos" && revisarList().length ? `<button class="revbar" data-act="revisar">${I("edit")}<span><b>${revisarList().length}</b> pedido${revisarList().length === 1 ? "" : "s"} editado${revisarList().length === 1 ? "" : "s"} por el equipo</span><em>Ver</em></button>` : ""}
