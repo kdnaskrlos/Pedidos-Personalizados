@@ -895,6 +895,8 @@ body.fixedv{scrollbar-width:none}
 @keyframes anpulse{0%,100%{box-shadow:0 0 0 0 rgba(234,179,8,0);transform:scale(1)}35%{box-shadow:0 0 0 6px rgba(234,179,8,.28);transform:scale(1.015)}}
 @keyframes anwig{0%,100%{transform:rotate(0)}15%{transform:rotate(-14deg)}30%{transform:rotate(12deg)}45%{transform:rotate(-8deg)}60%{transform:rotate(0)}}
 @media (prefers-reduced-motion:reduce){.revbar.anun.anim,.revbar.anun.anim .antx svg.i{animation:none}}
+/* v3.6 sin "deslizar hacia abajo para recargar" (recargaba la app y hacía parpadear la barra del teléfono) */
+html,body{overscroll-behavior-y:none}
 @media (max-width:1000px){.hello{padding-bottom:8px;margin-top:-6px}.hello h1{font-size:25px}}
 @media (max-width:1000px){.tiles.t5>:last-child{grid-column:1/-1}}
 @media (max-width:1000px){.pill.demo .m-pr{display:inline}}
@@ -988,7 +990,7 @@ import { initializeApp, deleteApp } from "https://www.gstatic.com/firebasejs/10.
 import { getAuth, onAuthStateChanged, signInWithEmailAndPassword, createUserWithEmailAndPassword, signOut, updatePassword, reauthenticateWithCredential, EmailAuthProvider } from "https://www.gstatic.com/firebasejs/10.12.2/firebase-auth.js";
 import { initializeFirestore, getFirestore, persistentLocalCache, persistentMultipleTabManager, doc, collection, query, where, onSnapshot, getDoc, getDocs, setDoc, updateDoc, deleteDoc, writeBatch, runTransaction } from "https://www.gstatic.com/firebasejs/10.12.2/firebase-firestore.js";
 
-const VERSION = "v3.5";
+const VERSION = "v3.6";
 /* ================= Utilidades ================= */
 const $ = (s, r = document) => r.querySelector(s);
 const esc = s => String(s ?? "").replace(/[&<>"']/g, c => ({"&":"&amp;","<":"&lt;",">":"&gt;",'"':"&quot;","'":"&#39;"}[c]));
@@ -1364,7 +1366,7 @@ function doRender(){
   const sc = scrollY;
   const nav = (v, ic, t, n) => `<button class="nav" data-view="${v}" aria-current="${S.view === v}">${I(ic)}${t}${n ? `<span class="bdg">${n}</span>` : ""}</button>`;
   const d = new Date();
-  $("#app").innerHTML = `
+  const html = `
   <aside class="side">
     <div class="logo">${I("shirt")}</div>
     ${nav("resumen","home","Resumen")}
@@ -1391,6 +1393,10 @@ function doRender(){
       ${S.view === "avisos" ? viewAvisos(a) : S.view === "pedidos" ? viewPedidos(a, pr) : S.view === "equipo" && pr.admin ? viewEquipo() : S.view === "ajustes" && pr.admin ? viewAjustes() : viewResumen(a, pr)}
     </main>
   </div>`;
+  // Si no cambió nada, no se vuelve a dibujar la pantalla (evita parpadeos y ahorra batería)
+  if (html === S._lastHtml && $("#app").querySelector(".shell")) return;
+  S._lastHtml = html;
+  $("#app").innerHTML = html;
   scrollTo(0, sc);
   if (focusId) { const el = document.getElementById(focusId); if (el && el.tagName === "INPUT") { el.focus(); try { el.setSelectionRange(el.value.length, el.value.length); } catch(e) {} } }
   bindMain();
