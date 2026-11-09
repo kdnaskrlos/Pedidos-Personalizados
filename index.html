@@ -979,7 +979,7 @@ import { initializeApp, deleteApp } from "https://www.gstatic.com/firebasejs/10.
 import { getAuth, onAuthStateChanged, signInWithEmailAndPassword, createUserWithEmailAndPassword, signOut, updatePassword, reauthenticateWithCredential, EmailAuthProvider } from "https://www.gstatic.com/firebasejs/10.12.2/firebase-auth.js";
 import { initializeFirestore, getFirestore, persistentLocalCache, persistentMultipleTabManager, doc, collection, query, where, onSnapshot, getDoc, getDocs, setDoc, updateDoc, deleteDoc, writeBatch, runTransaction } from "https://www.gstatic.com/firebasejs/10.12.2/firebase-firestore.js";
 
-const VERSION = "v2.97";
+const VERSION = "v2.98";
 /* ================= Utilidades ================= */
 const $ = (s, r = document) => r.querySelector(s);
 const esc = s => String(s ?? "").replace(/[&<>"']/g, c => ({"&":"&amp;","<":"&lt;",">":"&gt;",'"':"&quot;","'":"&#39;"}[c]));
@@ -1372,10 +1372,10 @@ function doRender(){
     <div class="topbar">
       <span class="pill st ${S.online && !S.cache ? "ok" : "bad"}"><i></i>${S.online ? (S.cache ? "Sincronizando…" : "En línea") : "Sin conexión · se guardará al volver"}</span>
       ${pr.admin && S.me && S.me.rol === "admin" && S.view === "resumen" ? `<button class="pill demo ${hayDemo() ? "on" : ""}" id="demoBtn" title="Modo prueba" aria-label="Modo prueba">${I("flask")}</button>` : ""}
-      ${S.view !== "resumen" ? `<span class="pill hide-m">${I("cal")}${DIAS[d.getDay()]} ${d.getDate()} de ${MESES[d.getMonth()]}</span>` : ""}
+      ${!(S.view === "resumen" || (pr.admin && (S.view === "ajustes" || S.view === "equipo"))) ? `<span class="pill hide-m">${I("cal")}${DIAS[d.getDay()]} ${d.getDate()} de ${MESES[d.getMonth()]}</span>` : ""}
       <span class="sp"></span>
       ${S.installEvt ? `<button class="pill" id="instBtn">${I("download")}<span class="hide-m">Instalar app</span></button>` : ""}
-      ${S.view === "resumen" ? `<span class="pill">${I("cal")}${DIAS[d.getDay()]} ${d.getDate()} de ${MESES[d.getMonth()]}</span>` : `<button class="pill" id="meBtn">${I("user")}${esc(S.me.nombre || S.me.usuario)}${pr.admin ? " · Admin" : ""}</button>`}
+      ${S.view === "resumen" || (pr.admin && (S.view === "ajustes" || S.view === "equipo")) ? `<span class="pill">${I("cal")}${DIAS[d.getDay()]} ${d.getDate()} de ${MESES[d.getMonth()]}</span>` : `<button class="pill" id="meBtn">${I("user")}${esc(S.me.nombre || S.me.usuario)}${pr.admin ? " · Admin" : ""}</button>`}
     </div>
     <main class="main">
       ${pr.admin && S.view === "avisos" && revisarList().length ? `<button class="revbar" data-act="revisar">${I("edit")}<span><b>${revisarList().length}</b> pedido${revisarList().length === 1 ? "" : "s"} editado${revisarList().length === 1 ? "" : "s"} por el equipo</span><em>Ver</em></button>` : ""}
@@ -1439,7 +1439,7 @@ function editarAnuncio(id){
       if (a) await updateDoc(doc(S.db, "anuncios/" + id), {texto:t});
       else await setDoc(doc(collection(S.db, "anuncios")), {texto:t, activo:false, hasta:null, creadoEn:new Date().toISOString(), creadoPor:S.me.usuario});
       ov.close(); toast("Guardado");
-    } catch(e) { toast("Error al guardar", true); }
+    } catch(e) { console.warn(e); toast(/permission/i.test(String(e.code || e.message)) ? "Falta publicar las reglas nuevas de Firebase" : "Error al guardar", true); }
   };
   if (a) $("#anDel", ov).onclick = () => confirmar("¿Eliminar este aviso?", "", "Eliminar", async () => { ov.close(); const copia = Object.assign({}, a); delete copia._id; await deleteDoc(doc(S.db, "anuncios/" + id)); toastUndo("Eliminado", () => setDoc(doc(S.db, "anuncios/" + id), copia)); });
 }
@@ -1870,7 +1870,7 @@ function viewEquipo(){
       <div class="uhead" data-utog="${esc(uid)}" role="button" tabindex="0" aria-expanded="${open}"><span class="av" style="--c:${admin ? "var(--accent)" : "var(--t-info)"}">${esc((u.nombre || u.usuario).slice(0, 1).toUpperCase())}</span>
         <div class="un"><b>${esc(u.nombre)}</b><small>@${esc(u.usuario)}</small></div>
         <span class="urole ${admin ? "a" : u.activo ? "" : "x"}">${admin ? "Administrador" : u.activo ? "Activo" : "Sin acceso"}</span><span class="uchev">${I("chev")}</span></div>
-      ${!open ? "" : admin ? (uid === S.uid ? `<div class="uacts one"><button class="btn" data-act="mipin">${I("key")}Cambiar mi PIN</button></div>` : "") : `
+      ${!open ? "" : admin ? (uid === S.uid ? `<div class="uacts one"><button class="btn" data-act="mipin">${I("key")}Cambiar mi PIN</button><button class="btn danger" data-act="salir">${I("logout")}Cerrar sesión</button></div>` : "") : `
       <div class="uperm">
         ${sw(uid, "verPersonalizado", "Ve Personalizado", u.verPersonalizado)}
         ${sw(uid, "verSublimacion", "Ve Sublimación", u.verSublimacion)}
@@ -1882,8 +1882,8 @@ function viewEquipo(){
     </div>`;
   };
   return `<div class="hello"><h1>Equipo</h1><span class="date">${us.length} usuario${us.length === 1 ? "" : "s"}</span></div>${adminTabs()}
-    <button class="btn listo newu" id="newUser">${I("plus")}Nuevo usuario</button>
-    <div class="ulist">${us.map(card).join("")}</div>`;
+    <div class="ulist">${us.map(card).join("")}</div>
+    <button class="btn listo newu" id="newUser">${I("plus")}Nuevo usuario</button>`;
 }
 
 /* ---------- Ajustes (admin) ---------- */
@@ -1951,6 +1951,7 @@ function bindMain(){
     if (d.anon) return alternarAnuncio(d.anon);
     if (d.act === "respaldo") return openRespaldo();
     if (d.act === "mipin") return cambiarMiPin();
+    if (d.act === "salir") return confirmar("¿Cerrar sesión?", "", "Cerrar sesión", async () => signOut(S.auth));
     if (d.act === "cuenta") return openCuenta();
     if (d.avisar) { marcarAvisado(d.avisar); return; }
     if (d.ya) return marcarAvisado(d.ya);
