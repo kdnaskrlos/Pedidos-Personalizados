@@ -951,7 +951,7 @@ import { initializeApp, deleteApp } from "https://www.gstatic.com/firebasejs/10.
 import { getAuth, onAuthStateChanged, signInWithEmailAndPassword, createUserWithEmailAndPassword, signOut, updatePassword, reauthenticateWithCredential, EmailAuthProvider } from "https://www.gstatic.com/firebasejs/10.12.2/firebase-auth.js";
 import { initializeFirestore, getFirestore, persistentLocalCache, persistentMultipleTabManager, doc, collection, query, where, onSnapshot, getDoc, getDocs, setDoc, updateDoc, deleteDoc, writeBatch, runTransaction } from "https://www.gstatic.com/firebasejs/10.12.2/firebase-firestore.js";
 
-const VERSION = "v2.92";
+const VERSION = "v2.93";
 /* ================= Utilidades ================= */
 const $ = (s, r = document) => r.querySelector(s);
 const esc = s => String(s ?? "").replace(/[&<>"']/g, c => ({"&":"&amp;","<":"&lt;",">":"&gt;",'"':"&quot;","'":"&#39;"}[c]));
@@ -1866,11 +1866,11 @@ function bindMain(){
     if (!b) return;
     const d = b.dataset;
     if (d.view) { setView(d.view); return; }
-    if (d.tile) { if (d.tile === "avisos") setView("avisos"); else if (d.tile.startsWith("tipo-")) { S.tab = d.tile.slice(5); S.filtro = "pendientes"; setView("pedidos"); } else { S.filtro = d.tile; autoTab(); setView("pedidos"); } return; }
+    if (d.tile) { if (d.tile === "avisos" || d.tile === "revisar") setView("avisos"); else if (d.tile.startsWith("tipo-")) { S.tab = d.tile.slice(5); S.filtro = "pendientes"; setView("pedidos"); } else { S.filtro = d.tile; autoTab(); setView("pedidos"); } return; }
     if (d.tab) { S.tab = d.tab; render(); return; }
     if (d.filtro) { S.filtro = d.filtro; autoTab(); render(); return; }
     if (d.act === "nuevo") return nuevoPedido(d.tipo);
-    if (d.act === "revisar" || d.tile === "revisar") return openRevisar();
+    if (d.act === "revisar") return openRevisar();
     if (d.act === "respaldo") return openRespaldo();
     if (d.act === "mipin") return cambiarMiPin();
     if (d.act === "cuenta") return openCuenta();
