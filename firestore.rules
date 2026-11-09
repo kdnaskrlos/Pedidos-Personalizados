@@ -55,6 +55,12 @@ service cloud.firestore {
       allow read, write: if activo();
     }
 
+    // Avisos informativos: los ve todo el equipo; solo el administrador los crea o cambia
+    match /anuncios/{id} {
+      allow read: if activo();
+      allow write: if admin();
+    }
+
     // Estado de los respaldos (solo el administrador)
     match /respaldos/{doc} {
       allow read, write: if admin();

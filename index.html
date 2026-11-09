@@ -863,6 +863,29 @@ body.fixedv{scrollbar-width:none}
 .topbar .pill{flex-shrink:0;white-space:nowrap}
 .topbar .pill.st{flex-shrink:1;min-width:0;overflow:hidden;text-overflow:ellipsis}
 .topbar #meBtn{flex-shrink:1;min-width:0;overflow:hidden;text-overflow:ellipsis}
+/* v2.97 avisos informativos, fecha arriba, prueba solo ícono */
+.hello.greet .date{display:none}
+.anlist{display:flex;flex-direction:column;gap:8px;margin-bottom:4px}
+.revbar.anun{padding:0 6px 0 0;gap:6px;border-color:#f3dc7c;background:#fff7d1;max-width:none;cursor:default}
+.revbar.anun .antx{flex:1;min-width:0;display:flex;align-items:center;gap:8px;border:0;background:none;font:inherit;color:inherit;padding:0 0 0 11px;min-height:38px;cursor:pointer;text-align:left}
+.revbar.anun .antx svg.i{color:#ca8a04}
+.revbar.anun .antx span{flex:1;min-width:0;white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
+.revbar.anun.off{opacity:.62}
+.revbar.anun .anq{flex:none;font-size:11.5px;font-weight:800;color:#a16207}
+.anchk{flex:none;width:28px;height:28px;border-radius:99px;display:grid;place-items:center;border:1.5px solid #e5c95a;background:var(--surface);color:#e5c95a;cursor:pointer;padding:0}
+.revbar .anchk svg.i{width:15px;height:15px;stroke-width:2.8;color:inherit}
+.temacard{padding:6px 16px!important}
+.temacard .swr span{display:inline-flex;align-items:center;gap:8px;font-weight:700}
+.anchk[aria-pressed="true"]{background:#16a34a;border-color:#16a34a;color:#fff}
+:root[data-theme="dark"] .revbar.anun{border-color:color-mix(in srgb,var(--soon) 30%,var(--line));background:color-mix(in srgb,var(--soon) 12%,var(--surface))}
+:root[data-theme="dark"] .revbar.anun .antx svg.i,:root[data-theme="dark"] .revbar.anun .anq{color:var(--soon)}
+.revbar.ancrear{max-width:none;justify-content:center;background:#dcfce7;border-color:#bbf7d0;color:#15803d;font-weight:800}
+.revbar.ancrear svg.i{color:#15803d}
+.revbar.ancrear span{flex:none}
+:root[data-theme="dark"] .revbar.ancrear{background:#12311f;border-color:#1f4d31;color:#86efac}
+:root[data-theme="dark"] .revbar.ancrear svg.i{color:#86efac}
+.antxt{font-size:16px;line-height:1.45;white-space:pre-wrap}
+.pill.demo .m-pr{display:none!important}
 @media (max-width:1000px){.hello{padding-bottom:8px;margin-top:-6px}.hello h1{font-size:25px}}
 @media (max-width:1000px){.tiles.t5>:last-child{grid-column:1/-1}}
 @media (max-width:1000px){.pill.demo .m-pr{display:inline}}
@@ -956,7 +979,7 @@ import { initializeApp, deleteApp } from "https://www.gstatic.com/firebasejs/10.
 import { getAuth, onAuthStateChanged, signInWithEmailAndPassword, createUserWithEmailAndPassword, signOut, updatePassword, reauthenticateWithCredential, EmailAuthProvider } from "https://www.gstatic.com/firebasejs/10.12.2/firebase-auth.js";
 import { initializeFirestore, getFirestore, persistentLocalCache, persistentMultipleTabManager, doc, collection, query, where, onSnapshot, getDoc, getDocs, setDoc, updateDoc, deleteDoc, writeBatch, runTransaction } from "https://www.gstatic.com/firebasejs/10.12.2/firebase-firestore.js";
 
-const VERSION = "v2.96";
+const VERSION = "v2.97";
 /* ================= Utilidades ================= */
 const $ = (s, r = document) => r.querySelector(s);
 const esc = s => String(s ?? "").replace(/[&<>"']/g, c => ({"&":"&amp;","<":"&lt;",">":"&gt;",'"':"&quot;","'":"&#39;"}[c]));
@@ -1028,6 +1051,7 @@ const DEF = {
   negocio: "Comic Shop", dias: 2, pais: "58",
   plantilla: "Hola {cliente} 👋, te escribimos de {negocio}.\nTu pedido {codigo} ({resumen}) ya está listo ✅\nSaldo pendiente: {saldo}\n¡Te esperamos!",
   diasRetiro: 3,
+  duracionAvisos: 24,
   plantillaSaludo: "Hola {cliente} 👋, te saludamos de {negocio}. Ya estamos registrando tu pedido de {tema}. Te avisaremos por aquí cuando esté listo.",
   plantillaRetiro: "Hola {cliente} 👋, te recordamos de {negocio} que tu pedido ({resumen}) está listo para retirar desde hace unos días.\nSaldo pendiente: {saldo}\n¡Te esperamos!",
   cat: {
@@ -1124,7 +1148,7 @@ const cfg = () => {
   const r = S.cfgRaw || {}, cat = Object.assign({}, DEF.cat, r.cat || {});
   // Firestore no admite listas dentro de listas: los colores se guardan como {n, h}
   cat.colores = (cat.colores || []).map(x => Array.isArray(x) ? x : [x.n, x.h || ""]).filter(x => x[0]);
-  return {negocio:DEF.negocio, dias:(r.dias ?? DEF.dias), pais:"58", plantilla:r.plantilla || DEF.plantilla, diasRetiro:(r.diasRetiro ?? DEF.diasRetiro), plantillaRetiro:r.plantillaRetiro || DEF.plantillaRetiro, plantillaSaludo:r.plantillaSaludo || DEF.plantillaSaludo, cat};
+  return {negocio:DEF.negocio, dias:(r.dias ?? DEF.dias), pais:"58", plantilla:r.plantilla || DEF.plantilla, diasRetiro:(r.diasRetiro ?? DEF.diasRetiro), plantillaRetiro:r.plantillaRetiro || DEF.plantillaRetiro, plantillaSaludo:r.plantillaSaludo || DEF.plantillaSaludo, duracionAvisos:(r.duracionAvisos ?? DEF.duracionAvisos), cat};
 };
 const loginEmail = (u, k) => `${u}.${k}@comicshop-pedidos.app`;
 const pinPass = pin => "cs-" + pin;
@@ -1215,6 +1239,7 @@ function startData(){
     toast("No se pudo leer: " + S.errores.join(", ") + " (" + (e.code || e.message) + ")", true);
   };
   if (perm().admin) add(onSnapshot(doc(S.db, "respaldos/estado"), s => { S.resp = s.exists() ? s.data() : null; render(); }, e => console.warn("respaldo", e)));
+  add(onSnapshot(collection(S.db, "anuncios"), s => { const o = {}; s.forEach(d => o[d.id] = Object.assign({_id:d.id}, d.data())); S.anuncios = o; render(); }, e => console.warn("anuncios", e)));
   add(onSnapshot(doc(S.db, "config/ajustes"), s => { S.cfgRaw = s.exists() ? s.data() : null; render(); }, err("ajustes")));
   add(onSnapshot(collection(S.db, "usuarios"), s => {
     const o = {}; s.forEach(d => o[d.id] = d.data()); S.usuarios = o; render();
@@ -1346,11 +1371,11 @@ function doRender(){
   <div class="shell">
     <div class="topbar">
       <span class="pill st ${S.online && !S.cache ? "ok" : "bad"}"><i></i>${S.online ? (S.cache ? "Sincronizando…" : "En línea") : "Sin conexión · se guardará al volver"}</span>
-      ${pr.admin && S.me && S.me.rol === "admin" && S.view === "resumen" ? `<button class="pill demo ${hayDemo() ? "on" : ""}" id="demoBtn">${I("flask")}<span class="hide-m">Modo prueba${hayDemo() ? " · activo" : ""}</span><span class="m-pr">Prueba</span></button>` : ""}
-      <span class="pill hide-m">${I("cal")}${DIAS[d.getDay()]} ${d.getDate()} de ${MESES[d.getMonth()]}</span>
+      ${pr.admin && S.me && S.me.rol === "admin" && S.view === "resumen" ? `<button class="pill demo ${hayDemo() ? "on" : ""}" id="demoBtn" title="Modo prueba" aria-label="Modo prueba">${I("flask")}</button>` : ""}
+      ${S.view !== "resumen" ? `<span class="pill hide-m">${I("cal")}${DIAS[d.getDay()]} ${d.getDate()} de ${MESES[d.getMonth()]}</span>` : ""}
       <span class="sp"></span>
       ${S.installEvt ? `<button class="pill" id="instBtn">${I("download")}<span class="hide-m">Instalar app</span></button>` : ""}
-      <button class="pill" id="meBtn">${I("user")}${esc(S.me.nombre || S.me.usuario)}${pr.admin ? " · Admin" : ""}</button>
+      ${S.view === "resumen" ? `<span class="pill">${I("cal")}${DIAS[d.getDay()]} ${d.getDate()} de ${MESES[d.getMonth()]}</span>` : `<button class="pill" id="meBtn">${I("user")}${esc(S.me.nombre || S.me.usuario)}${pr.admin ? " · Admin" : ""}</button>`}
     </div>
     <main class="main">
       ${pr.admin && S.view === "avisos" && revisarList().length ? `<button class="revbar" data-act="revisar">${I("edit")}<span><b>${revisarList().length}</b> pedido${revisarList().length === 1 ? "" : "s"} editado${revisarList().length === 1 ? "" : "s"} por el equipo</span><em>Ver</em></button>` : ""}
@@ -1387,6 +1412,44 @@ function filtrar(tipo){
   l.sort((a, b) => f === "entregados" ? String(b.entregadoEn || "").localeCompare(a.entregadoEn || "") : key(a).localeCompare(key(b)));
   return l;
 }
+/* ===== Avisos informativos (los crea el administrador) ===== */
+const anVigente = a => a.activo && (!a.hasta || new Date(a.hasta).getTime() > Date.now());
+function anunciosHTML(){
+  const adm = perm().admin;
+  const l = Object.values(S.anuncios || {}).filter(a => adm || anVigente(a)).sort((x, y) => String(y.creadoEn).localeCompare(String(x.creadoEn)));
+  const queda = a => { if (!a.hasta || !anVigente(a)) return ""; const m = Math.round((new Date(a.hasta) - Date.now()) / 60000); return m >= 1440 ? `${Math.round(m / 1440)} d` : m >= 60 ? `${Math.round(m / 60)} h` : `${Math.max(1, m)} min`; };
+  return (l.length || adm) ? `<div class="anlist">${l.map(a => `<div class="revbar anun ${anVigente(a) ? "on" : "off"}">
+      <button type="button" class="antx" data-anver="${esc(a._id)}">${I("alert")}<span>${esc(a.texto)}</span></button>
+      ${adm ? `${queda(a) ? `<small class="anq">${queda(a)}</small>` : ""}<button type="button" class="anchk" data-anon="${esc(a._id)}" aria-pressed="${anVigente(a)}" title="${anVigente(a) ? "Visible para el equipo" : "Mostrar al equipo"}">${I("check")}</button>` : ""}
+    </div>`).join("")}${adm ? `<button type="button" class="revbar ancrear" data-act="anuncio">${I("plus")}<span>Crear aviso</span></button>` : ""}</div>` : "";
+}
+function editarAnuncio(id){
+  const a = id ? (S.anuncios || {})[id] : null, adm = perm().admin;
+  if (!adm) {
+    const ov = modal(`<div class="mh"><h2>Aviso</h2><button class="ib" data-close>${I("x")}</button></div><div class="mb"><p class="antxt">${esc(a.texto)}</p></div>`, "sm pop");
+    return;
+  }
+  const ov = modal(`<div class="mh"><h2>${a ? "Editar aviso" : "Crear aviso"}</h2><button class="ib" data-close>${I("x")}</button></div>
+    <div class="mb"><div class="f"><label>Mensaje</label><textarea class="inp" id="anT" rows="3" maxlength="240" placeholder="Ej.: Mañana el taller abre a las 10 am">${esc(a ? a.texto : "")}</textarea></div></div>
+    <div class="mf">${a ? `<button class="btn danger" id="anDel">${I("trash")}Eliminar</button>` : ""}<button class="btn primary" id="anOk">${I("check")}Guardar</button></div>`, "sm pop");
+  setTimeout(() => $("#anT", ov).focus(), 50);
+  $("#anOk", ov).onclick = async () => {
+    const t = $("#anT", ov).value.trim(); if (!t) return toast("Escribe el mensaje", true);
+    try {
+      if (a) await updateDoc(doc(S.db, "anuncios/" + id), {texto:t});
+      else await setDoc(doc(collection(S.db, "anuncios")), {texto:t, activo:false, hasta:null, creadoEn:new Date().toISOString(), creadoPor:S.me.usuario});
+      ov.close(); toast("Guardado");
+    } catch(e) { toast("Error al guardar", true); }
+  };
+  if (a) $("#anDel", ov).onclick = () => confirmar("¿Eliminar este aviso?", "", "Eliminar", async () => { ov.close(); const copia = Object.assign({}, a); delete copia._id; await deleteDoc(doc(S.db, "anuncios/" + id)); toastUndo("Eliminado", () => setDoc(doc(S.db, "anuncios/" + id), copia)); });
+}
+async function alternarAnuncio(id){
+  const a = (S.anuncios || {})[id]; if (!a || !perm().admin) return;
+  const h = Number(cfg().duracionAvisos) || 0;
+  const data = anVigente(a) ? {activo:false} : {activo:true, hasta:h ? new Date(Date.now() + h * 3600000).toISOString() : null};
+  try { await updateDoc(doc(S.db, "anuncios/" + id), data); toast(data.activo ? "Visible para el equipo" : "Oculto"); } catch(e) { toast("Error al guardar", true); }
+}
+setInterval(() => { if (S.view === "resumen" && Object.keys(S.anuncios || {}).length && !document.querySelector(".md")) render(); }, 60000);
 /* ===== Respaldo (solo administrador) ===== */
 const RESP_LOCAL = "cs-respaldo-ultimo";
 function respaldoInfo(){
@@ -1570,7 +1633,7 @@ function viewResumen(a, pr){
   const tipos = ["personalizado","sublimacion"].filter(t => pr.ver[t]);
   const tile = (c, ic, lb, v, sub, act) => `<button class="tile tint" style="--c:${c}" data-tile="${act}"><span class="bg">${I(ic)}</span><span class="lb"><span class="chip sm">${I(ic)}</span>${lb}</span><span class="v num">${v}</span><span class="sub">${sub}</span></button>`;
   const pendTipo = t => pedidosList().filter(p => p.tipo === t && (p.estado || "pendiente") === "pendiente").length;
-  return `
+  return `${anunciosHTML()}
     <div class="hello greet"><h1>${h < 12 ? "Buenos días" : h < 19 ? "Buenas tardes" : "Buenas noches"}, <span>${esc((S.me.nombre || S.me.usuario).split(" ")[0])}</span></h1><span class="date">${I("cal")}${DIAS[d.getDay()]} ${d.getDate()} de ${MESES[d.getMonth()]} ${d.getFullYear()}</span></div>
     <div class="tiles ${pr.admin ? "t6" : "t5"}">
       ${tile("var(--accent)","box","Pendientes", a.pend.length, "por producir", "pendientes")}
@@ -1844,12 +1907,15 @@ async function guardarListas(cat){
 }
 function viewAjustes(){
   const c = Object.assign({}, cfg(), S.cdraft || {});
+  const oscuro = document.documentElement.dataset.theme === "dark";
   return `<div class="hello"><h1>Ajustes</h1><span class="date">${I("sliders")}Se aplican a todo el equipo</span></div>${adminTabs()}
+    <div class="card temacard"><label class="swr"><span>${I("moon")}Modo oscuro</span><input type="checkbox" class="swi" id="cTema" ${oscuro ? "checked" : ""}></label></div>
     <div class="card">
       <div class="sec">${I("sliders")}General</div>
       <div class="g3">
         <div class="f"><label>Avisar entregas con anticipación de</label><select class="inp" id="cDias">${[0,1,2,3,4,5,7,10,14].map(n => `<option value="${n}" ${n == c.dias ? "selected" : ""}>${n === 0 ? "Solo el mismo día" : n + " día" + (n > 1 ? "s" : "")}</option>`).join("")}</select></div>
         <div class="f"><label>Avisar si un pedido avisado no se retira en</label><select class="inp" id="cDiasRet">${[1,2,3,4,5,7,10,15,30].map(n => `<option value="${n}" ${n == c.diasRetiro ? "selected" : ""}>${n} día${n > 1 ? "s" : ""}</option>`).join("")}</select></div>
+        <div class="f"><label>Los avisos informativos se muestran durante</label><select class="inp" id="cDurAv">${[[1,"1 hora"],[3,"3 horas"],[6,"6 horas"],[12,"12 horas"],[24,"1 día"],[48,"2 días"],[72,"3 días"],[168,"1 semana"],[0,"Sin límite"]].map(([v, t]) => `<option value="${v}" ${v == c.duracionAvisos ? "selected" : ""}>${t}</option>`).join("")}</select></div>
       </div>
       <button class="btn primary" id="cSave" style="align-self:flex-end">${I("check")}Guardar</button>
     </div>
@@ -1871,7 +1937,7 @@ function viewAjustes(){
 function bindMain(){
   const app = $("#app");
   app.onclick = e => {
-    const b = e.target.closest("[data-view],[data-tab],[data-filtro],[data-act],[data-open],[data-avisar],[data-ya],[data-recordar],[data-entregar],[data-posponer],[data-lst],[data-lrm],[data-ladd],[data-buscar],[data-nc],[data-tile],[data-reset],[data-deluser],[data-utog]");
+    const b = e.target.closest("[data-anon],[data-anver],[data-view],[data-tab],[data-filtro],[data-act],[data-open],[data-avisar],[data-ya],[data-recordar],[data-entregar],[data-posponer],[data-lst],[data-lrm],[data-ladd],[data-buscar],[data-nc],[data-tile],[data-reset],[data-deluser],[data-utog]");
     if (!b) return;
     const d = b.dataset;
     if (d.view) { setView(d.view); return; }
@@ -1880,6 +1946,9 @@ function bindMain(){
     if (d.filtro) { S.filtro = d.filtro; autoTab(); render(); return; }
     if (d.act === "nuevo") return nuevoPedido(d.tipo);
     if (d.act === "revisar") return openRevisar();
+    if (d.act === "anuncio") return editarAnuncio(null);
+    if (d.anver) return editarAnuncio(d.anver);
+    if (d.anon) return alternarAnuncio(d.anon);
     if (d.act === "respaldo") return openRespaldo();
     if (d.act === "mipin") return cambiarMiPin();
     if (d.act === "cuenta") return openCuenta();
@@ -1899,7 +1968,7 @@ function bindMain(){
   const q = $("#q");
   if (q) q.oninput = () => { S.q = q.value; clearTimeout(q._t); q._t = setTimeout(render, 160); };
   $("#themeBtn").onclick = () => { const t = document.documentElement.dataset.theme === "dark" ? "light" : "dark"; document.documentElement.dataset.theme = t; try { localStorage.setItem("cs-tema", t); } catch(e) {} };
-  $("#meBtn").onclick = openCuenta;
+  if ($("#meBtn")) $("#meBtn").onclick = openCuenta;
   if ($("#demoBtn")) $("#demoBtn").onclick = toggleDemo;
   if ($("#instBtn")) $("#instBtn").onclick = async () => { S.installEvt.prompt(); await S.installEvt.userChoice; S.installEvt = null; render(); };
   if ($("#newUser")) $("#newUser").onclick = nuevoUsuario;
@@ -1908,7 +1977,7 @@ function bindMain(){
     catch(e) { toast("Error al guardar", true); ch.checked = !ch.checked; }
   });
   // Ajustes: conservar lo escrito y el tamaño de los cuadros de mensaje
-  const campos = {cDias:"dias", cDiasRet:"diasRetiro", cPl:"plantilla", cPlR:"plantillaRetiro", cPlS:"plantillaSaludo"};
+  const campos = {cDias:"dias", cDiasRet:"diasRetiro", cDurAv:"duracionAvisos", cPl:"plantilla", cPlR:"plantillaRetiro", cPlS:"plantillaSaludo"};
   for (const [id, k] of Object.entries(campos)) { const el = document.getElementById(id); if (el) el.addEventListener("input", () => { S.cdraft = Object.assign({}, S.cdraft, {[k]: el.tagName === "SELECT" ? Number(el.value) : el.value}); }); }
   ["cPl", "cPlR", "cPlS"].forEach(id => {
     const el = document.getElementById(id); if (!el) return;
@@ -1918,6 +1987,7 @@ function bindMain(){
   });
   const lin = $("#lin"); if (lin) lin.onkeydown = e => { if (e.key === "Enter") { e.preventDefault(); $("[data-ladd]").click(); } };
   if ($("#cSave")) {
+    if ($("#cTema")) $("#cTema").onchange = () => $("#themeBtn").click();
     $("#cSave").onclick = saveCfg; if ($("#cSave2")) $("#cSave2").onclick = saveCfg;
     bindRespaldo();
     $("#cReset").onclick = () => confirmar("¿Restaurar las listas originales?", "Se perderán las opciones que agregaste o quitaste.", "Restaurar", async () => { const r = Object.assign({}, S.cfgRaw || {}); delete r.cat; await setDoc(doc(S.db, "config/ajustes"), r); toast("Restaurado"); });
@@ -1927,7 +1997,7 @@ function bindMain(){
 async function saveCfg(){
   const c0 = cfg().cat, cat = Object.assign({}, c0, {colores: c0.colores.map(x => ({n:x[0], h:x[1] || ""}))});
   S.cdraft = null;
-  try { await setDoc(doc(S.db, "config/ajustes"), {negocio:DEF.negocio, dias:Number($("#cDias").value), plantilla:$("#cPl").value.trim() || DEF.plantilla, diasRetiro:Number($("#cDiasRet").value), plantillaRetiro:$("#cPlR").value.trim() || DEF.plantillaRetiro, plantillaSaludo:$("#cPlS").value.trim() || DEF.plantillaSaludo, cat}); toast("Guardado"); }
+  try { await setDoc(doc(S.db, "config/ajustes"), {negocio:DEF.negocio, dias:Number($("#cDias").value), plantilla:$("#cPl").value.trim() || DEF.plantilla, diasRetiro:Number($("#cDiasRet").value), duracionAvisos:Number($("#cDurAv").value), plantillaRetiro:$("#cPlR").value.trim() || DEF.plantillaRetiro, plantillaSaludo:$("#cPlS").value.trim() || DEF.plantillaSaludo, cat}); toast("Guardado"); }
   catch(e) { console.warn(e); toast("No se pudieron guardar los ajustes: " + (e.code || e.message), true); }
 }
 
