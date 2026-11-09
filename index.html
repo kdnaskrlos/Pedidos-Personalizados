@@ -890,8 +890,8 @@ body.fixedv{scrollbar-width:none}
 .tdate{display:inline-flex;align-items:center;gap:6px;font-size:13.5px;font-weight:600;color:var(--muted);white-space:nowrap;flex-shrink:0;padding:0 4px}
 .tdate svg.i{width:16px;height:16px}
 /* v3.3 animación de aviso nuevo (unos segundos, solo la primera vez) */
-.revbar.anun.anim{animation:anpulse 1.2s ease-in-out 3 both}
-.revbar.anun.anim .antx svg.i{animation:anwig 1.2s ease-in-out 3 both;animation-delay:inherit}
+.revbar.anun.anim{animation:anpulse 1.4s ease-in-out 5 both}
+.revbar.anun.anim .antx svg.i{animation:anwig 1.4s ease-in-out 5 both;animation-delay:inherit}
 @keyframes anpulse{0%,100%{box-shadow:0 0 0 0 rgba(234,179,8,0);transform:scale(1)}35%{box-shadow:0 0 0 6px rgba(234,179,8,.28);transform:scale(1.015)}}
 @keyframes anwig{0%,100%{transform:rotate(0)}15%{transform:rotate(-14deg)}30%{transform:rotate(12deg)}45%{transform:rotate(-8deg)}60%{transform:rotate(0)}}
 @media (prefers-reduced-motion:reduce){.revbar.anun.anim,.revbar.anun.anim .antx svg.i{animation:none}}
@@ -988,7 +988,7 @@ import { initializeApp, deleteApp } from "https://www.gstatic.com/firebasejs/10.
 import { getAuth, onAuthStateChanged, signInWithEmailAndPassword, createUserWithEmailAndPassword, signOut, updatePassword, reauthenticateWithCredential, EmailAuthProvider } from "https://www.gstatic.com/firebasejs/10.12.2/firebase-auth.js";
 import { initializeFirestore, getFirestore, persistentLocalCache, persistentMultipleTabManager, doc, collection, query, where, onSnapshot, getDoc, getDocs, setDoc, updateDoc, deleteDoc, writeBatch, runTransaction } from "https://www.gstatic.com/firebasejs/10.12.2/firebase-firestore.js";
 
-const VERSION = "v3.4";
+const VERSION = "v3.5";
 /* ================= Utilidades ================= */
 const $ = (s, r = document) => r.querySelector(s);
 const esc = s => String(s ?? "").replace(/[&<>"']/g, c => ({"&":"&amp;","<":"&lt;",">":"&gt;",'"':"&quot;","'":"&#39;"}[c]));
@@ -1432,7 +1432,7 @@ function anunciosHTML(){
   S.anAnim = S.anAnim || {}; let nuevo = false;
   l.filter(anVigente).forEach(a => { const k = a._id + "|" + (a.hasta || a.creadoEn); if (!vistos[k]) { vistos[k] = 1; S.anAnim[a._id] = Date.now(); nuevo = true; } });
   if (nuevo) { try { localStorage.setItem("cs-an-vistos", JSON.stringify(vistos)); } catch(e) {} }
-  const anim = a => { const t = S.anAnim[a._id]; const el = t ? Date.now() - t : 1e9; return el < 3600 ? ` anim" style="animation-delay:-${el}ms` : ""; };
+  const anim = a => { const t = S.anAnim[a._id]; const el = t ? Date.now() - t : 1e9; return el < 7000 ? ` anim" style="animation-delay:-${el}ms` : ""; };
   return (l.length || adm) ? `<div class="anlist">${l.map(a => `<div class="revbar anun ${anVigente(a) ? "on" : "off"}${anim(a)}">
       <button type="button" class="antx" data-anver="${esc(a._id)}">${I("alert")}<span>${esc(a.texto)}</span></button>
       ${adm ? `<button type="button" class="anchk" data-anon="${esc(a._id)}" aria-pressed="${anVigente(a)}" title="${anVigente(a) ? "Visible para el equipo" : "Mostrar al equipo"}">${I("check")}</button>` : ""}
