@@ -962,6 +962,12 @@ html,body{overscroll-behavior-y:none}
 .agvp{overflow:hidden;margin:0 -2px;touch-action:pan-y}
 .agtrack{display:flex;width:300%;transform:translateX(-33.3333%);will-change:transform}
 .agtrack>.dpg{width:33.3333%;flex:none;padding:0 2px;box-sizing:border-box}
+/* v3.28 calendario: día elegido en verde crema y puntos con el color del estado del pedido */
+.dd.ag.sel{background:#dcfce7;color:#15803d;box-shadow:inset 0 0 0 1.5px #bbf7d0}
+:root[data-theme="dark"] .dd.ag.sel{background:#12311f;color:#86efac;box-shadow:inset 0 0 0 1.5px #1f4d31}
+.dd.ag.sel em b{box-shadow:none}
+.dd.ag em b.pt-err{background:#dc2626}.dd.ag em b.pt-warn{background:#eab308}.dd.ag em b.pt-info{background:#3b82f6}
+.dd.ag em b.pt-vio{background:#8b5cf6}.dd.ag em b.pt-ok{background:#16a34a}.dd.ag em b.pt-nor{background:var(--muted)}
 @media (max-width:1000px){.hello{padding-bottom:8px;margin-top:-6px}.hello h1{font-size:25px}}
 @media (max-width:1000px){.tiles.t5>:last-child{grid-column:1/-1}}
 @media (max-width:1000px){.pill.demo .m-pr{display:inline}}
@@ -1072,7 +1078,7 @@ const updateDoc = (...a) => sinEsperar(fsUpdateDoc(...a));
 const deleteDoc = (...a) => sinEsperar(fsDeleteDoc(...a));
 const writeBatch = db => { const b = fsWriteBatch(db), c = b.commit.bind(b); b.commit = () => sinEsperar(c()); return b; };
 
-const VERSION = "v3.27";
+const VERSION = "v3.28";
 /* ================= Utilidades ================= */
 const $ = (s, r = document) => r.querySelector(s);
 const esc = s => String(s ?? "").replace(/[&<>"']/g, c => ({"&":"&amp;","<":"&lt;",">":"&gt;",'"':"&quot;","'":"&#39;"}[c]));
@@ -2435,7 +2441,7 @@ function openAgenda(){
     for (let dd = 1; dd <= nd; dd++) {
       const s = `${y}-${pad(m+1)}-${pad(dd)}`, l = g[s] || [];
       const act = l.filter(p => p.estado !== "entregado");
-      const puntos = act.slice(0, 3).map(p => `<b style="background:${p.urgente ? "var(--err)" : TIPOS[p.tipo].c}"></b>`).join("") + (act.length > 3 ? `<small>+${act.length - 3}</small>` : "") + (!act.length && l.length ? `<b class="ent"></b>` : "");
+      const puntos = act.slice(0, 3).map(p => `<b class="pt-${p.urgente ? "err" : dueShort(p).c || "nor"}"></b>`).join("") + (act.length > 3 ? `<small>+${act.length - 3}</small>` : "") + (!act.length && l.length ? `<b class="pt-ok"></b>` : "");
       cells += `<button class="dd ag ${s === t0 ? "hoy" : ""} ${s === sel ? "sel" : ""} ${l.length ? "con" : ""}" data-d="${s}"><span>${dd}</span><em>${puntos}</em></button>`;
     }
     for (let k = first + nd; k < 42; k++) cells += `<i class="dd ag"></i>`;
