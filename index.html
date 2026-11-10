@@ -983,6 +983,9 @@ html,body{overscroll-behavior-y:none}
 /* v3.39 tarjeta de sublimación en 2 columnas y N° en gris tenue como "Nombre" */
 .irow3.sub .r1{grid-template-columns:repeat(2,minmax(0,1fr))}
 .irow3 .r3 .nu:not(.on){color:color-mix(in srgb,var(--muted) 45%,transparent)}
+/* v3.40 campo de cantidad con fondo blanco */
+.irow3 .qty .qin{background:var(--surface)}
+.irow3 .qty .qin:focus{background:var(--surface)}
 @media (max-width:1000px){.hello{padding-bottom:8px;margin-top:-6px}.hello h1{font-size:25px}}
 @media (max-width:1000px){.tiles.t5>:last-child{grid-column:1/-1}}
 @media (max-width:1000px){.pill.demo .m-pr{display:inline}}
@@ -1093,7 +1096,7 @@ const updateDoc = (...a) => sinEsperar(fsUpdateDoc(...a));
 const deleteDoc = (...a) => sinEsperar(fsDeleteDoc(...a));
 const writeBatch = db => { const b = fsWriteBatch(db), c = b.commit.bind(b); b.commit = () => sinEsperar(c()); return b; };
 
-const VERSION = "v3.39";
+const VERSION = "v3.40";
 /* ================= Utilidades ================= */
 const $ = (s, r = document) => r.querySelector(s);
 const esc = s => String(s ?? "").replace(/[&<>"']/g, c => ({"&":"&amp;","<":"&lt;",">":"&gt;",'"':"&quot;","'":"&#39;"}[c]));
@@ -2678,6 +2681,12 @@ function openForm(id, tipo, cliente, borrador){
     </div>
     <div class="mf"><button class="btn" id="prev">${I("undo")}Atrás</button><span style="flex:1"></span><button class="btn" id="save">${I("check")}Guardar</button><button class="btn c" style="--c:${T.c}" id="next">Siguiente</button></div>`, "wide", true);
   F._ov = ov;
+  // Tocar un espacio vacío contrae la prenda abierta (cuando están en modo compacto)
+  ov.addEventListener("click", e => {
+    if (F.iOpen == null || F.items.length <= 3 || !document.body.contains(ov)) return;
+    if (e.target.closest(".irow3, .iswipe, .addbar, button, input, textarea, select, a, label")) return;
+    F.iOpen = null; renderItems();
+  });
   const salir = () => confirmar("¿Salir sin guardar?", "Los datos de este pedido se perderán.", "Salir", async () => { if (F && F._nuevo) borrarBorrador(); ov.close(); F = null; });
   ov.querySelectorAll("[data-cerrar]").forEach(b => b.onclick = salir);
   ov.onBack = () => { navPush(); if (F && F.step > 0) goStep(F.step - 1); else salir(); };
