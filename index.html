@@ -916,6 +916,9 @@ html,body{overscroll-behavior-y:none}
 .agday b{font-size:15px;font-weight:800}
 .agday span{font-size:12.5px;color:var(--muted);font-weight:600}
 .aglist{display:flex;flex-direction:column;gap:8px}
+/* v3.10 agenda por debajo del pedido abierto; botón de prueba al final del Resumen */
+.dp-ov.agov{z-index:45}
+.main>.pill.demo,#demoBtn{align-self:center;margin:4px auto 0;display:inline-flex}
 @media (max-width:1000px){.hello{padding-bottom:8px;margin-top:-6px}.hello h1{font-size:25px}}
 @media (max-width:1000px){.tiles.t5>:last-child{grid-column:1/-1}}
 @media (max-width:1000px){.pill.demo .m-pr{display:inline}}
@@ -1020,7 +1023,7 @@ const updateDoc = (...a) => sinEsperar(fsUpdateDoc(...a));
 const deleteDoc = (...a) => sinEsperar(fsDeleteDoc(...a));
 const writeBatch = db => { const b = fsWriteBatch(db), c = b.commit.bind(b); b.commit = () => sinEsperar(c()); return b; };
 
-const VERSION = "v3.9";
+const VERSION = "v3.10";
 /* ================= Utilidades ================= */
 const $ = (s, r = document) => r.querySelector(s);
 const esc = s => String(s ?? "").replace(/[&<>"']/g, c => ({"&":"&amp;","<":"&lt;",">":"&gt;",'"':"&quot;","'":"&#39;"}[c]));
@@ -1412,7 +1415,6 @@ function doRender(){
   <div class="shell">
     <div class="topbar">
       <span class="pill st ${S.online && !S.cache ? "ok" : "bad"}"><i></i>${S.online ? (S.cache ? "Sincronizando…" : "En línea") : "Sin conexión · se guardará al volver"}</span>
-      ${pr.admin && S.me && S.me.rol === "admin" && S.view === "resumen" ? `<button class="pill demo ${hayDemo() ? "on" : ""}" id="demoBtn" title="Modo prueba" aria-label="Modo prueba">${I("flask")}</button>` : ""}
       ${!(S.view === "resumen" || (pr.admin && (S.view === "ajustes" || S.view === "equipo"))) ? `<button class="pill tdate hide-m" data-act="agenda" title="Calendario de pedidos">${I("cal")}${DIAS[d.getDay()]} ${d.getDate()} de ${MESES[d.getMonth()]}</button>` : ""}
       <span class="sp"></span>
       ${S.installEvt ? `<button class="pill" id="instBtn">${I("download")}<span class="hide-m">Instalar app</span></button>` : ""}
@@ -1703,6 +1705,7 @@ function viewResumen(a, pr){
       ${(() => { const n = pedidosList().filter(p => p.estado === "listo" && p.avisado).length; return tile("var(--t-violet)","bag","Sin retirar", n, n === 1 ? "cliente avisado que no ha retirado" : "clientes avisados que no han retirado", "retirar"); })()}
       ${pr.admin ? (() => { const n = revisarList().length; return tile("var(--t-pink, #db2777)","edit","Cambios", n, n ? (n === 1 ? "pedido editado por el equipo" : "pedidos editados por el equipo") : "sin cambios por revisar", "revisar"); })() : ""}
     </div>
+    ${pr.admin && S.me.rol === "admin" ? `<button class="pill demo ${hayDemo() ? "on" : ""}" id="demoBtn">${I("flask")}Modo prueba${hayDemo() ? " · activo" : ""}</button>` : ""}
     <p class="appver">${esc(cfg().negocio)} · Pedidos · versión ${VERSION}</p>`;
 }
 function viewPedidos(a, pr){
@@ -2370,7 +2373,7 @@ function openCalendar(current, onPick, opts = {}){
 function openAgenda(){
   const v = today0(); v.setDate(1);
   let sel = ymd(today0());
-  const ov = document.createElement("div"); ov.className = "dp-ov"; overlay(ov);
+  const ov = document.createElement("div"); ov.className = "dp-ov agov"; overlay(ov);
   const porDia = () => { const g = {}; pedidosList().forEach(p => { if (p.fechaEntrega) (g[p.fechaEntrega] = g[p.fechaEntrega] || []).push(p); }); return g; };
   const draw = () => {
     const g = porDia(), y = v.getFullYear(), m = v.getMonth(), first = (new Date(y, m, 1).getDay() + 6) % 7, nd = new Date(y, m + 1, 0).getDate(), t0 = ymd(today0());
