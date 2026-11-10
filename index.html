@@ -1097,7 +1097,7 @@ const updateDoc = (...a) => sinEsperar(fsUpdateDoc(...a));
 const deleteDoc = (...a) => sinEsperar(fsDeleteDoc(...a));
 const writeBatch = db => { const b = fsWriteBatch(db), c = b.commit.bind(b); b.commit = () => sinEsperar(c()); return b; };
 
-const VERSION = "v3.45";
+const VERSION = "v3.46";
 /* ================= Utilidades ================= */
 const $ = (s, r = document) => r.querySelector(s);
 const esc = s => String(s ?? "").replace(/[&<>"']/g, c => ({"&":"&amp;","<":"&lt;",">":"&gt;",'"':"&quot;","'":"&#39;"}[c]));
@@ -2873,6 +2873,18 @@ function animarPrendas(cambio){
     a.onfinish = a.oncancel = () => { el.style.overflow = ""; };
   });
 }
+// Quitar una prenda: la tarjeta se desvanece y su espacio se cierra suavemente; luego se reacomodan las demás
+function quitarPrenda(n, wrap, deslizado, luego){
+  const it = F.items[n];
+  const fin = () => { if (!F) return; animarPrendas(() => { const k = F.items.indexOf(it); if (k >= 0) F.items.splice(k, 1); F.iOpen = null; renderItems(); }); renderTotals(); if (luego) luego(); };
+  if (!wrap || !wrap.animate) return fin();
+  const h = wrap.getBoundingClientRect().height, mb = getComputedStyle(wrap).marginBottom;
+  wrap.style.overflow = "hidden"; wrap.style.pointerEvents = "none";
+  const card = wrap.querySelector(".irow3"), bg = wrap.querySelector(".delbg");
+  if (!deslizado && card) card.animate([{opacity:1, transform:"none"}, {opacity:0, transform:"translateX(-18px) scale(.97)"}], {duration:180, easing:"ease-in", fill:"forwards"});
+  if (bg) bg.animate([{opacity:getComputedStyle(bg).opacity}, {opacity:0}], {duration:200, fill:"forwards"});
+  wrap.animate([{height:h + "px", marginBottom:mb}, {height:"0px", marginBottom:"0px"}], {duration:240, delay:deslizado ? 0 : 110, easing:"cubic-bezier(.4,0,.2,1)", fill:"forwards"}).onfinish = fin;
+}
 function cambiarAbierta(n){ animarPrendas(() => { F.iOpen = n; renderItems(); }); }
 const qtyHTML = it => `<div class="qty">${it.cant === 1 ? `<button type="button" class="del" data-del title="Quitar">${I("trash")}</button>` : `<button type="button" data-q="-1">−</button>`}<input class="qin" type="text" inputmode="numeric" pattern="[0-9]*" data-cant value="${it.cant || 1}" placeholder="1" aria-label="Unidades"><button type="button" data-q="1">+</button></div>`;
 function renderItems(){
@@ -2922,7 +2934,7 @@ function renderItems(){
     const n = Number(row.dataset.i), it = F.items[n], t = e.target.closest("button"); if (!t) return;
     if (t.dataset.pick) return elegir(it, t.dataset.pick);
     if (t.dataset.q) { it.cant = Math.max(1, it.cant + Number(t.dataset.q)); renderItems(); renderTotals(); }
-    if (t.hasAttribute("data-del")) { animarPrendas(() => { F.items.splice(n, 1); F.iOpen = null; renderItems(); }); renderTotals(); }
+    if (t.hasAttribute("data-del")) quitarPrenda(n, row.closest(".iswipe") || row, false);
   };
   box.oninput = e => {
     const row = e.target.closest("[data-i]"); if (!row) return;
@@ -2972,10 +2984,7 @@ function deslizarBorrar(box){
     if (borrar) {
       r.style.transform = "translateX(-110%)";
       const n = Number(r.dataset.i), quitado = F.items[n];
-      setTimeout(() => {
-        animarPrendas(() => { F.items.splice(n, 1); F.iOpen = null; renderItems(); }); renderTotals();
-        toastUndo("Prenda eliminada", async () => { if (!F) return; animarPrendas(() => { F.items.splice(n, 0, quitado); renderItems(); }); renderTotals(); });
-      }, 180);
+      setTimeout(() => quitarPrenda(n, w, true, () => toastUndo("Prenda eliminada", async () => { if (!F) return; animarPrendas(() => { F.items.splice(n, 0, quitado); renderItems(); }); renderTotals(); })), 170);
     } else { r.style.transform = ""; r.style.opacity = ""; r.classList.remove("borrar"); if (w) { w.classList.remove("armed"); setTimeout(() => w.classList.remove("on"), 220); } }
   };
   box.addEventListener("touchend", soltar); box.addEventListener("touchcancel", soltar);
