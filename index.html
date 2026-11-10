@@ -23,7 +23,7 @@
    barra lateral de íconos (abajo en el teléfono), tarjetas pastel, tema claro por defecto. */
 :root{
   --bg:#ffffff; --surface:#ffffff; --surface-2:#f6f8fa; --line:#e5e9ee; --ink:#111827; --muted:#6b7280;
-  --accent:#16a34a; --accent-ink:#ffffff; --accent-soft:#ecfdf3;
+  --accent:#16a34a; --accent-ink:#ffffff; --accent-soft:#dcfce7;
   --t-pers:#0d9488; --t-sub:#c2410c; --t-info:#2563eb; --t-violet:#7c3aed; --t-wa:#16a34a;
   --ok:#16a34a; --warn:#b45309; --err:#dc2626;
   --f:"Plus Jakarta Sans",system-ui,-apple-system,"Segoe UI",sans-serif;
@@ -106,7 +106,7 @@ button.pill:hover{border-color:var(--ink)}
 .btn.primary:hover{filter:brightness(1.05)}
 .btn.c{background:var(--c);border-color:var(--c);color:#fff}
 .btn.danger{color:var(--err);border-color:color-mix(in srgb,var(--err) 40%,var(--line))}
-.btn.wa{background:#1fae55;border-color:#1fae55;color:#fff}
+.btn.wa{background:#16a34a;border-color:#16a34a;color:#fff}
 .btn.sm{padding:5px 10px;font-size:12px;min-height:30px}
 .btn:disabled{opacity:.45;cursor:default;filter:none}
 .card{background:var(--surface);border:1px solid var(--line);border-radius:var(--r);padding:18px;display:flex;flex-direction:column;gap:14px;min-width:0}
@@ -387,15 +387,15 @@ table.mx{border-collapse:collapse;width:100%;font-size:13px}
 .aday.err{color:var(--err);background:color-mix(in srgb,var(--err) 10%,var(--surface))}
 .aday.warn{color:var(--warn);background:color-mix(in srgb,var(--warn) 12%,var(--surface))}
 .aw,.ac2{flex:none;width:36px;height:36px;border-radius:10px;display:grid;place-items:center;border:1px solid var(--line);background:var(--surface);color:var(--ink)}
-.aw{background:#1fae55;border-color:#1fae55;color:#fff}
+.aw{background:#16a34a;border-color:#16a34a;color:#fff}
 .aw svg.i,.ac2 svg.i{width:18px;height:18px}
 .aempty{font-size:13px;color:var(--muted);padding:10px 12px;border:1px dashed var(--line);border-radius:var(--r)}
 /* pie del detalle */
 .dfoot{flex-direction:column;align-items:stretch}
 .drow{display:flex;gap:8px;align-items:center}
 .dgrid{display:grid;grid-template-columns:1fr 1fr;gap:8px}
-.btn.listo{width:100%;min-height:48px;font-size:15px;background:color-mix(in srgb,var(--accent) 16%,var(--surface));border-color:color-mix(in srgb,var(--accent) 35%,var(--line));color:color-mix(in srgb,var(--accent) 75%,#000)}
-:root[data-theme="dark"] .btn.listo{color:var(--accent)}
+.btn.listo{width:100%;min-height:48px;font-size:15px;background:#dcfce7;border-color:#bbf7d0;color:#15803d}
+:root[data-theme="dark"] .btn.listo{background:#12311f;border-color:#1f4d31;color:#86efac}
 .btn.listo:hover{border-color:var(--accent)}
 .btn.wa.big{min-height:48px;font-size:15px}
 
@@ -662,9 +662,9 @@ table.mx{border-collapse:collapse;width:100%;font-size:13px}
 .pdb{padding:16px;gap:14px}
 .pdcard{background:var(--surface);border:1px solid var(--line);border-radius:16px;padding:16px;display:flex;flex-direction:column;gap:12px}
 .pdcard hr{border:0;border-top:1px solid var(--line);margin:0}
-.pddate{flex-direction:row;align-items:center;gap:14px;background:#fff4e8;border-color:#fbd9b4}
+.pddate{flex-direction:row;align-items:center;gap:14px;background:#fff7d1;border-color:#f3dc7c}
 .pddate.err{background:#fdecec;border-color:#f6c0c0}
-.pddate.ok{background:#e9f7ee;border-color:#bfe6cc}
+.pddate.ok{background:#dcfce7;border-color:#bbf7d0}
 .pddate.info{background:#ebf2fe;border-color:#c5d8fb}
 :root[data-theme="dark"] .pddate{background:color-mix(in srgb,var(--warn) 12%,var(--surface));border-color:color-mix(in srgb,var(--warn) 30%,var(--line))}
 .pdcal{width:50px;height:54px;flex:none;border-radius:10px;background:var(--surface);border:1px solid var(--line);display:flex;flex-direction:column;align-items:center;justify-content:center;line-height:1}
@@ -679,7 +679,7 @@ table.mx{border-collapse:collapse;width:100%;font-size:13px}
 .pdwho{display:flex;align-items:center;gap:12px}
 .pdav{width:44px;height:44px;border-radius:50%;display:grid;place-items:center;font-weight:800;font-size:14px;background:var(--accent-soft);color:var(--accent);flex:none}
 .pdwho b{font-size:17px;font-weight:600}
-.pdwa{display:flex;align-items:center;justify-content:center;gap:8px;min-height:46px;border-radius:10px;padding:0 14px;background:#dcf5e3;border:1px solid #b8e6c6;color:#15803d;font-weight:800;font-size:14px;text-decoration:none}
+.pdwa{display:flex;align-items:center;justify-content:center;gap:8px;min-height:46px;border-radius:10px;padding:0 14px;background:#dcfce7;border:1px solid #bbf7d0;color:#15803d;font-weight:800;font-size:14px;text-decoration:none}
 :root[data-theme="dark"] .pdwa{background:#12311f;border-color:#1f4d31;color:#86efac}
 .pdwa svg.i{width:16px;height:16px}
 .pdlbl{font-size:12px;font-weight:800;letter-spacing:.05em;color:var(--muted);display:flex;align-items:center;gap:8px}
@@ -704,12 +704,12 @@ table.mx{border-collapse:collapse;width:100%;font-size:13px}
 .pdpay b{font-size:18px;font-weight:800}
 .pdpay .ab{background:var(--surface-2)} .pdpay .ab b{color:#15803d}
 .pdpay .sa{background:#fdecec;border-color:#f6c0c0} .pdpay .sa b{color:#c81e1e}
-.pdpay .sa.ok{background:#e9f7ee;border-color:#bfe6cc} .pdpay .sa.ok b{color:#15803d}
+.pdpay .sa.ok{background:#dcfce7;border-color:#bbf7d0} .pdpay .sa.ok b{color:#15803d}
 :root[data-theme="dark"] .pdpay .sa{background:color-mix(in srgb,var(--err) 12%,var(--surface));border-color:color-mix(in srgb,var(--err) 30%,var(--line))} :root[data-theme="dark"] .pdpay .sa b{color:var(--err)}
 :root[data-theme="dark"] .pdpay .ab b{color:var(--ok)}
 .pdnote{white-space:pre-wrap;font-size:14px}
 .pdhist{padding:0 4px}
-.btn.pdlisto{width:100%;min-height:52px;font-size:16px;background:#137a4f;border-color:#137a4f;color:#fff;border-radius:12px}
+.btn.pdlisto{width:100%;min-height:52px;font-size:16px;background:#15803d;border-color:#15803d;color:#fff;border-radius:12px}
 .btn.pdlisto:hover{filter:brightness(1.06)}
 .pdmd .drow2 .btn{min-height:48px;border-radius:12px;font-size:15px}
 
@@ -748,7 +748,7 @@ table.mx{border-collapse:collapse;width:100%;font-size:13px}
 /* v2.51 píldoras con los mismos colores de la tarjeta de fecha del detalle */
 .oc2-due,.aday,.oc2-due.warn,.aday.warn{border:1px solid #f3dc7c;background:#fff7d1;color:#a16207}
 .oc2-due.err,.aday.err{border-color:#f6c0c0;background:#fdecec;color:var(--err)}
-.oc2-due.ok,.aday.ok,.aday.info{border-color:#bfe6cc;background:#e9f7ee;color:var(--ok)}
+.oc2-due.ok,.aday.ok,.aday.info{border-color:#bbf7d0;background:#dcfce7;color:#15803d}
 .oc2-due.info{border-color:#c5d8fb;background:#ebf2fe;color:var(--t-info)}
 :root[data-theme="dark"] .oc2-due,:root[data-theme="dark"] .aday,:root[data-theme="dark"] .oc2-due.warn,:root[data-theme="dark"] .aday.warn{border-color:color-mix(in srgb,var(--soon) 30%,var(--line));background:color-mix(in srgb,var(--soon) 12%,var(--surface));color:var(--soon)}
 :root[data-theme="dark"] .oc2-due.err,:root[data-theme="dark"] .aday.err{border-color:color-mix(in srgb,var(--err) 30%,var(--line));background:color-mix(in srgb,var(--err) 12%,var(--surface));color:var(--err)}
@@ -768,13 +768,13 @@ table.mx{border-collapse:collapse;width:100%;font-size:13px}
 /* v2.53 pronta entrega en amarillo */
 :root{--soon:#ca8a04}
 :root[data-theme="dark"]{--soon:#facc15}
-.pddate:not(.err):not(.ok):not(.info):not(.vio){background:#fff8d6;border-color:#f3dc7c}
+.pddate:not(.err):not(.ok):not(.info):not(.vio){background:#fff7d1;border-color:#f3dc7c}
 .pddate:not(.err):not(.ok):not(.info):not(.vio) .pdrel,.pddate:not(.err):not(.ok):not(.info):not(.vio) .pdcal small{color:#a16207}
 :root[data-theme="dark"] .pddate:not(.err):not(.ok):not(.info):not(.vio){background:color-mix(in srgb,var(--soon) 12%,var(--surface));border-color:color-mix(in srgb,var(--soon) 30%,var(--line))}
 :root[data-theme="dark"] .pddate:not(.err):not(.ok):not(.info):not(.vio) .pdrel,:root[data-theme="dark"] .pddate:not(.err):not(.ok):not(.info):not(.vio) .pdcal small{color:var(--soon)}
 /* v2.55 Sin retirar en morado */
 .oc2-due.vio,.aday.vio{border-color:#d9c9fb;background:#f3eefe;color:var(--t-violet)}
-.pddate.vio{background:#f5f0ff;border-color:#d9c9fb}
+.pddate.vio{background:#f3eefe;border-color:#d9c9fb}
 .pddate.vio .pdrel,.pddate.vio .pdcal small{color:var(--t-violet)}
 .pdst.vio{background:color-mix(in srgb,var(--t-violet) 12%,var(--surface));color:var(--t-violet)}
 :root[data-theme="dark"] .oc2-due.vio,:root[data-theme="dark"] .aday.vio{border-color:color-mix(in srgb,var(--t-violet) 30%,var(--line));background:color-mix(in srgb,var(--t-violet) 12%,var(--surface))}
@@ -1044,6 +1044,12 @@ html,body{overscroll-behavior-y:none}
   .toast{bottom:96px}
   .tiles{grid-template-columns:1fr 1fr}
 }
+
+/* v3.20 paleta unificada en modo oscuro para los "crema" */
+:root[data-theme="dark"] .pdwa,:root[data-theme="dark"] .pdpay .sa.ok,:root[data-theme="dark"] .pddate.ok,:root[data-theme="dark"] .oc2-due.ok,:root[data-theme="dark"] .aday.ok{background:#12311f;border-color:#1f4d31;color:#86efac}
+:root[data-theme="dark"] .pdpay .sa.ok b{color:#86efac}
+.pdcal small{color:#a16207}
+.pddate.err .pdcal small,.pddate.err .pdrel{color:var(--err)}
 </style>
 </head>
 <body>
@@ -1066,7 +1072,7 @@ const updateDoc = (...a) => sinEsperar(fsUpdateDoc(...a));
 const deleteDoc = (...a) => sinEsperar(fsDeleteDoc(...a));
 const writeBatch = db => { const b = fsWriteBatch(db), c = b.commit.bind(b); b.commit = () => sinEsperar(c()); return b; };
 
-const VERSION = "v3.19";
+const VERSION = "v3.20";
 /* ================= Utilidades ================= */
 const $ = (s, r = document) => r.querySelector(s);
 const esc = s => String(s ?? "").replace(/[&<>"']/g, c => ({"&":"&amp;","<":"&lt;",">":"&gt;",'"':"&quot;","'":"&#39;"}[c]));
