@@ -1090,7 +1090,7 @@ const updateDoc = (...a) => sinEsperar(fsUpdateDoc(...a));
 const deleteDoc = (...a) => sinEsperar(fsDeleteDoc(...a));
 const writeBatch = db => { const b = fsWriteBatch(db), c = b.commit.bind(b); b.commit = () => sinEsperar(c()); return b; };
 
-const VERSION = "v3.37";
+const VERSION = "v3.38";
 /* ================= Utilidades ================= */
 const $ = (s, r = document) => r.querySelector(s);
 const esc = s => String(s ?? "").replace(/[&<>"']/g, c => ({"&":"&amp;","<":"&lt;",">":"&gt;",'"':"&quot;","'":"&#39;"}[c]));
@@ -2569,7 +2569,14 @@ function openAgenda(){
 // Mayúscula inicial mientras se escribe: en cada palabra (nombres) o solo en la primera (tema)
 const CONECT = ["de","del","la","las","los","y","e","o","u","a","al","en","con","por","para","sin","da","das","do","dos","di","van","von","el"];
 const capPalabras = s => s.replace(/(^|[\s'-])(\p{Ll})/gu, (m, a, b) => a + b.toLocaleUpperCase("es"))
-  .replace(/(\s)(\p{Lu}\p{Ll}*)(?=\s|$)/gu, (m, a, w) => CONECT.includes(w.toLocaleLowerCase("es")) ? a + w.toLocaleLowerCase("es") : m);
+  .replace(/(?<=(?:^|\s)(\S*))(\s+)(\p{Lu}\p{Ll}*)(?=\s|$)/gu, (m, prev, a, w) => {
+    // Los artículos (el, la, los, las) solo van en minúscula después de un conector: "Camisa de la Escuela", pero "Panadería La Cosecha"
+    const l = w.toLocaleLowerCase("es"), p = prev.toLocaleLowerCase("es");
+    if (!CONECT.includes(l)) return m;
+    if (ARTIC.includes(l) && !PREP.includes(p)) return m;
+    return a + l;
+  });
+const ARTIC = ["el","la","las","los"], PREP = ["de","del","a","al","en","con","por","para","sin"];
 const capPrimera = s => s.replace(/^(\s*)(\p{Ll})/u, (m, a, b) => a + b.toLocaleUpperCase("es"));
 function mayus(el, todas){
   const v = el.value, n = todas ? capPalabras(v) : capPrimera(v);
