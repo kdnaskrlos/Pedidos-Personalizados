@@ -929,6 +929,19 @@ html,body{overscroll-behavior-y:none}
 .irow3.mini .mt small{font-weight:600;color:var(--muted);font-size:13px}
 .irow3.mini svg.i{flex:none;width:18px;height:18px;color:var(--muted)}
 .irow3.mini.bad{border-color:var(--err);background:color-mix(in srgb,var(--err) 5%,var(--surface))}
+/* v3.13 animación de meses, nombre/número en segunda línea, deslizar para borrar, tarjeta seleccionada */
+.slL{animation:slL .22s ease-out}
+.slR{animation:slR .22s ease-out}
+@keyframes slL{from{transform:translateX(28px);opacity:0}to{transform:none;opacity:1}}
+@keyframes slR{from{transform:translateX(-28px);opacity:0}to{transform:none;opacity:1}}
+@media (prefers-reduced-motion:reduce){.slL,.slR{animation:none}}
+.irow3.mini .mt{display:flex;flex-direction:column;gap:1px;white-space:normal}
+.irow3.mini .m1{white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
+.irow3.mini .m2{font-size:12px;font-weight:600;color:var(--ink);white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
+.irow3{touch-action:pan-y}
+.irow3.borrar{border-color:var(--err)!important;background:color-mix(in srgb,var(--err) 10%,var(--surface))!important}
+.irow3.selc{border-color:#93c5fd;box-shadow:0 0 0 3px rgba(59,130,246,.16),0 6px 22px rgba(59,130,246,.22)}
+:root[data-theme="dark"] .irow3.selc{border-color:#3b82f6;box-shadow:0 0 0 3px rgba(59,130,246,.22),0 6px 22px rgba(59,130,246,.3)}
 @media (max-width:1000px){.hello{padding-bottom:8px;margin-top:-6px}.hello h1{font-size:25px}}
 @media (max-width:1000px){.tiles.t5>:last-child{grid-column:1/-1}}
 @media (max-width:1000px){.pill.demo .m-pr{display:inline}}
@@ -1033,7 +1046,7 @@ const updateDoc = (...a) => sinEsperar(fsUpdateDoc(...a));
 const deleteDoc = (...a) => sinEsperar(fsDeleteDoc(...a));
 const writeBatch = db => { const b = fsWriteBatch(db), c = b.commit.bind(b); b.commit = () => sinEsperar(c()); return b; };
 
-const VERSION = "v3.12";
+const VERSION = "v3.13";
 /* ================= Utilidades ================= */
 const $ = (s, r = document) => r.querySelector(s);
 const esc = s => String(s ?? "").replace(/[&<>"']/g, c => ({"&":"&amp;","<":"&lt;",">":"&gt;",'"':"&quot;","'":"&#39;"}[c]));
@@ -2385,7 +2398,7 @@ function openAgenda(){
   let sel = ymd(today0());
   const ov = document.createElement("div"); ov.className = "dp-ov agov"; overlay(ov);
   const porDia = () => { const g = {}; pedidosList().forEach(p => { if (p.fechaEntrega) (g[p.fechaEntrega] = g[p.fechaEntrega] || []).push(p); }); return g; };
-  const draw = () => {
+  const draw = dir => {
     const g = porDia(), y = v.getFullYear(), m = v.getMonth(), first = (new Date(y, m, 1).getDay() + 6) % 7, nd = new Date(y, m + 1, 0).getDate(), t0 = ymd(today0());
     let cells = ["Lu","Ma","Mi","Ju","Vi","Sá","Do"].map(x => `<span>${x}</span>`).join("");
     for (let i = 0; i < first; i++) cells += "<i></i>";
@@ -2401,11 +2414,12 @@ function openAgenda(){
     ov.innerHTML = `<div class="dp-pop agpop"><div class="dph"><button data-nav="-1">‹</button><b>${MESES[m]} ${y}</b><button data-nav="1">›</button></div><div class="dpg">${cells}</div>
       <div class="agday"><b>${(s => s.charAt(0).toUpperCase() + s.slice(1))(`${DIAS[f.getDay()]} ${f.getDate()} de ${MESES[f.getMonth()]}`)}</b><span>${l.length ? `${l.length} entrega${l.length === 1 ? "" : "s"}` : "Sin entregas"}</span></div>
       <div class="aglist">${l.map(cardHTML).join("")}</div></div>`;
+    if (dir) { const gr = ov.querySelector(".dpg"), tt = ov.querySelector(".dph b"); [gr, tt].forEach(x => x && x.classList.add(dir > 0 ? "slL" : "slR")); }
     loadFotos(ov);
   };
   ov.onclick = e => {
     if (e.target === ov) return ov.close();
-    const n = e.target.closest("[data-nav]"); if (n) { v.setMonth(v.getMonth() + Number(n.dataset.nav)); return draw(); }
+    const n = e.target.closest("[data-nav]"); if (n) { v.setMonth(v.getMonth() + Number(n.dataset.nav)); return draw(Number(n.dataset.nav)); }
     const d = e.target.closest("[data-d]"); if (d) { sel = d.dataset.d; return draw(); }
     const o = e.target.closest("[data-open]"); if (o) openDetail(o.dataset.open);
   };
@@ -2414,7 +2428,7 @@ function openAgenda(){
   ov.addEventListener("touchstart", e => { const t = e.touches[0]; x0 = t.clientX; y0 = t.clientY; }, {passive:true});
   ov.addEventListener("touchend", e => {
     if (x0 === null) return; const t = e.changedTouches[0], dx = t.clientX - x0, dy = t.clientY - y0; x0 = null;
-    if (Math.abs(dx) > 50 && Math.abs(dx) > Math.abs(dy) * 1.5 && e.target.closest(".dpg,.dph")) { v.setMonth(v.getMonth() + (dx < 0 ? 1 : -1)); draw(); }
+    if (Math.abs(dx) > 50 && Math.abs(dx) > Math.abs(dy) * 1.5 && e.target.closest(".dpg,.dph")) { v.setMonth(v.getMonth() + (dx < 0 ? 1 : -1)); draw(dx < 0 ? 1 : -1); }
   }, {passive:true});
   draw();
   const t = setInterval(() => { if (!document.body.contains(ov)) return clearInterval(t); if (!document.querySelector(".md")) { const sc = ov.querySelector(".agpop") && ov.querySelector(".agpop").scrollTop; draw(); if (sc) ov.querySelector(".agpop").scrollTop = sc; } }, 3000);
@@ -2697,7 +2711,7 @@ function renderItems(){
   const pb = (f, val, ph, extra = "", off = false) => `<button type="button" class="pbtn ${val ? "on" : ""}${off ? " off" : ""}" ${off ? "disabled" : `data-pick="${f}"`} data-err="${f}">${extra}<span>${esc(val || ph)}</span></button>`;
   if (!F.items.length) {
     box.innerHTML = `<div class="iempty"><button type="button" class="addfirst" id="addItem">${I("plus")}Agregar prenda</button></div>`;
-  } else box.innerHTML = F.items.map((it, i) => F.items.length > 3 && i !== F.iOpen ? itemMini(it, i, isSub) : `<div class="irow3" data-i="${i}">
+  } else box.innerHTML = F.items.map((it, i) => F.items.length > 3 && i !== F.iOpen ? itemMini(it, i, isSub) : `<div class="irow3${F.items.length > 3 ? " selc" : ""}" data-i="${i}">
       <div class="r1">
         ${pb("etiqueta", isSub ? "" : it.etiqueta, "Etiqueta", "", isSub)}
         ${pb("talla", it.talla, "Talla")}
@@ -2736,14 +2750,47 @@ function renderItems(){
     const row = e.target.closest("[data-i]"), it = F.items[Number(row.dataset.i)];
     it.cant = Math.max(1, parseInt(e.target.value) || Number(it.cant) || 1); renderItems(); renderTotals();
   };
-  if (!box._qbound) { box._qbound = true; box.addEventListener("focusin", onIn); box.addEventListener("focusout", onOut); }
+  if (!box._qbound) { box._qbound = true; box.addEventListener("focusin", onIn); box.addEventListener("focusout", onOut); deslizarBorrar(box); }
+}
+// Deslizar una prenda hacia la izquierda hasta casi el borde para borrarla (con Deshacer)
+function deslizarBorrar(box){
+  let row = null, x0 = 0, y0 = 0, modo = "", dx = 0;
+  box.addEventListener("touchstart", e => {
+    const r = e.target.closest(".irow3"); if (!r || e.target.closest("input,textarea")) return;
+    row = r; x0 = e.touches[0].clientX; y0 = e.touches[0].clientY; modo = ""; dx = 0;
+  }, {passive:true});
+  box.addEventListener("touchmove", e => {
+    if (!row) return;
+    const t = e.touches[0], mx = t.clientX - x0, my = t.clientY - y0;
+    if (!modo) { if (Math.abs(mx) < 10 && Math.abs(my) < 10) return; modo = Math.abs(mx) > Math.abs(my) && mx < 0 ? "x" : "y"; if (modo === "y") { row = null; return; } row.style.transition = "none"; }
+    e.preventDefault(); dx = Math.min(0, mx);
+    // Solo borra si el dedo llega casi al borde izquierdo de la pantalla
+    const fin = t.clientX < Math.max(40, innerWidth * .12) && dx < -innerWidth * .4;
+    row.style.transform = `translateX(${dx}px)`; row.style.opacity = String(Math.max(.35, 1 + dx / 500));
+    row.classList.toggle("borrar", fin);
+  }, {passive:false});
+  const soltar = () => {
+    if (!row) return; const r = row; row = null;
+    const borrar = r.classList.contains("borrar");
+    r.style.transition = "transform .2s ease, opacity .2s ease";
+    if (borrar) {
+      r.style.transform = "translateX(-110%)"; r.style.opacity = "0";
+      const n = Number(r.dataset.i), quitado = F.items[n];
+      setTimeout(() => {
+        F.items.splice(n, 1); F.iOpen = null; renderItems(); renderTotals();
+        toastUndo("Prenda eliminada", async () => { if (!F) return; F.items.splice(n, 0, quitado); renderItems(); renderTotals(); });
+      }, 180);
+    } else { r.style.transform = ""; r.style.opacity = ""; r.classList.remove("borrar"); }
+  };
+  box.addEventListener("touchend", soltar); box.addEventListener("touchcancel", soltar);
 }
 // Prenda resumida en una línea (cuando hay más de 3); al tocarla se despliega
 function itemMini(it, i, isSub){
   const falta = !itemVacio(it) && reqItem().some(f => !it[f]);
   const a = [it.prenda, !isSub && it.color ? it.color.toLowerCase() : ""].filter(Boolean).join(" ");
-  const b = [it.talla, it.horma, !isSub ? it.etiqueta : "", it.nombre, it.numero ? "N° " + it.numero : ""].filter(Boolean).join(" · ");
-  return `<div class="irow3 mini${falta ? " bad" : ""}" data-i="${i}" data-abrir role="button" tabindex="0"><span class="mq num">${Number(it.cant) || 1}</span><span class="mt">${esc(a || "Prenda sin completar")}${b ? ` <small>· ${esc(b)}</small>` : ""}</span>${I("chev")}</div>`;
+  const b = [it.talla, it.horma, !isSub ? it.etiqueta : ""].filter(Boolean).join(" · ");
+  const c = [it.nombre ? "Nombre: " + it.nombre : "", it.numero ? "N° " + it.numero : ""].filter(Boolean).join(" · ");
+  return `<div class="irow3 mini${falta ? " bad" : ""}" data-i="${i}" data-abrir role="button" tabindex="0"><span class="mq num">${Number(it.cant) || 1}</span><span class="mt"><span class="m1">${esc(a || "Prenda sin completar")}${b ? ` <small>· ${esc(b)}</small>` : ""}</span>${c ? `<span class="m2">${esc(c)}</span>` : ""}</span>${I("chev")}</div>`;
 }
 function elegir(it, f){
   const c = cfg().cat, isP = F.tipo === "personalizado";
