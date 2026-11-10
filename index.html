@@ -1072,7 +1072,7 @@ const updateDoc = (...a) => sinEsperar(fsUpdateDoc(...a));
 const deleteDoc = (...a) => sinEsperar(fsDeleteDoc(...a));
 const writeBatch = db => { const b = fsWriteBatch(db), c = b.commit.bind(b); b.commit = () => sinEsperar(c()); return b; };
 
-const VERSION = "v3.26";
+const VERSION = "v3.27";
 /* ================= Utilidades ================= */
 const $ = (s, r = document) => r.querySelector(s);
 const esc = s => String(s ?? "").replace(/[&<>"']/g, c => ({"&":"&amp;","<":"&lt;",">":"&gt;",'"':"&quot;","'":"&#39;"}[c]));
@@ -2912,7 +2912,7 @@ function elegir(it, f){
     clearErr("f-items"); renderItems(); renderTotals();
   };
   if (f === "talla") pickPopup({title:"Talla", kind:"talla", current:it.talla, onPick:conHorma,
-    sections:[{title:"Niño", options:c.tallasNino.map(v => ({v}))}, {title:"Unisex", options:c.tallasAdulto.filter(v => !esPlus(v)).map(v => ({v}))}, {title:"Unisex Plus", options:c.tallasAdulto.filter(esPlus).map(v => ({v}))}].filter(s => s.options.length)});
+    sections:[{title:"Niños", options:c.tallasNino.map(v => ({v}))}, {title:"Adultos", options:c.tallasAdulto.filter(v => !esPlus(v)).map(v => ({v}))}, {title:"Plus", options:c.tallasAdulto.filter(esPlus).map(v => ({v}))}].filter(s => s.options.length)});
 }
 function numPad(actual, onOk){
   let v = String(actual || "");
