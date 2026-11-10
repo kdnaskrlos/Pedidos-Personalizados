@@ -974,6 +974,11 @@ html,body{overscroll-behavior-y:none}
 .dd.ag.sel em b{box-shadow:none}
 .dd.ag em b.pt-err{background:#dc2626}.dd.ag em b.pt-warn{background:#eab308}.dd.ag em b.pt-info{background:#3b82f6}
 .dd.ag em b.pt-vio{background:#8b5cf6}.dd.ag em b.pt-ok{background:#16a34a}.dd.ag em b.pt-nor{background:var(--muted)}
+/* v3.33 botón actualizar sin pastilla junto a la fecha */
+.rfb{border:0;background:none;padding:6px;margin-right:2px;color:var(--muted);display:inline-flex;align-items:center;cursor:pointer;-webkit-tap-highlight-color:transparent}
+.rfb svg.i{width:19px;height:19px}
+.rfb:active{color:var(--accent)}
+.rfb.gira svg{animation:sp .7s linear infinite;color:var(--accent)}
 @media (max-width:1000px){.hello{padding-bottom:8px;margin-top:-6px}.hello h1{font-size:25px}}
 @media (max-width:1000px){.tiles.t5>:last-child{grid-column:1/-1}}
 @media (max-width:1000px){.pill.demo .m-pr{display:inline}}
@@ -1084,7 +1089,7 @@ const updateDoc = (...a) => sinEsperar(fsUpdateDoc(...a));
 const deleteDoc = (...a) => sinEsperar(fsDeleteDoc(...a));
 const writeBatch = db => { const b = fsWriteBatch(db), c = b.commit.bind(b); b.commit = () => sinEsperar(c()); return b; };
 
-const VERSION = "v3.32";
+const VERSION = "v3.33";
 /* ================= Utilidades ================= */
 const $ = (s, r = document) => r.querySelector(s);
 const esc = s => String(s ?? "").replace(/[&<>"']/g, c => ({"&":"&amp;","<":"&lt;",">":"&gt;",'"':"&quot;","'":"&#39;"}[c]));
@@ -1108,6 +1113,7 @@ function money(v, mon){
 }
 function toast(msg, bad){ if (bad && S.me && S.me.rol !== "admin" && /permission|permiso|denied|denegado/i.test(String(msg))) { console.warn("aviso oculto:", msg); return; } document.querySelectorAll(".toast").forEach(x => x.remove()); const t = document.createElement("div"); t.className = "toast" + (bad ? " bad" : ""); t.textContent = msg; document.body.appendChild(t); setTimeout(() => t.remove(), bad ? 4500 : 2500); }
 const P = {
+  refresh:'<path d="M20 11a8 8 0 0 0-14.6-4.5L4 8"/><path d="M4 3v5h5"/><path d="M4 13a8 8 0 0 0 14.6 4.5L20 16"/><path d="M20 21v-5h-5"/>',
   home:'<path d="M3 10.5 12 3l9 7.5V20a1 1 0 0 1-1 1h-5v-6H9v6H4a1 1 0 0 1-1-1z"/>',
   back:'<path d="m15 18-6-6 6-6"/>',
   flask:'<path d="M9 3h6M10 3v6.5L4.6 18.4A1.7 1.7 0 0 0 6 21h12a1.7 1.7 0 0 0 1.4-2.6L14 9.5V3"/><path d="M7.5 15h9"/>',
@@ -1476,6 +1482,14 @@ function guardarArranque(){
     catch(e) { try { delete c.pedidos; localStorage.setItem(ARR, JSON.stringify(c)); } catch(e2) {} }
   }, 1500);
 }
+// Fecha corta para la barra superior: "Mar 10 nov"
+const fechaCorta = d => { const c = s => s.slice(0, 3); const x = c(DIAS[d.getDay()]); return `${x.charAt(0).toUpperCase() + x.slice(1)} ${d.getDate()} ${c(MESES[d.getMonth()])}`; };
+// Botón actualizar: busca versión nueva y recarga (abre al instante con la copia local)
+function refrescar(b){
+  if (b) b.classList.add("gira");
+  const fin = () => setTimeout(() => location.reload(), 500);
+  if ("serviceWorker" in navigator) navigator.serviceWorker.getRegistration().then(r => r && r.update()).catch(() => {}).finally(fin); else fin();
+}
 function render(){ guardarArranque(); if (renderQ) return; renderQ = true; requestAnimationFrame(() => { renderQ = false; doRender(); }); }
 function doRender(){
   document.body.classList.toggle("fixedv", S.view === "resumen");
@@ -1504,10 +1518,10 @@ function doRender(){
   <div class="shell">
     <div class="topbar">
       <span class="pill st ${S.online && !S.cache ? "ok" : "bad"}"><i></i>${S.online ? (S.cache ? "Sincronizando…" : "En línea") : "Sin conexión"}</span>
-      ${!(S.view === "resumen" || (pr.admin && (S.view === "ajustes" || S.view === "equipo"))) ? `<button class="pill tdate hide-m" data-act="agenda" title="Calendario de pedidos">${I("cal")}${DIAS[d.getDay()]} ${d.getDate()} de ${MESES[d.getMonth()]}</button>` : ""}
+      ${!(S.view === "resumen" || (pr.admin && (S.view === "ajustes" || S.view === "equipo"))) ? `<button class="rfb hide-m" data-act="refrescar" title="Actualizar">${I("refresh")}</button><button class="pill tdate hide-m" data-act="agenda" title="Calendario de pedidos">${I("cal")}${fechaCorta(d)}</button>` : ""}
       <span class="sp"></span>
       ${S.installEvt ? `<button class="pill" id="instBtn">${I("download")}<span class="hide-m">Instalar app</span></button>` : ""}
-      ${S.view === "resumen" || (pr.admin && (S.view === "ajustes" || S.view === "equipo")) ? `<button class="pill tdate" data-act="agenda" title="Calendario de pedidos">${I("cal")}${DIAS[d.getDay()]} ${d.getDate()} de ${MESES[d.getMonth()]}</button>` : `<button class="pill" id="meBtn">${I("user")}${esc(S.me.nombre || S.me.usuario)}${pr.admin ? " · Admin" : ""}</button>`}
+      ${S.view === "resumen" || (pr.admin && (S.view === "ajustes" || S.view === "equipo")) ? `<button class="rfb" data-act="refrescar" title="Actualizar">${I("refresh")}</button><button class="pill tdate" data-act="agenda" title="Calendario de pedidos">${I("cal")}${fechaCorta(d)}</button>` : `<button class="pill" id="meBtn">${I("user")}${esc(S.me.nombre || S.me.usuario)}${pr.admin ? " · Admin" : ""}</button>`}
     </div>
     <main class="main">
       ${pr.admin && S.view === "avisos" && revisarList().length ? `<button class="revbar" data-act="revisar">${I("edit")}<span><b>${revisarList().length}</b> pedido${revisarList().length === 1 ? "" : "s"} editado${revisarList().length === 1 ? "" : "s"} por el equipo</span><em>Ver</em></button>` : ""}
@@ -2117,6 +2131,7 @@ function bindMain(){
     if (d.act === "revisar") return openRevisar();
     if (d.act === "anuncio") return editarAnuncio(null);
     if (d.act === "agenda") return openAgenda();
+    if (d.act === "refrescar") return refrescar(e.target.closest("[data-act]"));
     if (d.anver) return editarAnuncio(d.anver);
     if (d.anon) return alternarAnuncio(d.anon);
     if (d.act === "respaldo") return openRespaldo();
