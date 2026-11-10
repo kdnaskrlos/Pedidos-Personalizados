@@ -940,8 +940,8 @@ html,body{overscroll-behavior-y:none}
 .irow3.mini .m2{font-size:12px;font-weight:600;color:var(--ink);white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
 .irow3{touch-action:pan-y}
 .irow3.borrar{border-color:var(--err)!important;background:color-mix(in srgb,var(--err) 10%,var(--surface))!important}
-.irow3.selc{border-color:#93c5fd;box-shadow:0 0 0 3px rgba(59,130,246,.16),0 6px 22px rgba(59,130,246,.22)}
-:root[data-theme="dark"] .irow3.selc{border-color:#3b82f6;box-shadow:0 0 0 3px rgba(59,130,246,.22),0 6px 22px rgba(59,130,246,.3)}
+.irow3.selc{border-color:#bbf7d0;box-shadow:0 0 0 1.5px #bbf7d0}
+:root[data-theme="dark"] .irow3.selc{border-color:#1f4d31;box-shadow:0 0 0 1.5px #1f4d31}
 /* v3.15 estado de conexión sin forma de pastilla */
 .topbar .pill.st{background:none;border-color:transparent;box-shadow:none;padding-left:2px;padding-right:2px;font-weight:700}
 @media (max-width:1000px){.hello{padding-bottom:8px;margin-top:-6px}.hello h1{font-size:25px}}
@@ -1048,7 +1048,7 @@ const updateDoc = (...a) => sinEsperar(fsUpdateDoc(...a));
 const deleteDoc = (...a) => sinEsperar(fsDeleteDoc(...a));
 const writeBatch = db => { const b = fsWriteBatch(db), c = b.commit.bind(b); b.commit = () => sinEsperar(c()); return b; };
 
-const VERSION = "v3.15";
+const VERSION = "v3.16";
 /* ================= Utilidades ================= */
 const $ = (s, r = document) => r.querySelector(s);
 const esc = s => String(s ?? "").replace(/[&<>"']/g, c => ({"&":"&amp;","<":"&lt;",">":"&gt;",'"':"&quot;","'":"&#39;"}[c]));
