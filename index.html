@@ -1097,7 +1097,7 @@ const updateDoc = (...a) => sinEsperar(fsUpdateDoc(...a));
 const deleteDoc = (...a) => sinEsperar(fsDeleteDoc(...a));
 const writeBatch = db => { const b = fsWriteBatch(db), c = b.commit.bind(b); b.commit = () => sinEsperar(c()); return b; };
 
-const VERSION = "v3.44";
+const VERSION = "v3.45";
 /* ================= Utilidades ================= */
 const $ = (s, r = document) => r.querySelector(s);
 const esc = s => String(s ?? "").replace(/[&<>"']/g, c => ({"&":"&amp;","<":"&lt;",">":"&gt;",'"':"&quot;","'":"&#39;"}[c]));
@@ -2859,16 +2859,17 @@ const itemVacio = i => !i.etiqueta && !i.prenda && !i.color && !i.talla && !i.no
 // Cambios en la lista de prendas con transición suave de altura (abrir, cerrar, compactar todas, agregar)
 function animarPrendas(cambio){
   const box = F._ov && $("#items", F._ov); if (!box) return cambio();
-  const h0 = {}, mini0 = {};
-  box.querySelectorAll(".irow3[data-i]").forEach(el => { h0[el.dataset.i] = el.getBoundingClientRect().height; mini0[el.dataset.i] = el.classList.contains("mini"); });
+  // Se identifica cada tarjeta por su prenda (no por su posición), así funciona también al quitar una del medio
+  const h0 = new Map(), mini0 = new Map(), de = el => F.items[Number(el.dataset.i)];
+  box.querySelectorAll(".irow3[data-i]").forEach(el => { const it = de(el); if (it) { h0.set(it, el.getBoundingClientRect().height); mini0.set(it, el.classList.contains("mini")); } });
   cambio();
   box.querySelectorAll(".irow3[data-i]").forEach(el => {
-    const i = el.dataset.i, nuevo = !(i in h0), h1 = el.getBoundingClientRect().height, a0 = nuevo ? 0 : h0[i];
+    const it = de(el), nuevo = !h0.has(it), h1 = el.getBoundingClientRect().height, a0 = nuevo ? 0 : h0.get(it);
     if (Math.abs(h1 - a0) < 2) return;
     el.style.overflow = "hidden";
     const kf = nuevo ? [{height:"0px", opacity:0}, {height:h1 + "px", opacity:1}] : [{height:a0 + "px"}, {height:h1 + "px"}];
     const a = el.animate(kf, {duration:280, easing:"cubic-bezier(.22,.9,.3,1)"});
-    if (!el.classList.contains("mini") && (nuevo || mini0[i])) el.querySelectorAll(".r1, .r3").forEach((r, k) => r.animate([{opacity:0, transform:"translateY(-6px)"}, {opacity:1, transform:"none"}], {duration:240, delay:40 + k * 35, easing:"ease-out", fill:"backwards"}));
+    if (!el.classList.contains("mini") && (nuevo || mini0.get(it))) el.querySelectorAll(".r1, .r3").forEach((r, k) => r.animate([{opacity:0, transform:"translateY(-6px)"}, {opacity:1, transform:"none"}], {duration:240, delay:40 + k * 35, easing:"ease-out", fill:"backwards"}));
     a.onfinish = a.oncancel = () => { el.style.overflow = ""; };
   });
 }
@@ -2921,7 +2922,7 @@ function renderItems(){
     const n = Number(row.dataset.i), it = F.items[n], t = e.target.closest("button"); if (!t) return;
     if (t.dataset.pick) return elegir(it, t.dataset.pick);
     if (t.dataset.q) { it.cant = Math.max(1, it.cant + Number(t.dataset.q)); renderItems(); renderTotals(); }
-    if (t.hasAttribute("data-del")) { F.items.splice(n, 1); F.iOpen = null; renderItems(); renderTotals(); }
+    if (t.hasAttribute("data-del")) { animarPrendas(() => { F.items.splice(n, 1); F.iOpen = null; renderItems(); }); renderTotals(); }
   };
   box.oninput = e => {
     const row = e.target.closest("[data-i]"); if (!row) return;
@@ -2972,8 +2973,8 @@ function deslizarBorrar(box){
       r.style.transform = "translateX(-110%)";
       const n = Number(r.dataset.i), quitado = F.items[n];
       setTimeout(() => {
-        F.items.splice(n, 1); F.iOpen = null; renderItems(); renderTotals();
-        toastUndo("Prenda eliminada", async () => { if (!F) return; F.items.splice(n, 0, quitado); renderItems(); renderTotals(); });
+        animarPrendas(() => { F.items.splice(n, 1); F.iOpen = null; renderItems(); }); renderTotals();
+        toastUndo("Prenda eliminada", async () => { if (!F) return; animarPrendas(() => { F.items.splice(n, 0, quitado); renderItems(); }); renderTotals(); });
       }, 180);
     } else { r.style.transform = ""; r.style.opacity = ""; r.classList.remove("borrar"); if (w) { w.classList.remove("armed"); setTimeout(() => w.classList.remove("on"), 220); } }
   };
