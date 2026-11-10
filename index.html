@@ -1097,7 +1097,7 @@ const updateDoc = (...a) => sinEsperar(fsUpdateDoc(...a));
 const deleteDoc = (...a) => sinEsperar(fsDeleteDoc(...a));
 const writeBatch = db => { const b = fsWriteBatch(db), c = b.commit.bind(b); b.commit = () => sinEsperar(c()); return b; };
 
-const VERSION = "v3.46";
+const VERSION = "v3.47";
 /* ================= Utilidades ================= */
 const $ = (s, r = document) => r.querySelector(s);
 const esc = s => String(s ?? "").replace(/[&<>"']/g, c => ({"&":"&amp;","<":"&lt;",">":"&gt;",'"':"&quot;","'":"&#39;"}[c]));
@@ -2934,7 +2934,7 @@ function renderItems(){
     const n = Number(row.dataset.i), it = F.items[n], t = e.target.closest("button"); if (!t) return;
     if (t.dataset.pick) return elegir(it, t.dataset.pick);
     if (t.dataset.q) { it.cant = Math.max(1, it.cant + Number(t.dataset.q)); renderItems(); renderTotals(); }
-    if (t.hasAttribute("data-del")) quitarPrenda(n, row.closest(".iswipe") || row, false);
+    if (t.hasAttribute("data-del")) { const quitado = F.items[n]; quitarPrenda(n, row.closest(".iswipe") || row, false, () => toastUndo("Prenda eliminada", async () => { if (!F) return; animarPrendas(() => { F.items.splice(n, 0, quitado); renderItems(); }); renderTotals(); })); }
   };
   box.oninput = e => {
     const row = e.target.closest("[data-i]"); if (!row) return;
