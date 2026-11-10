@@ -1096,7 +1096,7 @@ const updateDoc = (...a) => sinEsperar(fsUpdateDoc(...a));
 const deleteDoc = (...a) => sinEsperar(fsDeleteDoc(...a));
 const writeBatch = db => { const b = fsWriteBatch(db), c = b.commit.bind(b); b.commit = () => sinEsperar(c()); return b; };
 
-const VERSION = "v3.40";
+const VERSION = "v3.41";
 /* ================= Utilidades ================= */
 const $ = (s, r = document) => r.querySelector(s);
 const esc = s => String(s ?? "").replace(/[&<>"']/g, c => ({"&":"&amp;","<":"&lt;",">":"&gt;",'"':"&quot;","'":"&#39;"}[c]));
@@ -2685,7 +2685,7 @@ function openForm(id, tipo, cliente, borrador){
   ov.addEventListener("click", e => {
     if (F.iOpen == null || F.items.length <= 3 || !document.body.contains(ov)) return;
     if (e.target.closest(".irow3, .iswipe, .addbar, button, input, textarea, select, a, label")) return;
-    F.iOpen = null; renderItems();
+    cambiarAbierta(null);
   });
   const salir = () => confirmar("¿Salir sin guardar?", "Los datos de este pedido se perderán.", "Salir", async () => { if (F && F._nuevo) borrarBorrador(); ov.close(); F = null; });
   ov.querySelectorAll("[data-cerrar]").forEach(b => b.onclick = salir);
@@ -2857,6 +2857,22 @@ function pickPopup({title, kind, options, sections, current, otro, onPick}){
 const blankItem = prev => ({etiqueta: prev ? prev.etiqueta : "", prenda: prev ? prev.prenda : "", color: prev ? prev.color : "", horma: prev ? prev.horma : "", talla:"", cant:1, nombre:"", numero:""});
 const reqItem = () => F && F.tipo === "sublimacion" ? ["prenda", "talla", "horma"] : ["etiqueta", "prenda", "color", "talla", "horma"];
 const itemVacio = i => !i.etiqueta && !i.prenda && !i.color && !i.talla && !i.nombre;
+// Abre/cierra prendas con una transición suave de altura
+function cambiarAbierta(n){
+  const box = $("#items", F._ov); if (!box) { F.iOpen = n; return renderItems(); }
+  const prev = F.iOpen, alto = i => { const el = box.querySelector(`.irow3[data-i="${i}"]`); return el ? el.getBoundingClientRect().height : 0; };
+  const h0 = {[n]:alto(n), [prev]:alto(prev)};
+  F.iOpen = n; renderItems();
+  [n, prev].forEach(i => {
+    if (i == null) return;
+    const el = box.querySelector(`.irow3[data-i="${i}"]`); if (!el || !h0[i]) return;
+    const h1 = el.getBoundingClientRect().height; if (Math.abs(h1 - h0[i]) < 2) return;
+    el.style.overflow = "hidden";
+    const a = el.animate([{height:h0[i] + "px"}, {height:h1 + "px"}], {duration:280, easing:"cubic-bezier(.22,.9,.3,1)"});
+    if (i === n) el.querySelectorAll(".r1, .r3").forEach((r, k) => r.animate([{opacity:0, transform:"translateY(-6px)"}, {opacity:1, transform:"none"}], {duration:240, delay:40 + k * 35, easing:"ease-out", fill:"backwards"}));
+    a.onfinish = a.oncancel = () => { el.style.overflow = ""; };
+  });
+}
 const qtyHTML = it => `<div class="qty">${it.cant === 1 ? `<button type="button" class="del" data-del title="Quitar">${I("trash")}</button>` : `<button type="button" data-q="-1">−</button>`}<input class="qin" type="text" inputmode="numeric" pattern="[0-9]*" data-cant value="${it.cant || 1}" placeholder="1" aria-label="Unidades"><button type="button" data-q="1">+</button></div>`;
 function renderItems(){
   const ov = F._ov, c = cfg().cat;
@@ -2901,7 +2917,7 @@ function renderItems(){
     if (e.target.closest("#addItem")) return nueva(blankItem());
     if (e.target.closest("#dupItem")) { const last = F.items[F.items.length - 1]; return nueva(last ? JSON.parse(JSON.stringify(last)) : blankItem()); }
     const row = e.target.closest("[data-i]"); if (!row) return;
-    if (row.hasAttribute("data-abrir")) { F.iOpen = Number(row.dataset.i); renderItems(); const r = box.querySelector(`[data-i="${F.iOpen}"]`); if (r) r.scrollIntoView({behavior:"smooth", block:"center"}); return; }
+    if (row.hasAttribute("data-abrir")) { cambiarAbierta(Number(row.dataset.i)); const r = box.querySelector(`[data-i="${F.iOpen}"]`); if (r) setTimeout(() => r.scrollIntoView({behavior:"smooth", block:"nearest"}), 290); return; }
     const n = Number(row.dataset.i), it = F.items[n], t = e.target.closest("button"); if (!t) return;
     if (t.dataset.pick) return elegir(it, t.dataset.pick);
     if (t.dataset.q) { it.cant = Math.max(1, it.cant + Number(t.dataset.q)); renderItems(); renderTotals(); }
