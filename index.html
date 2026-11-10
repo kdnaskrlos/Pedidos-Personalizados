@@ -1072,7 +1072,7 @@ const updateDoc = (...a) => sinEsperar(fsUpdateDoc(...a));
 const deleteDoc = (...a) => sinEsperar(fsDeleteDoc(...a));
 const writeBatch = db => { const b = fsWriteBatch(db), c = b.commit.bind(b); b.commit = () => sinEsperar(c()); return b; };
 
-const VERSION = "v3.21";
+const VERSION = "v3.22";
 /* ================= Utilidades ================= */
 const $ = (s, r = document) => r.querySelector(s);
 const esc = s => String(s ?? "").replace(/[&<>"']/g, c => ({"&":"&amp;","<":"&lt;",">":"&gt;",'"':"&quot;","'":"&#39;"}[c]));
@@ -1152,8 +1152,8 @@ const DEF = {
     prendasPers: ["Franela","Franela oversize","Chemise","Suéter","Hoodie","Franelilla","Gorra","Otro"],
     prendasSub: ["Franela","Chemise","Suéter","Camisa deportiva","Short deportivo","Uniforme completo","Traje de baño","Licra","Franelilla","Otro"],
     colores: [["Fullprint","full"],["Blanco","#ffffff"],["Negro","#111111"],["Gris claro","#cfd2d6"],["Gris oscuro","#4b5055"],["Azul rey","#1d4ed8"],["Azul marino","#1e2a4a"],["Azul cielo","#7cc4f0"],["Rojo","#d92b2b"],["Vinotinto","#6d1a2a"],["Verde","#1f8a4c"],["Verde manzana","#8cc63f"],["Amarillo","#f5c518"],["Naranja","#f07c1b"],["Rosado","#f4a6c1"],["Morado","#6b3fa0"],["Beige","#e6d3b3"]],
-    hormas: ["Caballero","Dama","Niño","Unisex","Unisex Plus","Oversize"],
-    hormasSub: ["Caballero","Dama","Niño","Unisex","Unisex Plus"],
+    hormas: ["Caballero","Dama","Niño","Niña","Unisex","Unisex Plus","Oversize"],
+    hormasSub: ["Caballero","Dama","Niño","Niña","Unisex","Unisex Plus"],
     marcas: ["AS","Etanol","Comic Shop","Serfe"],
     tallasNino: ["2","4","6","8","10","12","14","16"],
     tallasAdulto: ["XS","S","M","L","XL","2XL","3XL","4XL"]
@@ -2864,11 +2864,19 @@ function elegir(it, f){
   if (f === "color") pickPopup({title:"Color", kind:"color", current:it.color, otro:true, onPick:set,
     options:c.colores.filter(x => isP ? x[1] !== "full" : true).map(([v, h]) => ({v, h}))});
   if (f === "horma") pickPopup({title:"Horma", kind:"text", current:it.horma, onPick:v => set(v === "__none" ? "" : v),
-    options:[...new Set([...(isP ? c.hormas : c.hormasSub), "Niño", "Unisex", "Unisex Plus"])].map(v => ({v}))});
+    options:[...new Set([...(isP ? c.hormas : c.hormasSub), "Niño", "Niña", "Unisex", "Unisex Plus"])].map(v => ({v}))});
   if (f === "numero") return numPad(it.numero, v => { it.numero = v; renderItems(); });
   if (f === "etiqueta") pickPopup({title:"Etiqueta", kind:"text", current:it.etiqueta, onPick:set, options:c.marcas.map(v => ({v}))});
   // Al elegir la talla, la horma se pone sola según el grupo: Niño, Unisex o Unisex Plus (se puede cambiar después)
-  const conHorma = v => { it.talla = v; it.horma = c.tallasNino.includes(v) ? "Niño" : esPlus(v) ? "Unisex Plus" : "Unisex"; clearErr("f-items"); renderItems(); renderTotals(); };
+  // Si ya elegiste una horma que encaja con ese grupo (Niña, Dama, Caballero, Oversize…), se respeta
+  const conHorma = v => {
+    const hm = it.horma || "", nino = /^niñ[oa]s?$/i.test(hm);
+    it.talla = v;
+    if (c.tallasNino.includes(v)) { if (!nino) it.horma = "Niño"; }
+    else if (esPlus(v)) { if (!hm || nino || hm === "Unisex") it.horma = "Unisex Plus"; }
+    else if (!hm || nino || hm === "Unisex Plus") it.horma = "Unisex";
+    clearErr("f-items"); renderItems(); renderTotals();
+  };
   if (f === "talla") pickPopup({title:"Talla", kind:"talla", current:it.talla, onPick:conHorma,
     sections:[{title:"Niño", options:c.tallasNino.map(v => ({v}))}, {title:"Unisex", options:c.tallasAdulto.filter(v => !esPlus(v)).map(v => ({v}))}, {title:"Unisex Plus", options:c.tallasAdulto.filter(esPlus).map(v => ({v}))}].filter(s => s.options.length)});
 }
