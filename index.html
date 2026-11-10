@@ -887,7 +887,6 @@ body.fixedv{scrollbar-width:none}
 :root[data-theme="dark"] .revbar.ancrear svg.i{color:#86efac}
 .antxt{font-size:16px;line-height:1.45;white-space:pre-wrap}
 .pill.demo .m-pr{display:none!important}
-.tdate{display:inline-flex;align-items:center;gap:6px;font-size:13.5px;font-weight:600;color:var(--muted);white-space:nowrap;flex-shrink:0;padding:0 4px}
 .tdate svg.i{width:16px;height:16px}
 /* v3.3 animación de aviso nuevo (unos segundos, solo la primera vez) */
 .revbar.anun.anim{animation:anpulse 1.4s ease-in-out 5 both}
@@ -897,6 +896,26 @@ body.fixedv{scrollbar-width:none}
 @media (prefers-reduced-motion:reduce){.revbar.anun.anim,.revbar.anun.anim .antx svg.i{animation:none}}
 /* v3.6 sin "deslizar hacia abajo para recargar" (recargaba la app y hacía parpadear la barra del teléfono) */
 html,body{overscroll-behavior-y:none}
+/* v3.8 mensajes de error en una sola línea */
+.f.err>.msg,.f.err .msg .ti.bad{display:block;white-space:nowrap;overflow:hidden;text-overflow:ellipsis;max-width:100%}
+.f.err .msg .ti.bad{display:flex}
+.f.err .msg .ti.bad>span,.f.err .msg .ti.bad{min-width:0}
+.errsum li{white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
+.toast{white-space:nowrap;overflow:hidden;text-overflow:ellipsis;max-width:92vw}
+/* v3.8 calendario de pedidos */
+.pill.tdate{cursor:pointer;font:inherit;font-size:13.5px;font-weight:600;color:var(--ink)}
+.agpop{width:min(94vw,440px);max-height:86vh;overflow:auto}
+.dd.ag{height:44px;display:flex;flex-direction:column;align-items:center;justify-content:center;gap:3px;padding:0}
+.dd.ag em{display:flex;gap:3px;height:6px;align-items:center;font-style:normal}
+.dd.ag em b{width:6px;height:6px;border-radius:99px;display:block}
+.dd.ag em b.ent{background:var(--muted);opacity:.5}
+.dd.ag em small{font-size:9px;font-weight:800;color:var(--muted);line-height:1}
+.dd.ag.con span{font-weight:800}
+.dd.ag.sel em b{box-shadow:0 0 0 1.5px #fff}
+.agday{display:flex;align-items:baseline;justify-content:space-between;gap:8px;border-top:1px solid var(--line);padding-top:10px}
+.agday b{font-size:15px;font-weight:800}
+.agday span{font-size:12.5px;color:var(--muted);font-weight:600}
+.aglist{display:flex;flex-direction:column;gap:8px}
 @media (max-width:1000px){.hello{padding-bottom:8px;margin-top:-6px}.hello h1{font-size:25px}}
 @media (max-width:1000px){.tiles.t5>:last-child{grid-column:1/-1}}
 @media (max-width:1000px){.pill.demo .m-pr{display:inline}}
@@ -988,9 +1007,20 @@ html,body{overscroll-behavior-y:none}
 import { firebaseConfig } from "./config.js";
 import { initializeApp, deleteApp } from "https://www.gstatic.com/firebasejs/10.12.2/firebase-app.js";
 import { getAuth, onAuthStateChanged, signInWithEmailAndPassword, createUserWithEmailAndPassword, signOut, updatePassword, reauthenticateWithCredential, EmailAuthProvider } from "https://www.gstatic.com/firebasejs/10.12.2/firebase-auth.js";
-import { initializeFirestore, getFirestore, persistentLocalCache, persistentMultipleTabManager, doc, collection, query, where, onSnapshot, getDoc, getDocs, setDoc, updateDoc, deleteDoc, writeBatch, runTransaction } from "https://www.gstatic.com/firebasejs/10.12.2/firebase-firestore.js";
+import { initializeFirestore, getFirestore, persistentLocalCache, persistentMultipleTabManager, doc, collection, query, where, onSnapshot, getDoc, getDocs, setDoc as fsSetDoc, updateDoc as fsUpdateDoc, deleteDoc as fsDeleteDoc, writeBatch as fsWriteBatch, runTransaction } from "https://www.gstatic.com/firebasejs/10.12.2/firebase-firestore.js";
+// Guardado sin esperar a internet: Firebase guarda el cambio en el teléfono al instante y lo sube
+// cuando hay conexión. La app sigue en cuanto el cambio quedó guardado localmente.
+const sinEsperar = p => {
+  let local = false;
+  p.catch(e => { if (local) { console.warn("sincronización", e); toast("No se pudo sincronizar un cambio", true); } });
+  return Promise.race([p, new Promise(r => setTimeout(() => { local = true; r("local"); }, 1200))]);
+};
+const setDoc = (...a) => sinEsperar(fsSetDoc(...a));
+const updateDoc = (...a) => sinEsperar(fsUpdateDoc(...a));
+const deleteDoc = (...a) => sinEsperar(fsDeleteDoc(...a));
+const writeBatch = db => { const b = fsWriteBatch(db), c = b.commit.bind(b); b.commit = () => sinEsperar(c()); return b; };
 
-const VERSION = "v3.7";
+const VERSION = "v3.8";
 /* ================= Utilidades ================= */
 const $ = (s, r = document) => r.querySelector(s);
 const esc = s => String(s ?? "").replace(/[&<>"']/g, c => ({"&":"&amp;","<":"&lt;",">":"&gt;",'"':"&quot;","'":"&#39;"}[c]));
@@ -1383,10 +1413,10 @@ function doRender(){
     <div class="topbar">
       <span class="pill st ${S.online && !S.cache ? "ok" : "bad"}"><i></i>${S.online ? (S.cache ? "Sincronizando…" : "En línea") : "Sin conexión · se guardará al volver"}</span>
       ${pr.admin && S.me && S.me.rol === "admin" && S.view === "resumen" ? `<button class="pill demo ${hayDemo() ? "on" : ""}" id="demoBtn" title="Modo prueba" aria-label="Modo prueba">${I("flask")}</button>` : ""}
-      ${!(S.view === "resumen" || (pr.admin && (S.view === "ajustes" || S.view === "equipo"))) ? `<span class="tdate hide-m">${I("cal")}${DIAS[d.getDay()]} ${d.getDate()} de ${MESES[d.getMonth()]}</span>` : ""}
+      ${!(S.view === "resumen" || (pr.admin && (S.view === "ajustes" || S.view === "equipo"))) ? `<button class="pill tdate hide-m" data-act="agenda" title="Calendario de pedidos">${I("cal")}${DIAS[d.getDay()]} ${d.getDate()} de ${MESES[d.getMonth()]}</button>` : ""}
       <span class="sp"></span>
       ${S.installEvt ? `<button class="pill" id="instBtn">${I("download")}<span class="hide-m">Instalar app</span></button>` : ""}
-      ${S.view === "resumen" || (pr.admin && (S.view === "ajustes" || S.view === "equipo")) ? `<span class="tdate">${I("cal")}${DIAS[d.getDay()]} ${d.getDate()} de ${MESES[d.getMonth()]}</span>` : `<button class="pill" id="meBtn">${I("user")}${esc(S.me.nombre || S.me.usuario)}${pr.admin ? " · Admin" : ""}</button>`}
+      ${S.view === "resumen" || (pr.admin && (S.view === "ajustes" || S.view === "equipo")) ? `<button class="pill tdate" data-act="agenda" title="Calendario de pedidos">${I("cal")}${DIAS[d.getDay()]} ${d.getDate()} de ${MESES[d.getMonth()]}</button>` : `<button class="pill" id="meBtn">${I("user")}${esc(S.me.nombre || S.me.usuario)}${pr.admin ? " · Admin" : ""}</button>`}
     </div>
     <main class="main">
       ${pr.admin && S.view === "avisos" && revisarList().length ? `<button class="revbar" data-act="revisar">${I("edit")}<span><b>${revisarList().length}</b> pedido${revisarList().length === 1 ? "" : "s"} editado${revisarList().length === 1 ? "" : "s"} por el equipo</span><em>Ver</em></button>` : ""}
@@ -1712,10 +1742,16 @@ function grupos(p){
   return Object.entries(g).map(([k, t]) => `${k}: ${Object.entries(t).map(([s, n]) => `${s}×${n}`).join(", ")}`);
 }
 function servsDe(p){ return Array.isArray(p.servicios) ? [...p.servicios] : p.servicio ? String(p.servicio).split(", ").filter(Boolean) : []; }
-const prKey = i => i.prenda ? (i.horma ? `${i.prenda} · ${i.horma}` : i.prenda) : "";
+// Tallas 2XL en adelante ("Unisex Plus") llevan su propio precio
+const esPlus = t => /^([2-9])\s*XL$|^X{2,}L$/i.test(String(t || "").trim());
+const prKey = i => i.prenda ? [i.prenda, i.horma, esPlus(i.talla) ? i.talla : ""].filter(Boolean).join(" · ") : "";
 function precioDe(p, prenda){
   if (p.pr) return num(p.pr[prenda]);
-  if (Array.isArray(p.precios)) { const x = p.precios.find(z => z.n === prenda) || p.precios.find(z => z.n === String(prenda).split(" · ")[0]); if (x) return num(x.v); }
+  if (Array.isArray(p.precios)) {
+    // Busca el precio exacto; si es un pedido viejo, el de la misma prenda sin talla u horma
+    const partes = String(prenda).split(" · ");
+    for (let n = partes.length; n > 0; n--) { const k = partes.slice(0, n).join(" · "), x = p.precios.find(z => z.n === k); if (x) return num(x.v); }
+  }
   return num(p.precio);
 }
 function prendasDe(p){ const g = {}; (p.items || []).forEach(i => { const k = prKey(i); if (k) g[k] = (g[k] || 0) + (Number(i.cant) || 1); }); return g; }
@@ -1733,16 +1769,19 @@ function dueShort(p){
 }
 const fmtCodigo = (tipo, n) => TIPOS[tipo].pre + "-" + String(n).padStart(4, "0");
 async function siguienteCodigo(tipo){
+  if (!navigator.onLine || S.online === false) return codigoLocal(tipo); // sin internet: número según los pedidos del teléfono
   const ref = doc(S.db, "contadores/" + tipo), re0 = new RegExp("^" + TIPOS[tipo].pre + "-(\\d{4,})$");
   const local = Object.values(S.pedidos).reduce((m, p) => { const x = re0.exec(p.codigo || ""); return x ? Math.max(m, Number(x[1])) : m; }, 0);
   try {
     const n = await Promise.race([
       runTransaction(S.db, async tx => { const s = await tx.get(ref); const n = Math.max((s.exists() && s.data().n) || 0, local) + 1; tx.set(ref, {n}); return n; }),
-      new Promise((_, r) => setTimeout(() => r(new Error("sin conexión")), 8000))
+      new Promise((_, r) => setTimeout(() => r(new Error("sin conexión")), 4000))
     ]);
     return fmtCodigo(tipo, n);
-  } catch(e) {
-    console.warn("contador", e);
+  } catch(e) { return codigoLocal(tipo); }
+}
+function codigoLocal(tipo){
+  {
     const re = new RegExp("^" + TIPOS[tipo].pre + "-(\\d{4,})$");
     const max = Object.values(S.pedidos).reduce((m, p) => { const x = re.exec(p.codigo || ""); return x ? Math.max(m, Number(x[1])) : m; }, 0);
     return fmtCodigo(tipo, max + 1);
@@ -1982,6 +2021,7 @@ function bindMain(){
     if (d.act === "nuevo") return nuevoPedido(d.tipo);
     if (d.act === "revisar") return openRevisar();
     if (d.act === "anuncio") return editarAnuncio(null);
+    if (d.act === "agenda") return openAgenda();
     if (d.anver) return editarAnuncio(d.anver);
     if (d.anon) return alternarAnuncio(d.anon);
     if (d.act === "respaldo") return openRespaldo();
@@ -2326,6 +2366,39 @@ function openCalendar(current, onPick, opts = {}){
   draw();
 }
 
+/* ===== Calendario de pedidos (por fecha de entrega), como una agenda ===== */
+function openAgenda(){
+  const v = today0(); v.setDate(1);
+  let sel = ymd(today0());
+  const ov = document.createElement("div"); ov.className = "dp-ov"; overlay(ov);
+  const porDia = () => { const g = {}; pedidosList().forEach(p => { if (p.fechaEntrega) (g[p.fechaEntrega] = g[p.fechaEntrega] || []).push(p); }); return g; };
+  const draw = () => {
+    const g = porDia(), y = v.getFullYear(), m = v.getMonth(), first = (new Date(y, m, 1).getDay() + 6) % 7, nd = new Date(y, m + 1, 0).getDate(), t0 = ymd(today0());
+    let cells = ["Lu","Ma","Mi","Ju","Vi","Sá","Do"].map(x => `<span>${x}</span>`).join("");
+    for (let i = 0; i < first; i++) cells += "<i></i>";
+    for (let dd = 1; dd <= nd; dd++) {
+      const s = `${y}-${pad(m+1)}-${pad(dd)}`, l = g[s] || [];
+      const act = l.filter(p => p.estado !== "entregado");
+      const puntos = act.slice(0, 3).map(p => `<b style="background:${p.urgente ? "var(--err)" : TIPOS[p.tipo].c}"></b>`).join("") + (act.length > 3 ? `<small>+${act.length - 3}</small>` : "") + (!act.length && l.length ? `<b class="ent"></b>` : "");
+      cells += `<button class="dd ag ${s === t0 ? "hoy" : ""} ${s === sel ? "sel" : ""} ${l.length ? "con" : ""}" data-d="${s}"><span>${dd}</span><em>${puntos}</em></button>`;
+    }
+    const l = (g[sel] || []).sort((a, b) => (a.estado === "entregado") - (b.estado === "entregado") || (b.urgente ? 1 : 0) - (a.urgente ? 1 : 0));
+    const f = parseYmd(sel);
+    ov.innerHTML = `<div class="dp-pop agpop"><div class="dph"><button data-nav="-1">‹</button><b>${MESES[m]} ${y}</b><button data-nav="1">›</button></div><div class="dpg">${cells}</div>
+      <div class="agday"><b>${(s => s.charAt(0).toUpperCase() + s.slice(1))(`${DIAS[f.getDay()]} ${f.getDate()} de ${MESES[f.getMonth()]}`)}</b><span>${l.length ? `${l.length} entrega${l.length === 1 ? "" : "s"}` : "Sin entregas"}</span></div>
+      <div class="aglist">${l.map(cardHTML).join("")}</div></div>`;
+    loadFotos(ov);
+  };
+  ov.onclick = e => {
+    if (e.target === ov) return ov.close();
+    const n = e.target.closest("[data-nav]"); if (n) { v.setMonth(v.getMonth() + Number(n.dataset.nav)); return draw(); }
+    const d = e.target.closest("[data-d]"); if (d) { sel = d.dataset.d; return draw(); }
+    const o = e.target.closest("[data-open]"); if (o) openDetail(o.dataset.open);
+  };
+  draw();
+  const t = setInterval(() => { if (!document.body.contains(ov)) return clearInterval(t); if (!document.querySelector(".md")) { const sc = ov.querySelector(".agpop") && ov.querySelector(".agpop").scrollTop; draw(); if (sc) ov.querySelector(".agpop").scrollTop = sc; } }, 3000);
+}
+
 // Mayúscula inicial mientras se escribe: en cada palabra (nombres) o solo en la primera (tema)
 const CONECT = ["de","del","la","las","los","y","e","da","das","do","dos","di","van","von","el"];
 const capPalabras = s => s.replace(/(^|[\s'-])(\p{Ll})/gu, (m, a, b) => a + b.toLocaleUpperCase("es"))
@@ -2519,26 +2592,26 @@ function goStep(n){
 function erroresPaso(i){
   const e = [], isP = F.tipo === "personalizado";
   if (i === 0) {
-    if ((F.cliente.nombre || "").trim().length < 3) e.push(["f-nombre", "Escribe el nombre del cliente"]);
-    const t = F._checkTel(); if (!t.ok) e.push(["f-tel", t.empty ? t.msg : "WhatsApp: " + t.msg]);
-    if (!(F.tema || "").trim()) e.push(["f-tema", "Escribe el tema o diseño"]);
-    if (isP && !F.servicios.length) e.push(["f-servicio", "Elige al menos un tipo de estampado"]);
-    if (isP && !F.prendaDe) e.push(["f-prendade", "Indica quién pone la prenda"]);
+    if ((F.cliente.nombre || "").trim().length < 3) e.push(["f-nombre", "Falta el nombre"]);
+    const t = F._checkTel(); if (!t.ok) e.push(["f-tel", t.msg]);
+    if (!(F.tema || "").trim()) e.push(["f-tema", "Falta el tema o diseño"]);
+    if (isP && !F.servicios.length) e.push(["f-servicio", "Elige un estampado"]);
+    if (isP && !F.prendaDe) e.push(["f-prendade", "Elige quién pone la prenda"]);
   }
   if (i === 1) {
     const llenas = F.items.filter(x => !itemVacio(x));
     const incompl = F.items.findIndex(x => !itemVacio(x) && (reqItem().some(f => !x[f])));
-    if (!llenas.length) e.push(["f-items", "Agrega al menos una prenda"]);
-    else if (incompl >= 0) e.push(["f-items", "Completa los datos marcados en rojo"]);
+    if (!llenas.length) e.push(["f-items", "Agrega una prenda"]);
+    else if (incompl >= 0) e.push(["f-items", "Completa lo marcado en rojo"]);
   }
   if (i === 2) {
-    if (!F.fechaEntrega) e.push(["f-fecha", "Elige la fecha de entrega"]);
+    if (!F.fechaEntrega) e.push(["f-fecha", "Elige la fecha"]);
     const prs = Object.keys(prendasDe(F));
-    if (!prs.length) e.push(["f-precio", "Primero agrega las prendas"]);
-    else if (prs.some(k => !(num(F.pr[k]) > 0))) e.push(["f-precio", "Escribe el precio de cada prenda"]);
-    if (!(num(F.abono) > 0) && !(F.motivoSinAbono || "").trim()) e.push(["f-motivo", "Escribe el motivo por el que no hay abono"]);
+    if (!prs.length) e.push(["f-precio", "Agrega prendas primero"]);
+    else if (prs.some(k => !(num(F.pr[k]) > 0))) e.push(["f-precio", "Falta un precio"]);
+    if (!(num(F.abono) > 0) && !(F.motivoSinAbono || "").trim()) e.push(["f-motivo", "Falta el motivo sin abono"]);
   }
-  if (i === 3 && F.imagenes.some(x => x.subiendo)) e.push(["", "Espera a que terminen de subir las imágenes"]);
+  if (i === 3 && F.imagenes.some(x => x.subiendo)) e.push(["", "Espera las imágenes"]);
   return e;
 }
 function marcarErrores(errs){
@@ -2649,7 +2722,7 @@ function elegir(it, f){
   if (f === "numero") return numPad(it.numero, v => { it.numero = v; renderItems(); });
   if (f === "etiqueta") pickPopup({title:"Etiqueta", kind:"text", current:it.etiqueta, onPick:set, options:c.marcas.map(v => ({v}))});
   if (f === "talla") pickPopup({title:"Talla", kind:"talla", current:it.talla, onPick:set,
-    sections:[{title:"Niño", options:c.tallasNino.map(v => ({v}))}, {title:"Adulto", options:c.tallasAdulto.map(v => ({v}))}]});
+    sections:[{title:"Niño", options:c.tallasNino.map(v => ({v}))}, {title:"Adulto", options:c.tallasAdulto.filter(v => !esPlus(v)).map(v => ({v}))}, {title:"Unisex Plus", options:c.tallasAdulto.filter(esPlus).map(v => ({v}))}].filter(s => s.options.length)});
 }
 function numPad(actual, onOk){
   let v = String(actual || "");
