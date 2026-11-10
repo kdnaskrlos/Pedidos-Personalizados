@@ -1065,7 +1065,7 @@ html,body{overscroll-behavior-y:none}
 import { firebaseConfig } from "./config.js";
 import { initializeApp, deleteApp } from "https://www.gstatic.com/firebasejs/10.12.2/firebase-app.js";
 import { getAuth, onAuthStateChanged, signInWithEmailAndPassword, createUserWithEmailAndPassword, signOut, updatePassword, reauthenticateWithCredential, EmailAuthProvider } from "https://www.gstatic.com/firebasejs/10.12.2/firebase-auth.js";
-import { initializeFirestore, getFirestore, persistentLocalCache, persistentMultipleTabManager, doc, collection, query, where, onSnapshot, getDoc, getDocs, setDoc as fsSetDoc, updateDoc as fsUpdateDoc, deleteDoc as fsDeleteDoc, writeBatch as fsWriteBatch, runTransaction } from "https://www.gstatic.com/firebasejs/10.12.2/firebase-firestore.js";
+import { initializeFirestore, getFirestore, persistentLocalCache, persistentMultipleTabManager, doc, collection, query, where, onSnapshot, getDoc, getDocFromCache, getDocs, setDoc as fsSetDoc, updateDoc as fsUpdateDoc, deleteDoc as fsDeleteDoc, writeBatch as fsWriteBatch, runTransaction } from "https://www.gstatic.com/firebasejs/10.12.2/firebase-firestore.js";
 // Guardado sin esperar a internet: Firebase guarda el cambio en el teléfono al instante y lo sube
 // cuando hay conexión. La app sigue en cuanto el cambio quedó guardado localmente.
 const sinEsperar = p => {
@@ -1078,7 +1078,7 @@ const updateDoc = (...a) => sinEsperar(fsUpdateDoc(...a));
 const deleteDoc = (...a) => sinEsperar(fsDeleteDoc(...a));
 const writeBatch = db => { const b = fsWriteBatch(db), c = b.commit.bind(b); b.commit = () => sinEsperar(c()); return b; };
 
-const VERSION = "v3.29";
+const VERSION = "v3.30";
 /* ================= Utilidades ================= */
 const $ = (s, r = document) => r.querySelector(s);
 const esc = s => String(s ?? "").replace(/[&<>"']/g, c => ({"&":"&amp;","<":"&lt;",">":"&gt;",'"':"&quot;","'":"&#39;"}[c]));
@@ -1276,8 +1276,19 @@ function boot(){
   S.auth = getAuth(S.app);
   try { S.db = initializeFirestore(S.app, {localCache: persistentLocalCache({tabManager: persistentMultipleTabManager()})}); }
   catch(e) { S.db = getFirestore(S.app); }
-  onSnapshot(doc(S.db, "sistema/estado"), s => { S.sistema = s.exists() ? s.data() : null; route(); }, e => { console.warn(e); gateMsg("alert", "No se pudo conectar", "Revisa tu conexión a internet. Si eres el administrador, verifica que publicaste las reglas de Firestore (GUIA.md, paso 4)."); });
-  onAuthStateChanged(S.auth, u => { stopSubs(); S.view = "resumen"; S.viewPushed = false; S.q = ""; S.filtro = "pendientes"; S.uid = u ? u.uid : null; S.me = null; if (u) startMe(); route(); });
+  // Arranque local: si hay una copia guardada de la última sesión, la app se muestra al instante (aunque no haya internet)
+  const cop = leerArranque();
+  if (cop) {
+    Object.assign(S, {sistema:cop.sistema, uid:cop.uid, me:cop.me, cfgRaw:cop.cfgRaw || null, usuarios:cop.usuarios || {}, anuncios:cop.anuncios || {}, pedidos:cop.pedidos || {}, resp:cop.resp || null, _local:true, cache:true});
+    route();
+    if (S.me && S.me.activo) { startMe(); startData(true); }
+  }
+  onSnapshot(doc(S.db, "sistema/estado"), s => { S.sistema = s.exists() ? s.data() : null; route(); }, e => { console.warn(e); if (S.me) return; gateMsg("alert", "No se pudo conectar", "Revisa tu conexión a internet. Si eres el administrador, verifica que publicaste las reglas de Firestore (GUIA.md, paso 4)."); });
+  onAuthStateChanged(S.auth, u => {
+    // Misma sesión que la copia local: se sigue sin reiniciar nada
+    if (S._local && u && u.uid === S.uid) { S._local = false; return; }
+    if (!u) borrarArranque();
+    S._local = false; stopSubs(); S.view = "resumen"; S.viewPushed = false; S.q = ""; S.filtro = "pendientes"; S.uid = u ? u.uid : null; S.me = null; if (u) startMe(); route(); });
   addEventListener("online", () => { S.online = true; render(); });
   addEventListener("offline", () => { S.online = false; render(); });
   addEventListener("beforeinstallprompt", e => { e.preventDefault(); S.installEvt = e; render(); });
@@ -1321,10 +1332,10 @@ function startMe(){
   }, e => { console.warn(e); S.me = false; route(); });
   S.unsubs.push(un);
 }
-function startData(){
+function startData(keep){
   // reinicia suscripciones de datos (no la del perfil)
   (S.dataUnsubs || []).forEach(u => { try { u(); } catch(e) {} });
-  S.dataUnsubs = []; S.pedidos = {};
+  S.dataUnsubs = []; if (!keep) S.pedidos = {};
   const add = u => { S.dataUnsubs.push(u); S.unsubs.push(u); };
   S.errores = [];
   const gen = (S.gen = (S.gen || 0) + 1);
@@ -1347,13 +1358,14 @@ function startData(){
   }, err("usuarios")));
   const pr = perm();
   const parts = {};
-  const merge = () => { const all = {}; Object.values(parts).forEach(m => Object.assign(all, m)); Object.keys(BORRAR).forEach(id => delete all[id]); S.pedidos = all; render(); };
+  let nSubs = 0;
+  const merge = () => { if (keep && Object.keys(parts).length < nSubs) return; const all = {}; Object.values(parts).forEach(m => Object.assign(all, m)); Object.keys(BORRAR).forEach(id => delete all[id]); S.pedidos = all; render(); };
   S.remerge = merge;
-  const sub = (key, q) => add(onSnapshot(q, { includeMetadataChanges: true }, s => {
+  const sub = (key, q) => (nSubs++, add(onSnapshot(q, { includeMetadataChanges: true }, s => {
     const m = {}; s.forEach(d => m[d.id] = Object.assign({_id: d.id}, d.data())); parts[key] = m;
     S.cache = !!(s.metadata && s.metadata.fromCache); if (!S.cache) S.reintento = false; merge();
     if (key === "todo" && !S.cache) migrarCodigos();
-  }, err("pedidos-" + key)));
+  }, err("pedidos-" + key))));
   const col = collection(S.db, "pedidos");
   if (pr.admin) sub("todo", col);
   else {
@@ -1442,7 +1454,23 @@ function alertas(){
   };
 }
 let renderQ = false;
-function render(){ if (renderQ) return; renderQ = true; requestAnimationFrame(() => { renderQ = false; doRender(); }); }
+// Copia local para abrir la app al instante; se actualiza sola mientras se usa
+const ARR = "cs-arranque";
+function leerArranque(){ try { const c = JSON.parse(localStorage.getItem(ARR) || "null"); return c && c.uid && c.me && c.sistema ? c : null; } catch(e) { return null; } }
+function borrarArranque(){ try { localStorage.removeItem(ARR); } catch(e) {} }
+let arrT = 0;
+// Fotos: primero la copia del teléfono (instantánea, también sin internet); si no está, se pide a internet
+const leerFoto = ref => getDocFromCache(ref).then(s => s.exists() ? s : getDoc(ref)).catch(() => getDoc(ref));
+function guardarArranque(){
+  clearTimeout(arrT);
+  arrT = setTimeout(() => {
+    if (!S.uid || !S.me || !S.me.activo || !S.sistema) return;
+    const c = {uid:S.uid, me:S.me, sistema:S.sistema, cfgRaw:S.cfgRaw, usuarios:S.usuarios, anuncios:S.anuncios, resp:S.resp, pedidos:S.pedidos};
+    try { localStorage.setItem(ARR, JSON.stringify(c)); }
+    catch(e) { try { delete c.pedidos; localStorage.setItem(ARR, JSON.stringify(c)); } catch(e2) {} }
+  }, 1500);
+}
+function render(){ guardarArranque(); if (renderQ) return; renderQ = true; requestAnimationFrame(() => { renderQ = false; doRender(); }); }
 function doRender(){
   document.body.classList.toggle("fixedv", S.view === "resumen");
   if (S.view !== "equipo") S.uOpen = null;
@@ -2341,9 +2369,9 @@ const fotoCache = {};
 // Miniatura liviana para las tarjetas; si una foto antigua no la tiene, se crea una sola vez
 function loadMini(id){
   const k = id + "_m";
-  if (!fotoCache[k]) fotoCache[k] = getDoc(doc(S.db, "fotos/" + k)).then(async s => {
+  if (!fotoCache[k]) fotoCache[k] = leerFoto(doc(S.db, "fotos/" + k)).then(async s => {
     if (s.exists() && s.data().data) return s.data().data;
-    if (!fotoCache[id]) fotoCache[id] = getDoc(doc(S.db, "fotos/" + id)).then(x => x.exists() ? x.data().data : "");
+    if (!fotoCache[id]) fotoCache[id] = leerFoto(doc(S.db, "fotos/" + id)).then(x => x.exists() ? x.data().data : "");
     const full = await fotoCache[id]; if (!full) return "";
     try {
       const img = await new Promise((res, rej) => { const i = new Image(); i.onload = () => res(i); i.onerror = rej; i.src = full; });
@@ -2362,7 +2390,7 @@ function loadFotos(root){
   root.querySelectorAll("img[data-foto]").forEach(async img => {
     const id = img.dataset.foto;
     try {
-      if (!fotoCache[id]) fotoCache[id] = getDoc(doc(S.db, "fotos/" + id)).then(s => s.exists() ? s.data().data : "");
+      if (!fotoCache[id]) fotoCache[id] = leerFoto(doc(S.db, "fotos/" + id)).then(s => s.exists() ? s.data().data : "");
       const src = await fotoCache[id];
       if (src && /^data:image\//.test(src)) img.src = src; else img.style.visibility = "hidden";
     } catch(e) { img.style.visibility = "hidden"; }
