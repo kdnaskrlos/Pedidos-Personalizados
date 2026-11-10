@@ -959,7 +959,7 @@ html,body{overscroll-behavior-y:none}
 :root[data-theme="dark"] .iswipe.armed .delbg{background:color-mix(in srgb,var(--err) 26%,var(--surface))}
 .irow3.borrar{border-color:var(--line)!important;background:var(--surface)!important}
 /* v3.18 calendario que se desliza como el del teléfono */
-.agvp{overflow:hidden;margin:0 -2px}
+.agvp{overflow:hidden;margin:0 -2px;touch-action:pan-y}
 .agtrack{display:flex;width:300%;transform:translateX(-33.3333%);will-change:transform}
 .agtrack>.dpg{width:33.3333%;flex:none;padding:0 2px;box-sizing:border-box}
 @media (max-width:1000px){.hello{padding-bottom:8px;margin-top:-6px}.hello h1{font-size:25px}}
@@ -1072,7 +1072,7 @@ const updateDoc = (...a) => sinEsperar(fsUpdateDoc(...a));
 const deleteDoc = (...a) => sinEsperar(fsDeleteDoc(...a));
 const writeBatch = db => { const b = fsWriteBatch(db), c = b.commit.bind(b); b.commit = () => sinEsperar(c()); return b; };
 
-const VERSION = "v3.22";
+const VERSION = "v3.24";
 /* ================= Utilidades ================= */
 const $ = (s, r = document) => r.querySelector(s);
 const esc = s => String(s ?? "").replace(/[&<>"']/g, c => ({"&":"&amp;","<":"&lt;",">":"&gt;",'"':"&quot;","'":"&#39;"}[c]));
@@ -2438,27 +2438,37 @@ function openAgenda(){
     for (let k = first + nd; k < 42; k++) cells += `<i class="dd ag"></i>`;
     return `<div class="dpg">${cells}</div>`;
   };
+  const mesDe = k => { const d = new Date(v.getFullYear(), v.getMonth() + k, 1); return [d.getFullYear(), d.getMonth()]; };
   const draw = () => {
     const g = porDia(), y = v.getFullYear(), m = v.getMonth();
     const l = (g[sel] || []).sort((a, b) => (a.estado === "entregado") - (b.estado === "entregado") || (b.urgente ? 1 : 0) - (a.urgente ? 1 : 0));
-    const f = parseYmd(sel), mes = k => { const d = new Date(y, m + k, 1); return [d.getFullYear(), d.getMonth()]; };
+    const f = parseYmd(sel);
     const sc = ov.querySelector(".agpop") ? ov.querySelector(".agpop").scrollTop : 0;
     ov.innerHTML = `<div class="dp-pop agpop"><div class="dph"><button data-nav="-1">‹</button><b>${MESES[m]} ${y}</b><button data-nav="1">›</button></div>
-      <div class="agvp"><div class="agtrack">${[-1, 0, 1].map(k => grilla(...mes(k), g)).join("")}</div></div>
+      <div class="agvp"><div class="agtrack">${[-1, 0, 1].map(k => grilla(...mesDe(k), g)).join("")}</div></div>
       <div class="agday"><b>${(s => s.charAt(0).toUpperCase() + s.slice(1))(`${DIAS[f.getDay()]} ${f.getDate()} de ${MESES[f.getMonth()]}`)}</b><span>${l.length ? `${l.length} entrega${l.length === 1 ? "" : "s"}` : "Sin entregas"}</span></div>
       <div class="aglist">${l.map(cardHTML).join("")}</div></div>`;
     if (sc) ov.querySelector(".agpop").scrollTop = sc;
     loadFotos(ov);
   };
-  // Cambia de mes deslizando la cuadrícula hacia el lado (como el calendario del teléfono)
-  const irA = (dir, desde = 0) => {
-    const tr = ov.querySelector(".agtrack"); if (!tr || moviendo) return;
-    moviendo = true;
-    tr.style.transition = "transform .3s cubic-bezier(.2,.8,.2,1)";
+  // Al cambiar de mes solo se redibujan la cuadrícula y el título (más rápido y sin parpadeos)
+  const drawMes = () => {
+    const tr = ov.querySelector(".agtrack"), g = porDia();
+    tr.style.transition = "none"; tr.style.transform = "";
+    tr.innerHTML = [-1, 0, 1].map(k => grilla(...mesDe(k), g)).join("");
+    ov.querySelector(".dph b").textContent = `${MESES[v.getMonth()]} ${v.getFullYear()}`;
+  };
+  // Pasa de mes con un deslizamiento corto; si llega otro gesto a mitad, termina al instante
+  let pend = null;
+  const terminar = () => { if (!pend) return; const d = pend; pend = null; moviendo = false; if (d.dir) { v.setMonth(v.getMonth() + d.dir); drawMes(); } else { const tr = ov.querySelector(".agtrack"); tr.style.transition = "none"; tr.style.transform = ""; } };
+  const irA = (dir, rapido) => {
+    const tr = ov.querySelector(".agtrack"); if (!tr) return;
+    terminar();
+    moviendo = true; pend = {dir};
+    tr.style.transition = `transform ${rapido ? .18 : .26}s cubic-bezier(.22,.9,.3,1)`;
     tr.style.transform = `translateX(${dir > 0 ? -66.6667 : dir < 0 ? 0 : -33.3333}%)`;
-    const fin = () => { moviendo = false; if (dir) { v.setMonth(v.getMonth() + dir); draw(); } else { tr.style.transition = ""; tr.style.transform = ""; } };
-    let hecho = false; const una = () => { if (hecho) return; hecho = true; fin(); };
-    tr.addEventListener("transitionend", una, {once:true}); setTimeout(una, 360);
+    const una = () => terminar();
+    tr.addEventListener("transitionend", una, {once:true}); setTimeout(una, rapido ? 230 : 310);
   };
   ov.onclick = e => {
     if (e.target === ov) return ov.close();
@@ -2467,23 +2477,34 @@ function openAgenda(){
     const d = e.target.closest("[data-d]"); if (d) { sel = d.dataset.d; return draw(); }
     const o = e.target.closest("[data-open]"); if (o) openDetail(o.dataset.open);
   };
-  // La cuadrícula sigue al dedo; al soltar pasa de mes si se arrastró lo suficiente
-  let x0 = null, y0 = 0, modo = "", dx = 0, arrastro = false;
-  ov.addEventListener("touchstart", e => { if (moviendo || !e.target.closest(".agvp")) return; const t = e.touches[0]; x0 = t.clientX; y0 = t.clientY; modo = ""; dx = 0; }, {passive:true});
-  ov.addEventListener("touchmove", e => {
-    if (x0 === null) return;
-    const t = e.touches[0], mx = t.clientX - x0, my = t.clientY - y0;
-    if (!modo) { if (Math.abs(mx) < 8 && Math.abs(my) < 8) return; modo = Math.abs(mx) > Math.abs(my) ? "x" : "y"; if (modo === "y") { x0 = null; return; } }
+  // La cuadrícula sigue al dedo; al soltar pasa de mes si se arrastró lo suficiente o con un movimiento rápido
+  let x0 = null, y0 = 0, modo = "", dx = 0, arrastro = false, t0 = 0, xs = [];
+  // Eventos de puntero con captura: aunque la cuadrícula se redibuje a mitad del gesto, el dedo no se pierde
+  let pid = null;
+  ov.addEventListener("pointerdown", e => {
+    const vp = e.target.closest(".agvp"); if (!vp || (e.pointerType === "mouse" && e.button !== 0)) return;
+    const habia = !!pend;
+    terminar(); // si venía de otro gesto, se completa de inmediato y se puede volver a arrastrar
+    pid = e.pointerId; x0 = e.clientX; y0 = e.clientY; modo = ""; dx = 0; t0 = performance.now(); xs = [[t0, x0]];
+    if (habia) try { vp.setPointerCapture(pid); } catch {}
+  });
+  ov.addEventListener("pointermove", e => {
+    if (x0 === null || e.pointerId !== pid) return;
+    const mx = e.clientX - x0, my = e.clientY - y0;
+    if (!modo) { if (Math.abs(mx) < 6 && Math.abs(my) < 6) return; modo = Math.abs(mx) > Math.abs(my) ? "x" : "y"; if (modo === "y") { x0 = null; return; } try { ov.querySelector(".agvp").setPointerCapture(pid); } catch {} }
     e.preventDefault(); dx = mx;
-    const tr = ov.querySelector(".agtrack"); tr.style.transition = "none"; tr.style.transform = `translateX(calc(-33.3333% + ${dx}px))`;
-  }, {passive:false});
-  const soltar = () => {
-    if (x0 === null) return; x0 = null; if (modo !== "x") return;
-    arrastro = Math.abs(dx) > 8; setTimeout(() => arrastro = false, 400);
-    const w = ov.querySelector(".agvp").clientWidth;
-    irA(Math.abs(dx) > w * .22 ? (dx < 0 ? 1 : -1) : 0);
+    const now = performance.now(); xs.push([now, e.clientX]); if (xs.length > 5) xs.shift();
+    const tr = ov.querySelector(".agtrack"); tr.style.transition = "none"; tr.style.transform = `translate3d(calc(-33.3333% + ${dx}px),0,0)`;
+  });
+  const soltar = e => {
+    if (x0 === null || e.pointerId !== pid) return; x0 = null; if (modo !== "x") return;
+    arrastro = Math.abs(dx) > 6; setTimeout(() => arrastro = false, 400);
+    const w = ov.querySelector(".agvp").clientWidth, a = xs[0], b = xs[xs.length - 1];
+    const vel = b && a && b[0] - a[0] > 8 ? (b[1] - a[1]) / (b[0] - a[0]) : 0; // px por ms
+    const rapido = Math.abs(vel) > .35 && Math.sign(vel) === Math.sign(dx) && Math.abs(dx) > 20;
+    irA(rapido || Math.abs(dx) > w * .2 ? (dx < 0 ? 1 : -1) : 0, rapido);
   };
-  ov.addEventListener("touchend", soltar); ov.addEventListener("touchcancel", soltar);
+  ov.addEventListener("pointerup", soltar); ov.addEventListener("pointercancel", soltar);
   draw();
   const t = setInterval(() => { if (!document.body.contains(ov)) return clearInterval(t); if (!document.querySelector(".md") && !moviendo && x0 === null) draw(); }, 3000);
 }
@@ -2867,12 +2888,13 @@ function elegir(it, f){
     options:[...new Set([...(isP ? c.hormas : c.hormasSub), "Niño", "Niña", "Unisex", "Unisex Plus"])].map(v => ({v}))});
   if (f === "numero") return numPad(it.numero, v => { it.numero = v; renderItems(); });
   if (f === "etiqueta") pickPopup({title:"Etiqueta", kind:"text", current:it.etiqueta, onPick:set, options:c.marcas.map(v => ({v}))});
-  // Al elegir la talla, la horma se pone sola según el grupo: Niño, Unisex o Unisex Plus (se puede cambiar después)
+  // Al elegir la talla, la horma se pone sola según el grupo: Unisex o Unisex Plus (se puede cambiar después)
+  // En tallas de niño la horma queda en blanco para elegir Niño o Niña
   // Si ya elegiste una horma que encaja con ese grupo (Niña, Dama, Caballero, Oversize…), se respeta
   const conHorma = v => {
     const hm = it.horma || "", nino = /^niñ[oa]s?$/i.test(hm);
     it.talla = v;
-    if (c.tallasNino.includes(v)) { if (!nino) it.horma = "Niño"; }
+    if (c.tallasNino.includes(v)) { if (!nino) it.horma = ""; }
     else if (esPlus(v)) { if (!hm || nino || hm === "Unisex") it.horma = "Unisex Plus"; }
     else if (!hm || nino || hm === "Unisex Plus") it.horma = "Unisex";
     clearErr("f-items"); renderItems(); renderTotals();
