@@ -1090,7 +1090,7 @@ const updateDoc = (...a) => sinEsperar(fsUpdateDoc(...a));
 const deleteDoc = (...a) => sinEsperar(fsDeleteDoc(...a));
 const writeBatch = db => { const b = fsWriteBatch(db), c = b.commit.bind(b); b.commit = () => sinEsperar(c()); return b; };
 
-const VERSION = "v3.36";
+const VERSION = "v3.37";
 /* ================= Utilidades ================= */
 const $ = (s, r = document) => r.querySelector(s);
 const esc = s => String(s ?? "").replace(/[&<>"']/g, c => ({"&":"&amp;","<":"&lt;",">":"&gt;",'"':"&quot;","'":"&#39;"}[c]));
@@ -2567,7 +2567,7 @@ function openAgenda(){
 }
 
 // Mayúscula inicial mientras se escribe: en cada palabra (nombres) o solo en la primera (tema)
-const CONECT = ["de","del","la","las","los","y","e","da","das","do","dos","di","van","von","el"];
+const CONECT = ["de","del","la","las","los","y","e","o","u","a","al","en","con","por","para","sin","da","das","do","dos","di","van","von","el"];
 const capPalabras = s => s.replace(/(^|[\s'-])(\p{Ll})/gu, (m, a, b) => a + b.toLocaleUpperCase("es"))
   .replace(/(\s)(\p{Lu}\p{Ll}*)(?=\s|$)/gu, (m, a, w) => CONECT.includes(w.toLocaleLowerCase("es")) ? a + w.toLocaleLowerCase("es") : m);
 const capPrimera = s => s.replace(/^(\s*)(\p{Ll})/u, (m, a, b) => a + b.toLocaleUpperCase("es"));
@@ -2713,7 +2713,7 @@ function openForm(id, tipo, cliente, borrador){
   if (inTel.value) checkTel();
   F._checkTel = () => parsePhone(inTel.value, inPais.value);
 
-  $("#in-tema", ov).oninput = e => { mayus(e.target, false); F.tema = e.target.value; clearErr("f-tema"); };
+  $("#in-tema", ov).oninput = e => { mayus(e.target, true); F.tema = e.target.value; clearErr("f-tema"); };
   $("#in-nota", ov).oninput = e => F.nota = e.target.value;
   $("#in-mon", ov).onchange = e => { F.moneda = e.target.value; renderTotals(); };
   $("#prl", ov).oninput = e => { const x = e.target.closest("[data-pr]"); if (!x) return; F.pr[x.dataset.pr] = x.value; x.classList.remove("bad"); if (!erroresPaso(2).some(z => z[0] === "f-precio")) clearErr("f-precio"); renderTotals(); };
