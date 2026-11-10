@@ -1046,7 +1046,7 @@ const updateDoc = (...a) => sinEsperar(fsUpdateDoc(...a));
 const deleteDoc = (...a) => sinEsperar(fsDeleteDoc(...a));
 const writeBatch = db => { const b = fsWriteBatch(db), c = b.commit.bind(b); b.commit = () => sinEsperar(c()); return b; };
 
-const VERSION = "v3.13";
+const VERSION = "v3.14";
 /* ================= Utilidades ================= */
 const $ = (s, r = document) => r.querySelector(s);
 const esc = s => String(s ?? "").replace(/[&<>"']/g, c => ({"&":"&amp;","<":"&lt;",">":"&gt;",'"':"&quot;","'":"&#39;"}[c]));
@@ -2751,6 +2751,13 @@ function renderItems(){
     it.cant = Math.max(1, parseInt(e.target.value) || Number(it.cant) || 1); renderItems(); renderTotals();
   };
   if (!box._qbound) { box._qbound = true; box.addEventListener("focusin", onIn); box.addEventListener("focusout", onOut); deslizarBorrar(box); }
+  // Si había un aviso en rojo de las prendas, se vuelve a revisar: desaparece cuando ya no aplica
+  const fi = $("#f-items", ov);
+  if (fi && fi.classList.contains("err")) {
+    const e = erroresPaso(1).find(x => x[0] === "f-items");
+    if (!e || !F.items.length) clearErr("f-items");
+    else { const m = fi.querySelector(".msg"); if (m) m.textContent = "✗ " + e[1]; marcarFilas(); }
+  }
 }
 // Deslizar una prenda hacia la izquierda hasta casi el borde para borrarla (con Deshacer)
 function deslizarBorrar(box){
