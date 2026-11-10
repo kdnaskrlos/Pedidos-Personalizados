@@ -1089,7 +1089,7 @@ const updateDoc = (...a) => sinEsperar(fsUpdateDoc(...a));
 const deleteDoc = (...a) => sinEsperar(fsDeleteDoc(...a));
 const writeBatch = db => { const b = fsWriteBatch(db), c = b.commit.bind(b); b.commit = () => sinEsperar(c()); return b; };
 
-const VERSION = "v3.34";
+const VERSION = "v3.35";
 /* ================= Utilidades ================= */
 const $ = (s, r = document) => r.querySelector(s);
 const esc = s => String(s ?? "").replace(/[&<>"']/g, c => ({"&":"&amp;","<":"&lt;",">":"&gt;",'"':"&quot;","'":"&#39;"}[c]));
@@ -2500,11 +2500,10 @@ function openAgenda(){
   const draw = () => {
     const g = porDia(), y = v.getFullYear(), m = v.getMonth();
     const l = (g[sel] || []).sort((a, b) => (a.estado === "entregado") - (b.estado === "entregado") || (b.urgente ? 1 : 0) - (a.urgente ? 1 : 0));
-    const f = parseYmd(sel);
     const sc = ov.querySelector(".agpop") ? ov.querySelector(".agpop").scrollTop : 0;
     ov.innerHTML = `<div class="dp-pop agpop"><div class="dph"><button data-nav="-1">‹</button><b>${MESES[m]} ${y}</b><button data-nav="1">›</button></div>
       <div class="agvp"><div class="agtrack">${[-1, 0, 1].map(k => grilla(...mesDe(k), g)).join("")}</div></div>
-      <div class="agday"><b>${(s => s.charAt(0).toUpperCase() + s.slice(1))(`${DIAS[f.getDay()]} ${f.getDate()} de ${MESES[f.getMonth()]}`)}</b><span>${l.length ? `${l.length} entrega${l.length === 1 ? "" : "s"}` : "Sin entregas"}</span></div>
+      <div class="agday"><span>${l.length ? `${l.length} entrega${l.length === 1 ? "" : "s"}` : "Sin entregas"}</span></div>
       <div class="aglist">${l.map(cardHTML).join("")}</div></div>`;
     if (sc) ov.querySelector(".agpop").scrollTop = sc;
     loadFotos(ov);
@@ -2952,7 +2951,7 @@ function elegir(it, f){
     return true;
   };
   if (f === "horma") pickPopup({title:"Horma", kind:"text", current:it.horma, onPick:v => { v = v === "__none" ? "" : v; if (!tallaCuadra(v, it.talla)) it.talla = ""; set(v); },
-    options:[...new Set([...(isP ? c.hormas : c.hormasSub), "Niño", "Niña", "Unisex", "Unisex Plus"])].map(v => ({v}))});
+    options:(isP ? c.hormas : c.hormasSub).map(v => ({v}))});
   if (f === "numero") return numPad(it.numero, v => { it.numero = v; renderItems(); });
   if (f === "etiqueta") pickPopup({title:"Etiqueta", kind:"text", current:it.etiqueta, onPick:set, options:c.marcas.map(v => ({v}))});
   // Al elegir la talla no se pone horma automática; si la horma elegida no corresponde a esa talla, queda en blanco
