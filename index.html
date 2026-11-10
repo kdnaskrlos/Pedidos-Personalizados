@@ -919,6 +919,16 @@ html,body{overscroll-behavior-y:none}
 /* v3.10 agenda por debajo del pedido abierto; botón de prueba al final del Resumen */
 .dp-ov.agov{z-index:45}
 .main>.pill.demo,#demoBtn{align-self:center;margin:4px auto 0;display:inline-flex}
+/* v3.11 tarjetas del Resumen un poco más compactas */
+.tiles .tile{padding:13px 15px;gap:6px}
+.tiles .tile .v{font-size:26px}
+/* prendas compactas cuando hay más de 3 */
+.irow3.mini{display:flex!important;flex-direction:row!important;grid-template-columns:none;align-items:center;justify-content:flex-start;text-align:left;gap:10px;padding:10px 12px;margin-bottom:8px;cursor:pointer}
+.irow3.mini .mq{flex:none;min-width:30px;height:30px;border-radius:9px;display:grid;place-items:center;font-weight:800;font-size:14px;background:var(--surface-2)}
+.irow3.mini .mt{flex:1;min-width:0;white-space:nowrap;overflow:hidden;text-overflow:ellipsis;font-weight:700;font-size:14.5px}
+.irow3.mini .mt small{font-weight:600;color:var(--muted);font-size:13px}
+.irow3.mini svg.i{flex:none;width:18px;height:18px;color:var(--muted)}
+.irow3.mini.bad{border-color:var(--err);background:color-mix(in srgb,var(--err) 5%,var(--surface))}
 @media (max-width:1000px){.hello{padding-bottom:8px;margin-top:-6px}.hello h1{font-size:25px}}
 @media (max-width:1000px){.tiles.t5>:last-child{grid-column:1/-1}}
 @media (max-width:1000px){.pill.demo .m-pr{display:inline}}
@@ -1023,7 +1033,7 @@ const updateDoc = (...a) => sinEsperar(fsUpdateDoc(...a));
 const deleteDoc = (...a) => sinEsperar(fsDeleteDoc(...a));
 const writeBatch = db => { const b = fsWriteBatch(db), c = b.commit.bind(b); b.commit = () => sinEsperar(c()); return b; };
 
-const VERSION = "v3.10";
+const VERSION = "v3.11";
 /* ================= Utilidades ================= */
 const $ = (s, r = document) => r.querySelector(s);
 const esc = s => String(s ?? "").replace(/[&<>"']/g, c => ({"&":"&amp;","<":"&lt;",">":"&gt;",'"':"&quot;","'":"&#39;"}[c]));
@@ -2398,6 +2408,13 @@ function openAgenda(){
     const d = e.target.closest("[data-d]"); if (d) { sel = d.dataset.d; return draw(); }
     const o = e.target.closest("[data-open]"); if (o) openDetail(o.dataset.open);
   };
+  // Deslizar a la izquierda o derecha para cambiar de mes
+  let x0 = null, y0 = 0;
+  ov.addEventListener("touchstart", e => { const t = e.touches[0]; x0 = t.clientX; y0 = t.clientY; }, {passive:true});
+  ov.addEventListener("touchend", e => {
+    if (x0 === null) return; const t = e.changedTouches[0], dx = t.clientX - x0, dy = t.clientY - y0; x0 = null;
+    if (Math.abs(dx) > 50 && Math.abs(dx) > Math.abs(dy) * 1.5 && e.target.closest(".dpg,.dph")) { v.setMonth(v.getMonth() + (dx < 0 ? 1 : -1)); draw(); }
+  }, {passive:true});
   draw();
   const t = setInterval(() => { if (!document.body.contains(ov)) return clearInterval(t); if (!document.querySelector(".md")) { const sc = ov.querySelector(".agpop") && ov.querySelector(".agpop").scrollTop; draw(); if (sc) ov.querySelector(".agpop").scrollTop = sc; } }, 3000);
 }
@@ -2589,6 +2606,7 @@ function goStep(n){
   $("#save", ov).className = "btn" + (last ? " c" : "");
   $("#save", ov).style.cssText = last ? `--c:${TIPOS[F.tipo].c}` : "";
   $("#errsum", ov).innerHTML = "";
+  if (F.iOpen != null) { F.iOpen = null; if (F.items.length > 3) renderItems(); }
   if (n === 2) { renderPrecios(); renderTotals(); }
   $("#fbody", ov).scrollTo(0, 0);
 }
@@ -2678,7 +2696,7 @@ function renderItems(){
   const pb = (f, val, ph, extra = "", off = false) => `<button type="button" class="pbtn ${val ? "on" : ""}${off ? " off" : ""}" ${off ? "disabled" : `data-pick="${f}"`} data-err="${f}">${extra}<span>${esc(val || ph)}</span></button>`;
   if (!F.items.length) {
     box.innerHTML = `<div class="iempty"><button type="button" class="addfirst" id="addItem">${I("plus")}Agregar prenda</button></div>`;
-  } else box.innerHTML = F.items.map((it, i) => `<div class="irow3" data-i="${i}">
+  } else box.innerHTML = F.items.map((it, i) => F.items.length > 3 && i !== F.iOpen ? itemMini(it, i, isSub) : `<div class="irow3" data-i="${i}">
       <div class="r1">
         ${pb("etiqueta", isSub ? "" : it.etiqueta, "Etiqueta", "", isSub)}
         ${pb("talla", it.talla, "Talla")}
@@ -2695,14 +2713,15 @@ function renderItems(){
       </div>
     </div>`).join("") + `<div class="addbar"><button type="button" class="addrow" id="addItem">${I("plus")}Agregar otra prenda</button><button type="button" class="addrow dup" id="dupItem">${I("copy")}Duplicar</button></div>`;
   box.onclick = e => {
-    const nueva = it => { F.items.push(it); renderItems(); renderTotals(); const rows = box.querySelectorAll(".irow3"); rows[rows.length - 1].scrollIntoView({behavior:"smooth", block:"center"}); };
+    const nueva = it => { F.items.push(it); F.iOpen = F.items.length - 1; renderItems(); renderTotals(); const rows = box.querySelectorAll(".irow3"); rows[rows.length - 1].scrollIntoView({behavior:"smooth", block:"center"}); };
     if (e.target.closest("#addItem")) return nueva(blankItem());
     if (e.target.closest("#dupItem")) { const last = F.items[F.items.length - 1]; return nueva(last ? JSON.parse(JSON.stringify(last)) : blankItem()); }
     const row = e.target.closest("[data-i]"); if (!row) return;
+    if (row.hasAttribute("data-abrir")) { F.iOpen = Number(row.dataset.i); renderItems(); const r = box.querySelector(`[data-i="${F.iOpen}"]`); if (r) r.scrollIntoView({behavior:"smooth", block:"center"}); return; }
     const n = Number(row.dataset.i), it = F.items[n], t = e.target.closest("button"); if (!t) return;
     if (t.dataset.pick) return elegir(it, t.dataset.pick);
     if (t.dataset.q) { it.cant = Math.max(1, it.cant + Number(t.dataset.q)); renderItems(); renderTotals(); }
-    if (t.hasAttribute("data-del")) { F.items.splice(n, 1); renderItems(); renderTotals(); }
+    if (t.hasAttribute("data-del")) { F.items.splice(n, 1); F.iOpen = null; renderItems(); renderTotals(); }
   };
   box.oninput = e => {
     const row = e.target.closest("[data-i]"); if (!row) return;
@@ -2717,6 +2736,13 @@ function renderItems(){
     it.cant = Math.max(1, parseInt(e.target.value) || Number(it.cant) || 1); renderItems(); renderTotals();
   };
   if (!box._qbound) { box._qbound = true; box.addEventListener("focusin", onIn); box.addEventListener("focusout", onOut); }
+}
+// Prenda resumida en una línea (cuando hay más de 3); al tocarla se despliega
+function itemMini(it, i, isSub){
+  const falta = !itemVacio(it) && reqItem().some(f => !it[f]);
+  const a = [it.prenda, !isSub && it.color ? it.color.toLowerCase() : ""].filter(Boolean).join(" ");
+  const b = [it.talla, it.horma, !isSub ? it.etiqueta : "", it.nombre, it.numero ? "N° " + it.numero : ""].filter(Boolean).join(" · ");
+  return `<div class="irow3 mini${falta ? " bad" : ""}" data-i="${i}" data-abrir role="button" tabindex="0"><span class="mq num">${Number(it.cant) || 1}</span><span class="mt">${esc(a || "Prenda sin completar")}${b ? ` <small>· ${esc(b)}</small>` : ""}</span>${I("chev")}</div>`;
 }
 function elegir(it, f){
   const c = cfg().cat, isP = F.tipo === "personalizado";
@@ -2758,6 +2784,7 @@ function elegirMarca(){
 }
 function marcarFilas(){
   const box = $("#items", F._ov);
+  if (F.items.length > 3) { const k = F.items.findIndex(it => !itemVacio(it) && reqItem().some(f => !it[f])); if (k >= 0 && k !== F.iOpen) { F.iOpen = k; renderItems(); } }
   F.items.forEach((it, i) => {
     if (itemVacio(it) && F.items.length > 1) return;
     reqItem().forEach(f => { if (!it[f]) box.querySelector(`[data-i="${i}"] [data-err="${f}"]`)?.classList.add("bad"); });
