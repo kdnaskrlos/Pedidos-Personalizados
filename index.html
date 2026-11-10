@@ -1097,7 +1097,7 @@ const updateDoc = (...a) => sinEsperar(fsUpdateDoc(...a));
 const deleteDoc = (...a) => sinEsperar(fsDeleteDoc(...a));
 const writeBatch = db => { const b = fsWriteBatch(db), c = b.commit.bind(b); b.commit = () => sinEsperar(c()); return b; };
 
-const VERSION = "v3.42";
+const VERSION = "v3.43";
 /* ================= Utilidades ================= */
 const $ = (s, r = document) => r.querySelector(s);
 const esc = s => String(s ?? "").replace(/[&<>"']/g, c => ({"&":"&amp;","<":"&lt;",">":"&gt;",'"':"&quot;","'":"&#39;"}[c]));
@@ -2682,7 +2682,7 @@ function openForm(id, tipo, cliente, borrador){
   F._ov = ov;
   // Tocar un espacio vacío contrae la prenda abierta (cuando están en modo compacto)
   ov.addEventListener("click", e => {
-    if (F.iOpen == null || F.items.length <= 3 || !document.body.contains(ov)) return;
+    if (!F || F.iOpen == null || !F.items || F.items.length <= 3 || !document.body.contains(ov)) return;
     if (e.target.closest(".irow3, .iswipe, .addbar, button, input, textarea, select, a, label")) return;
     cambiarAbierta(null);
   });
@@ -3006,9 +3006,15 @@ function elegir(it, f){
     options:(isP ? c.hormas : c.hormasSub).map(v => ({v}))});
   if (f === "numero") return numPad(it.numero, v => { it.numero = v; renderItems(); });
   if (f === "etiqueta") pickPopup({title:"Etiqueta", kind:"text", current:it.etiqueta, onPick:set, options:c.marcas.map(v => ({v}))});
-  // Al elegir la talla no se pone horma automática; si la horma elegida no corresponde a esa talla, queda en blanco
+  // Personalizado: la horma no se pone sola; si la elegida no corresponde a la talla, queda en blanco.
+  // Sublimación completa: la horma se sugiere según la talla (Niño, Unisex o Unisex Plus) si existe en la lista
   const conHorma = v => {
     it.talla = v;
+    if (!isP) {
+      const sug = c.tallasNino.includes(v) ? "Niño" : esPlus(v) ? "Unisex Plus" : "Unisex";
+      const ok = c.hormasSub.find(x => norm(x) === norm(sug));
+      if (ok) it.horma = ok;
+    }
     if (!tallaCuadra(it.horma, v)) it.horma = "";
     clearErr("f-items"); renderItems(); renderTotals();
   };
