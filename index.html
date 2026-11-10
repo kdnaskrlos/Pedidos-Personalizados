@@ -1089,7 +1089,7 @@ const updateDoc = (...a) => sinEsperar(fsUpdateDoc(...a));
 const deleteDoc = (...a) => sinEsperar(fsDeleteDoc(...a));
 const writeBatch = db => { const b = fsWriteBatch(db), c = b.commit.bind(b); b.commit = () => sinEsperar(c()); return b; };
 
-const VERSION = "v3.33";
+const VERSION = "v3.34";
 /* ================= Utilidades ================= */
 const $ = (s, r = document) => r.querySelector(s);
 const esc = s => String(s ?? "").replace(/[&<>"']/g, c => ({"&":"&amp;","<":"&lt;",">":"&gt;",'"':"&quot;","'":"&#39;"}[c]));
@@ -1482,8 +1482,8 @@ function guardarArranque(){
     catch(e) { try { delete c.pedidos; localStorage.setItem(ARR, JSON.stringify(c)); } catch(e2) {} }
   }, 1500);
 }
-// Fecha corta para la barra superior: "Mar 10 nov"
-const fechaCorta = d => { const c = s => s.slice(0, 3); const x = c(DIAS[d.getDay()]); return `${x.charAt(0).toUpperCase() + x.slice(1)} ${d.getDate()} ${c(MESES[d.getMonth()])}`; };
+// Fecha corta para la barra superior: "Martes 10 nov"
+const fechaCorta = d => { const x = DIAS[d.getDay()]; return `${x.charAt(0).toUpperCase() + x.slice(1)} ${d.getDate()} ${MESES[d.getMonth()].slice(0, 3)}`; };
 // Botón actualizar: busca versión nueva y recarga (abre al instante con la copia local)
 function refrescar(b){
   if (b) b.classList.add("gira");
