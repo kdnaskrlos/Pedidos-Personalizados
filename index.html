@@ -16,8 +16,14 @@
 <link rel="modulepreload" href="https://www.gstatic.com/firebasejs/10.12.2/firebase-app.js">
 <link rel="modulepreload" href="https://www.gstatic.com/firebasejs/10.12.2/firebase-auth.js">
 <link rel="modulepreload" href="https://www.gstatic.com/firebasejs/10.12.2/firebase-firestore.js">
-<link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Plus+Jakarta+Sans:wght@400;500;600;700;800&display=block">
-<script>try{const t=localStorage.getItem("cs-tema");if(t)document.documentElement.dataset.theme=t;}catch(e){}</script>
+<style>html,body{background:#fff;margin:0}html[data-theme="dark"],html[data-theme="dark"] body{background:#0e1319}html.fx #app{visibility:hidden}</style>
+<script>try{const t=localStorage.getItem("cs-tema");if(t)document.documentElement.dataset.theme=t;}catch(e){}
+// Al abrir: se pinta el fondo de inmediato (sin pantallazo gris) y la app aparece completa cuando la fuente está lista
+document.documentElement.classList.add("fx");
+window.__ver = () => document.documentElement.classList.remove("fx");
+window.__fuente = () => { const f = document.fonts; (f ? Promise.race([f.load('700 16px "Plus Jakarta Sans"'), new Promise(r => setTimeout(r, 1200))]) : Promise.resolve()).then(() => requestAnimationFrame(window.__ver)); };
+setTimeout(window.__ver, 2500);</script>
+<link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Plus+Jakarta+Sans:wght@400;500;600;700;800&display=block" media="print" onload="this.media='all';window.__fuente()" onerror="window.__ver()">
 <style>
 /* Estilo Comic Shop: Plus Jakarta Sans, acento verde, superficies blancas con bordes suaves,
    barra lateral de íconos (abajo en el teléfono), tarjetas pastel, tema claro por defecto. */
@@ -1078,7 +1084,7 @@ const updateDoc = (...a) => sinEsperar(fsUpdateDoc(...a));
 const deleteDoc = (...a) => sinEsperar(fsDeleteDoc(...a));
 const writeBatch = db => { const b = fsWriteBatch(db), c = b.commit.bind(b); b.commit = () => sinEsperar(c()); return b; };
 
-const VERSION = "v3.31";
+const VERSION = "v3.32";
 /* ================= Utilidades ================= */
 const $ = (s, r = document) => r.querySelector(s);
 const esc = s => String(s ?? "").replace(/[&<>"']/g, c => ({"&":"&amp;","<":"&lt;",">":"&gt;",'"':"&quot;","'":"&#39;"}[c]));
