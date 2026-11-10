@@ -1020,7 +1020,7 @@ const updateDoc = (...a) => sinEsperar(fsUpdateDoc(...a));
 const deleteDoc = (...a) => sinEsperar(fsDeleteDoc(...a));
 const writeBatch = db => { const b = fsWriteBatch(db), c = b.commit.bind(b); b.commit = () => sinEsperar(c()); return b; };
 
-const VERSION = "v3.8";
+const VERSION = "v3.9";
 /* ================= Utilidades ================= */
 const $ = (s, r = document) => r.querySelector(s);
 const esc = s => String(s ?? "").replace(/[&<>"']/g, c => ({"&":"&amp;","<":"&lt;",">":"&gt;",'"':"&quot;","'":"&#39;"}[c]));
@@ -2626,9 +2626,14 @@ function marcarErrores(errs){
     if (m && m.id !== "tel-msg") { m.className = "msg bad"; m.textContent = "✗ " + msg; }
   });
 }
+// Sin recuadros rojos: los campos quedan en rojo con su texto debajo; solo se avisa si el error no tiene campo
+function avisarSinCampo(errs){
+  const sin = errs.find(([id]) => !id); if (sin) toast(sin[1], true);
+  const f = F && F._ov && F._ov.querySelector(".f.err, .irow3 .bad, .pbtn.bad"); if (f) f.scrollIntoView({block:"center", behavior:"smooth"});
+}
 function pasoOK(i, mostrar){
   const errs = erroresPaso(i);
-  if (errs.length && mostrar) { marcarErrores(errs); toast(errs[0][1], true); }
+  if (errs.length && mostrar) { marcarErrores(errs); avisarSinCampo(errs); }
   return !errs.length;
 }
 function clearErr(id){ const el = F && F._ov && $("#" + id, F._ov); if (!el) return; el.classList.remove("err"); const m = el.querySelector(".msg"); if (m && m.classList.contains("bad") && m.id !== "tel-msg") { m.textContent = ""; m.className = "msg"; } }
@@ -2795,9 +2800,7 @@ async function saveForm(ov, orig){
     PASOS.forEach((_, i) => F.visto[i] = true);
     goStep(primero);
     marcarErrores(todos[primero]);
-    const lista = todos.flatMap((e, i) => e.map(([, m]) => `${PASOS[i][1]}: ${m}`));
-    $("#errsum", ov).innerHTML = `<div class="errsum">No se puede guardar todavía. Falta completar:<ul>${lista.map(e => `<li>${esc(e)}</li>`).join("")}</ul></div>`;
-    toast("Faltan datos", true);
+    avisarSinCampo(todos[primero]);
     return;
   }
   const tel = F._checkTel(), isP = F.tipo === "personalizado";
