@@ -980,6 +980,9 @@ html,body{overscroll-behavior-y:none}
 .rfb svg.i{width:19px;height:19px}
 .rfb:active{color:var(--accent)}
 .rfb.gira svg{animation:sp .7s linear infinite;color:var(--accent)}
+/* v3.39 tarjeta de sublimación en 2 columnas y N° en gris tenue como "Nombre" */
+.irow3.sub .r1{grid-template-columns:repeat(2,minmax(0,1fr))}
+.irow3 .r3 .nu:not(.on){color:color-mix(in srgb,var(--muted) 45%,transparent)}
 @media (max-width:1000px){.hello{padding-bottom:8px;margin-top:-6px}.hello h1{font-size:25px}}
 @media (max-width:1000px){.tiles.t5>:last-child{grid-column:1/-1}}
 @media (max-width:1000px){.pill.demo .m-pr{display:inline}}
@@ -1090,7 +1093,7 @@ const updateDoc = (...a) => sinEsperar(fsUpdateDoc(...a));
 const deleteDoc = (...a) => sinEsperar(fsDeleteDoc(...a));
 const writeBatch = db => { const b = fsWriteBatch(db), c = b.commit.bind(b); b.commit = () => sinEsperar(c()); return b; };
 
-const VERSION = "v3.38";
+const VERSION = "v3.39";
 /* ================= Utilidades ================= */
 const $ = (s, r = document) => r.querySelector(s);
 const esc = s => String(s ?? "").replace(/[&<>"']/g, c => ({"&":"&amp;","<":"&lt;",">":"&gt;",'"':"&quot;","'":"&#39;"}[c]));
@@ -1175,7 +1178,8 @@ const DEF = {
     hormasSub: ["Caballero","Dama","Niño","Niña","Unisex","Unisex Plus"],
     marcas: ["AS","Etanol","Comic Shop","Serfe"],
     tallasNino: ["2","4","6","8","10","12","14","16"],
-    tallasAdulto: ["XS","S","M","L","XL","2XL","3XL","4XL"]
+    tallasAdulto: ["XS","S","M","L","XL"],
+    tallasPlus: ["2XL","3XL","4XL"]
   }
 };
 const TIPOS = {
@@ -1260,6 +1264,8 @@ const cfg = () => {
   const r = S.cfgRaw || {}, cat = Object.assign({}, DEF.cat, r.cat || {});
   // Firestore no admite listas dentro de listas: los colores se guardan como {n, h}
   cat.colores = (cat.colores || []).map(x => Array.isArray(x) ? x : [x.n, x.h || ""]).filter(x => x[0]);
+  // Antes las tallas Plus estaban dentro de las de adulto: se separan (2XL en adelante)
+  if (r.cat && r.cat.tallasAdulto && !r.cat.tallasPlus) { cat.tallasPlus = r.cat.tallasAdulto.filter(esPlusTxt); cat.tallasAdulto = r.cat.tallasAdulto.filter(t => !esPlusTxt(t)); }
   return {negocio:DEF.negocio, dias:(r.dias ?? DEF.dias), pais:"58", plantilla:r.plantilla || DEF.plantilla, diasRetiro:(r.diasRetiro ?? DEF.diasRetiro), plantillaRetiro:r.plantillaRetiro || DEF.plantillaRetiro, plantillaSaludo:r.plantillaSaludo || DEF.plantillaSaludo, duracionAvisos:(r.duracionAvisos ?? DEF.duracionAvisos), cat};
 };
 const loginEmail = (u, k) => `${u}.${k}@comicshop-pedidos.app`;
@@ -1850,7 +1856,8 @@ function grupos(p){
 }
 function servsDe(p){ return Array.isArray(p.servicios) ? [...p.servicios] : p.servicio ? String(p.servicio).split(", ").filter(Boolean) : []; }
 // Tallas 2XL en adelante ("Unisex Plus") llevan su propio precio
-const esPlus = t => /^([2-9])\s*XL$|^X{2,}L$/i.test(String(t || "").trim());
+const esPlusTxt = t => /^([2-9])\s*XL$|^X{2,}L$/i.test(String(t || "").trim());
+const esPlus = t => { const v = String(t || "").trim(); return !!v && cfg().cat.tallasPlus.includes(v); };
 // Niño y Niña comparten el mismo precio
 const hormaPrecio = h => /^niñ[oa]s?$/i.test(String(h || "").trim()) ? "Niño/Niña" : h;
 const prKey = i => i.prenda ? [i.prenda, hormaPrecio(i.horma), esPlus(i.talla) ? i.talla : ""].filter(Boolean).join(" · ") : "";
@@ -2073,7 +2080,7 @@ function viewEquipo(){
 
 /* ---------- Ajustes (admin) ---------- */
 const adminTabs = () => `<div class="seg m-tabs"><button data-view="ajustes" aria-pressed="${S.view === "ajustes"}">Ajustes</button><button data-view="equipo" aria-pressed="${S.view === "equipo"}">Equipo</button></div>`;
-const LISTAS = [["servicios","Tipos de estampado"],["prendasPers","Prendas de Personalizado"],["prendasSub","Productos de Sublimación"],["colores","Colores"],["hormas","Hormas de Personalizado"],["hormasSub","Hormas de Sublimación"],["marcas","Etiquetas"],["tallasNino","Tallas de niño"],["tallasAdulto","Tallas unisex (2XL en adelante: Unisex Plus)"]];
+const LISTAS = [["servicios","Tipos de estampado"],["prendasPers","Prendas de Personalizado"],["prendasSub","Prendas de Sublimación"],["colores","Colores"],["hormas","Hormas de Personalizado"],["hormasSub","Hormas de Sublimación"],["marcas","Etiquetas"],["tallasNino","Niños"],["tallasAdulto","Adultos"],["tallasPlus","Plus"]];
 function listaHTML([k, label]){
   const items = cfg().cat[k] || [], open = S.lopen === k;
   const chip = (v, i) => k === "colores"
@@ -2841,6 +2848,7 @@ function pickPopup({title, kind, options, sections, current, otro, onPick}){
 const blankItem = prev => ({etiqueta: prev ? prev.etiqueta : "", prenda: prev ? prev.prenda : "", color: prev ? prev.color : "", horma: prev ? prev.horma : "", talla:"", cant:1, nombre:"", numero:""});
 const reqItem = () => F && F.tipo === "sublimacion" ? ["prenda", "talla", "horma"] : ["etiqueta", "prenda", "color", "talla", "horma"];
 const itemVacio = i => !i.etiqueta && !i.prenda && !i.color && !i.talla && !i.nombre;
+const qtyHTML = it => `<div class="qty">${it.cant === 1 ? `<button type="button" class="del" data-del title="Quitar">${I("trash")}</button>` : `<button type="button" data-q="-1">−</button>`}<input class="qin" type="text" inputmode="numeric" pattern="[0-9]*" data-cant value="${it.cant || 1}" placeholder="1" aria-label="Unidades"><button type="button" data-q="1">+</button></div>`;
 function renderItems(){
   const ov = F._ov, c = cfg().cat;
   const box = $("#items", ov), n = F.items.filter(i => !itemVacio(i)).reduce((s, i) => s + (Number(i.cant) || 1), 0);
@@ -2850,14 +2858,27 @@ function renderItems(){
   const pb = (f, val, ph, extra = "", off = false) => `<button type="button" class="pbtn ${val ? "on" : ""}${off ? " off" : ""}" ${off ? "disabled" : `data-pick="${f}"`} data-err="${f}">${extra}<span>${esc(val || ph)}</span></button>`;
   if (!F.items.length) {
     box.innerHTML = `<div class="iempty"><button type="button" class="addfirst" id="addItem">${I("plus")}Agregar prenda</button></div>`;
-  } else box.innerHTML = F.items.map((it, i) => swWrap(F.items.length > 3 && i !== F.iOpen ? itemMini(it, i, isSub) : `<div class="irow3${F.items.length > 3 ? " selc" : ""}" data-i="${i}">
+  } else box.innerHTML = F.items.map((it, i) => swWrap(F.items.length > 3 && i !== F.iOpen ? itemMini(it, i, isSub) : isSub ? `<div class="irow3 sub${F.items.length > 3 ? " selc" : ""}" data-i="${i}">
+      <div class="r1">
+        ${pb("prenda", it.prenda, "Prenda")}
+        ${qtyHTML(it)}
+      </div>
+      <div class="r1">
+        ${pb("talla", it.talla, "Talla")}
+        ${pb("horma", it.horma, "Horma")}
+      </div>
+      <div class="r3">
+        <input class="inp nm" data-fld="nombre" placeholder="Nombre" value="${esc(it.nombre || "")}">
+        <button type="button" class="pbtn nu ${it.numero ? "on" : ""}" data-pick="numero"><span>${esc(it.numero ? "N° " + it.numero : "N°")}</span></button>
+      </div>
+    </div>` : `<div class="irow3${F.items.length > 3 ? " selc" : ""}" data-i="${i}">
       <div class="r1">
         ${pb("etiqueta", isSub ? "" : it.etiqueta, "Etiqueta", "", isSub)}
         ${pb("talla", it.talla, "Talla")}
-        <div class="qty">${it.cant === 1 ? `<button type="button" class="del" data-del title="Quitar">${I("trash")}</button>` : `<button type="button" data-q="-1">−</button>`}<input class="qin" type="text" inputmode="numeric" pattern="[0-9]*" data-cant value="${it.cant || 1}" placeholder="1" aria-label="Unidades"><button type="button" data-q="1">+</button></div>
+        ${qtyHTML(it)}
       </div>
       <div class="r1">
-        ${pb("prenda", it.prenda, F.tipo === "personalizado" ? "Prenda" : "Producto")}
+        ${pb("prenda", it.prenda, "Prenda")}
         ${isSub ? pb("color", "", "Color", `<i class="sw0" style="${swatchStyle("full")}"></i>`, true) : pb("color", it.color, "Color", `<i class="sw0" style="${swatchStyle(hexOf(it.color))}"></i>`)}
         ${pb("horma", it.horma, "Horma")}
       </div>
@@ -2944,7 +2965,7 @@ function itemMini(it, i, isSub){
 function elegir(it, f){
   const c = cfg().cat, isP = F.tipo === "personalizado";
   const set = v => { it[f] = v; clearErr("f-items"); renderItems(); renderTotals(); };
-  if (f === "prenda") pickPopup({title: isP ? "Prenda" : "Producto", kind:"text", current:it.prenda, otro:true, onPick:set,
+  if (f === "prenda") pickPopup({title:"Prenda", kind:"text", current:it.prenda, otro:true, onPick:set,
     options:(isP ? c.prendasPers : c.prendasSub).filter(p => p !== "Otro").map(v => ({v}))});
   if (f === "color") pickPopup({title:"Color", kind:"color", current:it.color, otro:true, onPick:set,
     options:c.colores.filter(x => isP ? x[1] !== "full" : true).map(([v, h]) => ({v, h}))});
@@ -2968,7 +2989,7 @@ function elegir(it, f){
     clearErr("f-items"); renderItems(); renderTotals();
   };
   if (f === "talla") pickPopup({title:"Talla", kind:"talla", current:it.talla, onPick:conHorma,
-    sections:[{title:"Niños", options:c.tallasNino.map(v => ({v}))}, {title:"Adultos", options:c.tallasAdulto.filter(v => !esPlus(v)).map(v => ({v}))}, {title:"Plus", options:c.tallasAdulto.filter(esPlus).map(v => ({v}))}].filter(s => s.options.length)});
+    sections:[{title:"Niños", options:c.tallasNino.map(v => ({v}))}, {title:"Adultos", options:c.tallasAdulto.map(v => ({v}))}, {title:"Plus", options:c.tallasPlus.map(v => ({v}))}].filter(s => s.options.length)});
 }
 function numPad(actual, onOk){
   let v = String(actual || "");
@@ -3112,7 +3133,7 @@ function resumenTexto(p){
     ...Object.keys(prendasDe(p)).map(k => `Precio ${k}: ${money(precioDe(p, k), p.moneda)}`), `Total: ${money(t.total, p.moneda)}`, `Abono: ${money(t.abono, p.moneda)} · Saldo: ${money(t.saldo, p.moneda)}`, p.motivoSinAbono && `Sin abono: ${p.motivoSinAbono}`].filter(Boolean).join("\n").replace(/\n \n/g, "\n\n");
 }
 function tallyTable(p){
-  const c = cfg().cat, order = [...c.tallasAdulto, ...c.tallasNino], g = {}, ts = new Set();
+  const c = cfg().cat, order = [...c.tallasAdulto, ...c.tallasPlus, ...c.tallasNino], g = {}, ts = new Set();
   (p.items || []).forEach(i => { const k = `${i.prenda} ${i.color}${i.horma ? " · " + i.horma : ""}`; g[k] = g[k] || {}; g[k][i.talla] = (g[k][i.talla] || 0) + (i.cant || 1); ts.add(i.talla); });
   const ix = t => order.indexOf(t) < 0 ? 999 : order.indexOf(t);
   const tl = [...ts].sort((a, b) => ix(a) - ix(b));
