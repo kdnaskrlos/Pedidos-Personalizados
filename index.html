@@ -911,6 +911,7 @@ html,body{overscroll-behavior-y:none}
 /* v3.8 calendario de pedidos */
 .pill.tdate{cursor:pointer;font:inherit;font-size:13.5px;font-weight:600;color:var(--ink)}
 .agpop{width:min(94vw,440px);max-height:86vh;overflow:auto}
+.agpop>*{flex-shrink:0}
 .dd.ag{height:44px;display:flex;flex-direction:column;align-items:center;justify-content:center;gap:3px;padding:0}
 .dd.ag em{display:flex;gap:3px;height:6px;align-items:center;font-style:normal}
 .dd.ag em b{width:6px;height:6px;border-radius:99px;display:block}
@@ -1096,7 +1097,7 @@ const updateDoc = (...a) => sinEsperar(fsUpdateDoc(...a));
 const deleteDoc = (...a) => sinEsperar(fsDeleteDoc(...a));
 const writeBatch = db => { const b = fsWriteBatch(db), c = b.commit.bind(b); b.commit = () => sinEsperar(c()); return b; };
 
-const VERSION = "v3.41";
+const VERSION = "v3.42";
 /* ================= Utilidades ================= */
 const $ = (s, r = document) => r.querySelector(s);
 const esc = s => String(s ?? "").replace(/[&<>"']/g, c => ({"&":"&amp;","<":"&lt;",">":"&gt;",'"':"&quot;","'":"&#39;"}[c]));
@@ -1520,7 +1521,7 @@ function doRender(){
     <button class="nav new" data-act="nuevo" aria-label="Nuevo pedido" title="Nuevo pedido"><span class="ring">${I("plus")}</span></button>
     ${nav("avisos","bell","Avisos", nAv)}
     ${pr.admin ? `<span class="d-only">${nav("ajustes","sliders","Ajustes")}${nav("equipo","shield","Equipo")}</span><button class="nav m-only" data-view="ajustes" aria-current="${S.view === "equipo" || S.view === "ajustes"}">${I("shield")}Admin</button>`
-      : `<button class="nav m-only" data-act="cuenta">${I("user")}Cuenta</button>`}
+      : `<button class="nav" data-act="cuenta">${I("user")}Cuenta</button>`}
     <div class="grow"></div>
     <button class="theme" id="themeBtn" title="Cambiar tema">${I("sun","sun")}${I("moon","moon")}</button>
     <div class="ver">${VERSION}</div>
@@ -1528,10 +1529,9 @@ function doRender(){
   <div class="shell">
     <div class="topbar">
       <span class="pill st ${S.online && !S.cache ? "ok" : "bad"}"><i></i>${S.online ? (S.cache ? "Sincronizando…" : "En línea") : "Sin conexión"}</span>
-      ${!(S.view === "resumen" || (pr.admin && (S.view === "ajustes" || S.view === "equipo"))) ? `<button class="rfb hide-m" data-act="refrescar" title="Actualizar">${I("refresh")}</button><button class="pill tdate hide-m" data-act="agenda" title="Calendario de pedidos">${I("cal")}${fechaCorta(d)}</button>` : ""}
       <span class="sp"></span>
       ${S.installEvt ? `<button class="pill" id="instBtn">${I("download")}<span class="hide-m">Instalar app</span></button>` : ""}
-      ${S.view === "resumen" || (pr.admin && (S.view === "ajustes" || S.view === "equipo")) ? `<button class="rfb" data-act="refrescar" title="Actualizar">${I("refresh")}</button><button class="pill tdate" data-act="agenda" title="Calendario de pedidos">${I("cal")}${fechaCorta(d)}</button>` : `<button class="pill" id="meBtn">${I("user")}${esc(S.me.nombre || S.me.usuario)}${pr.admin ? " · Admin" : ""}</button>`}
+      <button class="rfb" data-act="refrescar" title="Actualizar">${I("refresh")}</button><button class="pill tdate" data-act="agenda" title="Calendario de pedidos">${I("cal")}${fechaCorta(d)}</button>
     </div>
     <main class="main">
       ${pr.admin && S.view === "avisos" && revisarList().length ? `<button class="revbar" data-act="revisar">${I("edit")}<span><b>${revisarList().length}</b> pedido${revisarList().length === 1 ? "" : "s"} editado${revisarList().length === 1 ? "" : "s"} por el equipo</span><em>Ver</em></button>` : ""}
@@ -2165,7 +2165,6 @@ function bindMain(){
   const q = $("#q");
   if (q) q.oninput = () => { S.q = q.value; clearTimeout(q._t); q._t = setTimeout(render, 160); };
   $("#themeBtn").onclick = () => { const t = document.documentElement.dataset.theme === "dark" ? "light" : "dark"; document.documentElement.dataset.theme = t; try { localStorage.setItem("cs-tema", t); } catch(e) {} };
-  if ($("#meBtn")) $("#meBtn").onclick = openCuenta;
   if ($("#demoBtn")) $("#demoBtn").onclick = toggleDemo;
   if ($("#instBtn")) $("#instBtn").onclick = async () => { S.installEvt.prompt(); await S.installEvt.userChoice; S.installEvt = null; render(); };
   if ($("#newUser")) $("#newUser").onclick = nuevoUsuario;
