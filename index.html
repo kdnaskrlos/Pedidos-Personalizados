@@ -880,10 +880,10 @@ body.fixedv{scrollbar-width:none}
 :root[data-theme="dark"] .anchk[aria-pressed="true"]{background:var(--soon);border-color:var(--soon);color:#1a1405}
 :root[data-theme="dark"] .revbar.anun{border-color:color-mix(in srgb,var(--soon) 30%,var(--line));background:color-mix(in srgb,var(--soon) 12%,var(--surface))}
 :root[data-theme="dark"] .revbar.anun .antx svg.i,:root[data-theme="dark"] .revbar.anun .anq{color:var(--soon)}
-.revbar.ancrear{max-width:none;justify-content:center;background:#dcfce7;border-color:#bbf7d0;color:#15803d;font-weight:800}
+.revbar.ancrear{max-width:none;justify-content:center;background:transparent;border:1.5px dashed #86efac;color:#15803d;font-weight:800}
 .revbar.ancrear svg.i{color:#15803d}
 .revbar.ancrear span{flex:none}
-:root[data-theme="dark"] .revbar.ancrear{background:#12311f;border-color:#1f4d31;color:#86efac}
+:root[data-theme="dark"] .revbar.ancrear{background:transparent;border-color:#2f6b45;color:#86efac}
 :root[data-theme="dark"] .revbar.ancrear svg.i{color:#86efac}
 .antxt{font-size:16px;line-height:1.45;white-space:pre-wrap}
 .pill.demo .m-pr{display:none!important}
@@ -958,6 +958,10 @@ html,body{overscroll-behavior-y:none}
 :root[data-theme="dark"] .iswipe .delbg{background:color-mix(in srgb,var(--err) 14%,var(--surface));border-color:color-mix(in srgb,var(--err) 35%,var(--line))}
 :root[data-theme="dark"] .iswipe.armed .delbg{background:color-mix(in srgb,var(--err) 26%,var(--surface))}
 .irow3.borrar{border-color:var(--line)!important;background:var(--surface)!important}
+/* v3.18 calendario que se desliza como el del teléfono */
+.agvp{overflow:hidden;margin:0 -2px}
+.agtrack{display:flex;width:300%;transform:translateX(-33.3333%);will-change:transform}
+.agtrack>.dpg{width:33.3333%;flex:none;padding:0 2px;box-sizing:border-box}
 @media (max-width:1000px){.hello{padding-bottom:8px;margin-top:-6px}.hello h1{font-size:25px}}
 @media (max-width:1000px){.tiles.t5>:last-child{grid-column:1/-1}}
 @media (max-width:1000px){.pill.demo .m-pr{display:inline}}
@@ -1062,7 +1066,7 @@ const updateDoc = (...a) => sinEsperar(fsUpdateDoc(...a));
 const deleteDoc = (...a) => sinEsperar(fsDeleteDoc(...a));
 const writeBatch = db => { const b = fsWriteBatch(db), c = b.commit.bind(b); b.commit = () => sinEsperar(c()); return b; };
 
-const VERSION = "v3.17";
+const VERSION = "v3.18";
 /* ================= Utilidades ================= */
 const $ = (s, r = document) => r.querySelector(s);
 const esc = s => String(s ?? "").replace(/[&<>"']/g, c => ({"&":"&amp;","<":"&lt;",">":"&gt;",'"':"&quot;","'":"&#39;"}[c]));
@@ -2411,11 +2415,12 @@ function openCalendar(current, onPick, opts = {}){
 /* ===== Calendario de pedidos (por fecha de entrega), como una agenda ===== */
 function openAgenda(){
   const v = today0(); v.setDate(1);
-  let sel = ymd(today0());
+  let sel = ymd(today0()), moviendo = false;
   const ov = document.createElement("div"); ov.className = "dp-ov agov"; overlay(ov);
   const porDia = () => { const g = {}; pedidosList().forEach(p => { if (p.fechaEntrega) (g[p.fechaEntrega] = g[p.fechaEntrega] || []).push(p); }); return g; };
-  const draw = dir => {
-    const g = porDia(), y = v.getFullYear(), m = v.getMonth(), first = (new Date(y, m, 1).getDay() + 6) % 7, nd = new Date(y, m + 1, 0).getDate(), t0 = ymd(today0());
+  // Una cuadrícula de mes (siempre 6 filas para que no cambie de tamaño)
+  const grilla = (y, m, g) => {
+    const first = (new Date(y, m, 1).getDay() + 6) % 7, nd = new Date(y, m + 1, 0).getDate(), t0 = ymd(today0());
     let cells = ["Lu","Ma","Mi","Ju","Vi","Sá","Do"].map(x => `<span>${x}</span>`).join("");
     for (let i = 0; i < first; i++) cells += "<i></i>";
     for (let dd = 1; dd <= nd; dd++) {
@@ -2424,30 +2429,57 @@ function openAgenda(){
       const puntos = act.slice(0, 3).map(p => `<b style="background:${p.urgente ? "var(--err)" : TIPOS[p.tipo].c}"></b>`).join("") + (act.length > 3 ? `<small>+${act.length - 3}</small>` : "") + (!act.length && l.length ? `<b class="ent"></b>` : "");
       cells += `<button class="dd ag ${s === t0 ? "hoy" : ""} ${s === sel ? "sel" : ""} ${l.length ? "con" : ""}" data-d="${s}"><span>${dd}</span><em>${puntos}</em></button>`;
     }
-    for (let k = first + nd; k < 42; k++) cells += `<i class="dd ag"></i>`; // siempre 6 filas: el calendario no cambia de tamaño
+    for (let k = first + nd; k < 42; k++) cells += `<i class="dd ag"></i>`;
+    return `<div class="dpg">${cells}</div>`;
+  };
+  const draw = () => {
+    const g = porDia(), y = v.getFullYear(), m = v.getMonth();
     const l = (g[sel] || []).sort((a, b) => (a.estado === "entregado") - (b.estado === "entregado") || (b.urgente ? 1 : 0) - (a.urgente ? 1 : 0));
-    const f = parseYmd(sel);
-    ov.innerHTML = `<div class="dp-pop agpop"><div class="dph"><button data-nav="-1">‹</button><b>${MESES[m]} ${y}</b><button data-nav="1">›</button></div><div class="dpg">${cells}</div>
+    const f = parseYmd(sel), mes = k => { const d = new Date(y, m + k, 1); return [d.getFullYear(), d.getMonth()]; };
+    const sc = ov.querySelector(".agpop") ? ov.querySelector(".agpop").scrollTop : 0;
+    ov.innerHTML = `<div class="dp-pop agpop"><div class="dph"><button data-nav="-1">‹</button><b>${MESES[m]} ${y}</b><button data-nav="1">›</button></div>
+      <div class="agvp"><div class="agtrack">${[-1, 0, 1].map(k => grilla(...mes(k), g)).join("")}</div></div>
       <div class="agday"><b>${(s => s.charAt(0).toUpperCase() + s.slice(1))(`${DIAS[f.getDay()]} ${f.getDate()} de ${MESES[f.getMonth()]}`)}</b><span>${l.length ? `${l.length} entrega${l.length === 1 ? "" : "s"}` : "Sin entregas"}</span></div>
       <div class="aglist">${l.map(cardHTML).join("")}</div></div>`;
-    if (dir) { const gr = ov.querySelector(".dpg"), tt = ov.querySelector(".dph b"); [gr, tt].forEach(x => x && x.classList.add(dir > 0 ? "slL" : "slR")); }
+    if (sc) ov.querySelector(".agpop").scrollTop = sc;
     loadFotos(ov);
+  };
+  // Cambia de mes deslizando la cuadrícula hacia el lado (como el calendario del teléfono)
+  const irA = (dir, desde = 0) => {
+    const tr = ov.querySelector(".agtrack"); if (!tr || moviendo) return;
+    moviendo = true;
+    tr.style.transition = "transform .3s cubic-bezier(.2,.8,.2,1)";
+    tr.style.transform = `translateX(${dir > 0 ? -66.6667 : dir < 0 ? 0 : -33.3333}%)`;
+    const fin = () => { moviendo = false; if (dir) { v.setMonth(v.getMonth() + dir); draw(); } else { tr.style.transition = ""; tr.style.transform = ""; } };
+    let hecho = false; const una = () => { if (hecho) return; hecho = true; fin(); };
+    tr.addEventListener("transitionend", una, {once:true}); setTimeout(una, 360);
   };
   ov.onclick = e => {
     if (e.target === ov) return ov.close();
-    const n = e.target.closest("[data-nav]"); if (n) { v.setMonth(v.getMonth() + Number(n.dataset.nav)); return draw(Number(n.dataset.nav)); }
+    if (arrastro) { arrastro = false; return; }
+    const n = e.target.closest("[data-nav]"); if (n) return irA(Number(n.dataset.nav));
     const d = e.target.closest("[data-d]"); if (d) { sel = d.dataset.d; return draw(); }
     const o = e.target.closest("[data-open]"); if (o) openDetail(o.dataset.open);
   };
-  // Deslizar a la izquierda o derecha para cambiar de mes
-  let x0 = null, y0 = 0;
-  ov.addEventListener("touchstart", e => { const t = e.touches[0]; x0 = t.clientX; y0 = t.clientY; }, {passive:true});
-  ov.addEventListener("touchend", e => {
-    if (x0 === null) return; const t = e.changedTouches[0], dx = t.clientX - x0, dy = t.clientY - y0; x0 = null;
-    if (Math.abs(dx) > 50 && Math.abs(dx) > Math.abs(dy) * 1.5 && e.target.closest(".dpg,.dph")) { v.setMonth(v.getMonth() + (dx < 0 ? 1 : -1)); draw(dx < 0 ? 1 : -1); }
-  }, {passive:true});
+  // La cuadrícula sigue al dedo; al soltar pasa de mes si se arrastró lo suficiente
+  let x0 = null, y0 = 0, modo = "", dx = 0, arrastro = false;
+  ov.addEventListener("touchstart", e => { if (moviendo || !e.target.closest(".agvp")) return; const t = e.touches[0]; x0 = t.clientX; y0 = t.clientY; modo = ""; dx = 0; }, {passive:true});
+  ov.addEventListener("touchmove", e => {
+    if (x0 === null) return;
+    const t = e.touches[0], mx = t.clientX - x0, my = t.clientY - y0;
+    if (!modo) { if (Math.abs(mx) < 8 && Math.abs(my) < 8) return; modo = Math.abs(mx) > Math.abs(my) ? "x" : "y"; if (modo === "y") { x0 = null; return; } }
+    e.preventDefault(); dx = mx;
+    const tr = ov.querySelector(".agtrack"); tr.style.transition = "none"; tr.style.transform = `translateX(calc(-33.3333% + ${dx}px))`;
+  }, {passive:false});
+  const soltar = () => {
+    if (x0 === null) return; x0 = null; if (modo !== "x") return;
+    arrastro = Math.abs(dx) > 8; setTimeout(() => arrastro = false, 400);
+    const w = ov.querySelector(".agvp").clientWidth;
+    irA(Math.abs(dx) > w * .22 ? (dx < 0 ? 1 : -1) : 0);
+  };
+  ov.addEventListener("touchend", soltar); ov.addEventListener("touchcancel", soltar);
   draw();
-  const t = setInterval(() => { if (!document.body.contains(ov)) return clearInterval(t); if (!document.querySelector(".md")) { const sc = ov.querySelector(".agpop") && ov.querySelector(".agpop").scrollTop; draw(); if (sc) ov.querySelector(".agpop").scrollTop = sc; } }, 3000);
+  const t = setInterval(() => { if (!document.body.contains(ov)) return clearInterval(t); if (!document.querySelector(".md") && !moviendo && x0 === null) draw(); }, 3000);
 }
 
 // Mayúscula inicial mientras se escribe: en cada palabra (nombres) o solo en la primera (tema)
