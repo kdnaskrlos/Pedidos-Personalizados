@@ -987,6 +987,9 @@ html,body{overscroll-behavior-y:none}
 /* v3.40 campo de cantidad con fondo blanco */
 .irow3 .qty .qin{background:var(--surface)}
 .irow3 .qty .qin:focus{background:var(--surface)}
+/* v3.49 la animación de cambio de pantalla no debe ensanchar la página (movía la barra de íconos) */
+html,body{overflow-x:clip}
+.shell{overflow-x:clip}
 @media (max-width:1000px){.hello{padding-bottom:8px;margin-top:-6px}.hello h1{font-size:25px}}
 @media (max-width:1000px){.tiles.t5>:last-child{grid-column:1/-1}}
 @media (max-width:1000px){.pill.demo .m-pr{display:inline}}
@@ -1097,7 +1100,7 @@ const updateDoc = (...a) => sinEsperar(fsUpdateDoc(...a));
 const deleteDoc = (...a) => sinEsperar(fsDeleteDoc(...a));
 const writeBatch = db => { const b = fsWriteBatch(db), c = b.commit.bind(b); b.commit = () => sinEsperar(c()); return b; };
 
-const VERSION = "v3.48";
+const VERSION = "v3.49";
 /* ================= Utilidades ================= */
 const $ = (s, r = document) => r.querySelector(s);
 const esc = s => String(s ?? "").replace(/[&<>"']/g, c => ({"&":"&amp;","<":"&lt;",">":"&gt;",'"':"&quot;","'":"&#39;"}[c]));
@@ -1500,6 +1503,22 @@ function refrescar(b){
   if (b) b.classList.add("gira");
   const fin = () => setTimeout(() => location.reload(), 500);
   if ("serviceWorker" in navigator) navigator.serviceWorker.getRegistration().then(r => r && r.update()).catch(() => {}).finally(fin); else fin();
+}
+// Equipo: abrir/cerrar un usuario con la misma transición suave de las tarjetas de prendas
+function abrirUsuario(uid){
+  const antes = S.uOpen, h0 = {};
+  document.querySelectorAll("[data-ucard]").forEach(el => h0[el.dataset.ucard] = el.getBoundingClientRect().height);
+  S.uOpen = uid; renderQ = false; doRender();
+  if (MENOS_MOV) return;
+  [uid, antes].forEach(k => {
+    if (!k) return;
+    const el = document.querySelector(`[data-ucard="${CSS.escape(k)}"]`); if (!el || !h0[k]) return;
+    const h1 = el.getBoundingClientRect().height; if (Math.abs(h1 - h0[k]) < 2) return;
+    el.style.overflow = "hidden";
+    const a = el.animate([{height:h0[k] + "px"}, {height:h1 + "px"}], {duration:280, easing:"cubic-bezier(.22,.9,.3,1)"});
+    if (k === uid) [...el.children].slice(1).forEach((r, i) => r.animate([{opacity:0, transform:"translateY(-6px)"}, {opacity:1, transform:"none"}], {duration:240, delay:40 + i * 35, easing:"ease-out", fill:"backwards"}));
+    a.onfinish = a.oncancel = () => { el.style.overflow = ""; };
+  });
 }
 function render(){ guardarArranque(); if (renderQ) return; renderQ = true; requestAnimationFrame(() => { renderQ = false; doRender(); }); }
 function doRender(){
@@ -2068,7 +2087,7 @@ function viewEquipo(){
   const card = ([uid, u]) => {
     const admin = u.rol === "admin";
     const open = S.uOpen === uid;
-    return `<div class="ucard ${!admin && !u.activo ? "off" : ""} ${open ? "open" : ""}">
+    return `<div class="ucard ${!admin && !u.activo ? "off" : ""} ${open ? "open" : ""}" data-ucard="${esc(uid)}">
       <div class="uhead" data-utog="${esc(uid)}" role="button" tabindex="0" aria-expanded="${open}"><span class="av" style="--c:${admin ? "var(--accent)" : "var(--t-info)"}">${esc((u.nombre || u.usuario).slice(0, 1).toUpperCase())}</span>
         <div class="un"><b>${esc(u.nombre)}</b><small>@${esc(u.usuario)}</small></div>
         <span class="urole ${admin ? "a" : u.activo ? "" : "x"}">${admin ? "Administrador" : u.activo ? "Activo" : "Sin acceso"}</span><span class="uchev">${I("chev")}</span></div>
@@ -2165,7 +2184,7 @@ function bindMain(){
     if (d.lst) { S.lopen = S.lopen === d.lst ? null : d.lst; render(); return; }
     if (d.lrm) { const [k, i] = d.lrm.split("|"); const cat = JSON.parse(JSON.stringify(cfg().cat)); if (cat[k].length <= 1) return toast("Mínimo una opción", true); cat[k].splice(Number(i), 1); return guardarListas(cat); }
     if (d.ladd) { const k = d.ladd, v = ($("#lin").value || "").trim(); if (!v) return $("#lin").focus(); const cat = JSON.parse(JSON.stringify(cfg().cat)); const names = cat[k].map(x => norm(Array.isArray(x) ? x[0] : x)); if (names.includes(norm(v))) return toast("Ya existe", true); cat[k].push(k === "colores" ? [v, $("#lcol").value] : v); return guardarListas(cat); }
-    if (d.utog) { S.uOpen = S.uOpen === d.utog ? null : d.utog; render(); return; }
+    if (d.utog) { abrirUsuario(S.uOpen === d.utog ? null : d.utog); return; }
     if (d.reset) return resetPin(d.reset);
     if (d.deluser) { const u = S.usuarios[d.deluser]; return confirmar(`¿Eliminar a ${u.nombre}?`, "No podrá entrar más. Sus pedidos se conservan.", "Eliminar", async () => { const bt = writeBatch(S.db); bt.delete(doc(S.db, "usuarios/" + d.deluser)); bt.delete(doc(S.db, "logins/" + u.usuario)); await bt.commit(); toast("Usuario eliminado"); }); }
   };
