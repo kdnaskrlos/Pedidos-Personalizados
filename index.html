@@ -1097,7 +1097,7 @@ const updateDoc = (...a) => sinEsperar(fsUpdateDoc(...a));
 const deleteDoc = (...a) => sinEsperar(fsDeleteDoc(...a));
 const writeBatch = db => { const b = fsWriteBatch(db), c = b.commit.bind(b); b.commit = () => sinEsperar(c()); return b; };
 
-const VERSION = "v3.47";
+const VERSION = "v3.48";
 /* ================= Utilidades ================= */
 const $ = (s, r = document) => r.querySelector(s);
 const esc = s => String(s ?? "").replace(/[&<>"']/g, c => ({"&":"&amp;","<":"&lt;",">":"&gt;",'"':"&quot;","'":"&#39;"}[c]));
@@ -1543,6 +1543,13 @@ function doRender(){
   S._lastHtml = html;
   $("#app").innerHTML = html;
   scrollTo(0, sc);
+  // Al cambiar de pantalla, el contenido entra deslizándose suave desde el lado al que se navega
+  const ORD = ["resumen", "pedidos", "avisos", "ajustes", "equipo"];
+  if (S._vistaAnt && S._vistaAnt !== S.view && !MENOS_MOV) {
+    const m = $("#app .main"), dir = ORD.indexOf(S.view) >= ORD.indexOf(S._vistaAnt) ? 1 : -1;
+    if (m) m.animate([{opacity:0, transform:`translateX(${dir * 18}px)`}, {opacity:1, transform:"none"}], {duration:220, easing:"cubic-bezier(.22,.9,.3,1)"});
+  }
+  S._vistaAnt = S.view;
   if (focusId) { const el = document.getElementById(focusId); if (el && el.tagName === "INPUT") { el.focus(); try { el.setSelectionRange(el.value.length, el.value.length); } catch(e) {} } }
   bindMain();
 }
@@ -2320,16 +2327,29 @@ function setView(v){
   else if (!S.viewPushed) { S.viewPushed = true; navPush(); }
   S.view = v; S.q = ""; render(); scrollTo(0, 0);
 }
+const MENOS_MOV = matchMedia("(prefers-reduced-motion: reduce)").matches;
+const ANIM = {duration:220, easing:"cubic-bezier(.22,.9,.3,1)"};
 function overlay(el){
   document.body.appendChild(el);
   NAV.stack.push(el); navPush();
   document.body.style.overflow = "hidden";
+  // Entrada: el fondo aparece y la ventana sube suavemente
+  const caja = () => el.firstElementChild && el.firstElementChild !== el ? el.firstElementChild : null;
+  if (!MENOS_MOV) {
+    el.animate([{opacity:0}, {opacity:1}], {duration:180, easing:"ease-out"});
+    const c = caja(); if (c) c.animate([{opacity:0, transform:"translateY(18px) scale(.985)"}, {opacity:1, transform:"none"}], ANIM);
+  }
   el.close = fromPop => {
-    if (!el.isConnected) return;
-    el.remove();
+    if (!el.isConnected || el._cerrando) return;
+    el._cerrando = true; el.style.pointerEvents = "none"; el.classList.add("cerrando");
     const i = NAV.stack.indexOf(el); if (i >= 0) NAV.stack.splice(i, 1);
     if (!fromPop) navSilentBack();
-    if (!document.querySelector(".ov,.dp-ov,.lbx,.tsplit")) document.body.style.overflow = "";
+    if (![...document.querySelectorAll(".ov,.dp-ov,.lbx,.tsplit")].some(x => x !== el && !x._cerrando)) document.body.style.overflow = "";
+    // Salida: la ventana baja y se desvanece antes de quitarse
+    if (MENOS_MOV) return el.remove();
+    const c = caja(); if (c) c.animate([{opacity:1, transform:"none"}, {opacity:0, transform:"translateY(14px) scale(.985)"}], {duration:160, easing:"ease-in", fill:"forwards"});
+    el.animate([{opacity:1}, {opacity:0}], {duration:170, easing:"ease-in", fill:"forwards"}).onfinish = () => el.remove();
+    setTimeout(() => el.isConnected && el.remove(), 400);
   };
   return el;
 }
@@ -2761,8 +2781,12 @@ function openForm(id, tipo, cliente, borrador){
   if (pasoBorr) { for (let i = 0; i <= pasoBorr; i++) F.visto[i] = true; goStep(pasoBorr); }
 }
 function goStep(n){
-  const ov = F._ov; F.step = n; F.visto[n] = true;
-  ov.querySelectorAll(".step").forEach(s => s.hidden = Number(s.dataset.step) !== n);
+  const ov = F._ov, antes = F.step; F.step = n; F.visto[n] = true;
+  ov.querySelectorAll(".step").forEach(s => {
+    s.hidden = Number(s.dataset.step) !== n;
+    // El paso nuevo entra desde el lado hacia el que se avanza
+    if (!s.hidden && antes !== undefined && antes !== n && !MENOS_MOV) s.animate([{opacity:0, transform:`translateX(${n > antes ? 22 : -22}px)`}, {opacity:1, transform:"none"}], ANIM);
+  });
   ov.querySelectorAll(".steps [data-go]").forEach((b, i) => {
     b.setAttribute("aria-current", i === n);
     const errs = erroresPaso(i);
