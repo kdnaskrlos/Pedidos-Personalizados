@@ -943,7 +943,21 @@ html,body{overscroll-behavior-y:none}
 .irow3.selc{border-color:#bbf7d0;box-shadow:0 0 0 1.5px #bbf7d0}
 :root[data-theme="dark"] .irow3.selc{border-color:#1f4d31;box-shadow:0 0 0 1.5px #1f4d31}
 /* v3.15 estado de conexión sin forma de pastilla */
-.topbar .pill.st{background:none;border-color:transparent;box-shadow:none;padding-left:2px;padding-right:2px;font-weight:700}
+.topbar .pill.st{background:none;border-color:transparent;box-shadow:none;padding-left:0;padding-right:2px;font-weight:700;display:inline-flex;align-items:center;gap:7px;justify-content:flex-start;margin-left:0}
+.topbar .pill.st i{flex:none;width:8px;height:8px;margin:0}
+/* v3.17 deslizar para borrar: fondo rojo crema con papelera */
+.iswipe{position:relative;margin-bottom:12px}
+.iswipe>.irow3{margin-bottom:0!important;position:relative;z-index:1}
+.iswipe .delbg{position:absolute;inset:0;border-radius:16px;background:#fdecec;border:1px solid #f6c0c0;display:flex;align-items:center;justify-content:flex-end;padding-right:22px;opacity:0;transition:opacity .15s,background .15s}
+.iswipe.on .delbg{opacity:1}
+.iswipe .dlb{display:inline-flex;align-items:center;gap:8px;color:var(--err);font-weight:800;font-size:15px}
+.iswipe .dlb svg.i{width:22px;height:22px}
+.iswipe.armed .delbg{background:#fbd5d5;border-color:#f19c9c}
+.iswipe.armed .dlb svg.i{animation:trashwig .5s ease-in-out infinite}
+@keyframes trashwig{0%,100%{transform:rotate(0) scale(1.15)}25%{transform:rotate(-14deg) scale(1.25)}75%{transform:rotate(14deg) scale(1.25)}}
+:root[data-theme="dark"] .iswipe .delbg{background:color-mix(in srgb,var(--err) 14%,var(--surface));border-color:color-mix(in srgb,var(--err) 35%,var(--line))}
+:root[data-theme="dark"] .iswipe.armed .delbg{background:color-mix(in srgb,var(--err) 26%,var(--surface))}
+.irow3.borrar{border-color:var(--line)!important;background:var(--surface)!important}
 @media (max-width:1000px){.hello{padding-bottom:8px;margin-top:-6px}.hello h1{font-size:25px}}
 @media (max-width:1000px){.tiles.t5>:last-child{grid-column:1/-1}}
 @media (max-width:1000px){.pill.demo .m-pr{display:inline}}
@@ -1048,7 +1062,7 @@ const updateDoc = (...a) => sinEsperar(fsUpdateDoc(...a));
 const deleteDoc = (...a) => sinEsperar(fsDeleteDoc(...a));
 const writeBatch = db => { const b = fsWriteBatch(db), c = b.commit.bind(b); b.commit = () => sinEsperar(c()); return b; };
 
-const VERSION = "v3.16";
+const VERSION = "v3.17";
 /* ================= Utilidades ================= */
 const $ = (s, r = document) => r.querySelector(s);
 const esc = s => String(s ?? "").replace(/[&<>"']/g, c => ({"&":"&amp;","<":"&lt;",">":"&gt;",'"':"&quot;","'":"&#39;"}[c]));
@@ -2713,7 +2727,7 @@ function renderItems(){
   const pb = (f, val, ph, extra = "", off = false) => `<button type="button" class="pbtn ${val ? "on" : ""}${off ? " off" : ""}" ${off ? "disabled" : `data-pick="${f}"`} data-err="${f}">${extra}<span>${esc(val || ph)}</span></button>`;
   if (!F.items.length) {
     box.innerHTML = `<div class="iempty"><button type="button" class="addfirst" id="addItem">${I("plus")}Agregar prenda</button></div>`;
-  } else box.innerHTML = F.items.map((it, i) => F.items.length > 3 && i !== F.iOpen ? itemMini(it, i, isSub) : `<div class="irow3${F.items.length > 3 ? " selc" : ""}" data-i="${i}">
+  } else box.innerHTML = F.items.map((it, i) => swWrap(F.items.length > 3 && i !== F.iOpen ? itemMini(it, i, isSub) : `<div class="irow3${F.items.length > 3 ? " selc" : ""}" data-i="${i}">
       <div class="r1">
         ${pb("etiqueta", isSub ? "" : it.etiqueta, "Etiqueta", "", isSub)}
         ${pb("talla", it.talla, "Talla")}
@@ -2728,7 +2742,7 @@ function renderItems(){
         <input class="inp nm" data-fld="nombre" placeholder="Nombre" value="${esc(it.nombre || "")}">
         <button type="button" class="pbtn nu ${it.numero ? "on" : ""}" data-pick="numero"><span>${esc(it.numero ? "N° " + it.numero : "N°")}</span></button>
       </div>
-    </div>`).join("") + `<div class="addbar"><button type="button" class="addrow" id="addItem">${I("plus")}Agregar otra prenda</button><button type="button" class="addrow dup" id="dupItem">${I("copy")}Duplicar</button></div>`;
+    </div>`)).join("") + `<div class="addbar"><button type="button" class="addrow" id="addItem">${I("plus")}Agregar otra prenda</button><button type="button" class="addrow dup" id="dupItem">${I("copy")}Duplicar</button></div>`;
   box.onclick = e => {
     const nueva = it => { F.items.push(it); F.iOpen = F.items.length - 1; renderItems(); renderTotals(); const rows = box.querySelectorAll(".irow3"); rows[rows.length - 1].scrollIntoView({behavior:"smooth", block:"center"}); };
     if (e.target.closest("#addItem")) return nueva(blankItem());
@@ -2761,35 +2775,38 @@ function renderItems(){
     else { const m = fi.querySelector(".msg"); if (m) m.textContent = "✗ " + e[1]; marcarFilas(); }
   }
 }
+// Cada prenda va sobre un fondo rojo crema con la papelera, que se ve al deslizarla
+const swWrap = html => `<div class="iswipe"><div class="delbg"><span class="dlb">${I("trash")}<b>Quitar</b></span></div>${html}</div>`;
 // Deslizar una prenda hacia la izquierda hasta casi el borde para borrarla (con Deshacer)
 function deslizarBorrar(box){
-  let row = null, x0 = 0, y0 = 0, modo = "", dx = 0;
+  let row = null, wrap = null, x0 = 0, y0 = 0, modo = "", dx = 0;
   box.addEventListener("touchstart", e => {
     const r = e.target.closest(".irow3"); if (!r || e.target.closest("input,textarea")) return;
     row = r; x0 = e.touches[0].clientX; y0 = e.touches[0].clientY; modo = ""; dx = 0;
+    wrap = r.closest(".iswipe");
   }, {passive:true});
   box.addEventListener("touchmove", e => {
     if (!row) return;
     const t = e.touches[0], mx = t.clientX - x0, my = t.clientY - y0;
-    if (!modo) { if (Math.abs(mx) < 10 && Math.abs(my) < 10) return; modo = Math.abs(mx) > Math.abs(my) && mx < 0 ? "x" : "y"; if (modo === "y") { row = null; return; } row.style.transition = "none"; }
+    if (!modo) { if (Math.abs(mx) < 10 && Math.abs(my) < 10) return; modo = Math.abs(mx) > Math.abs(my) && mx < 0 ? "x" : "y"; if (modo === "y") { row = null; return; } row.style.transition = "none"; if (wrap) wrap.classList.add("on"); }
     e.preventDefault(); dx = Math.min(0, mx);
     // Solo borra si el dedo llega casi al borde izquierdo de la pantalla
     const fin = t.clientX < Math.max(40, innerWidth * .12) && dx < -innerWidth * .4;
-    row.style.transform = `translateX(${dx}px)`; row.style.opacity = String(Math.max(.35, 1 + dx / 500));
-    row.classList.toggle("borrar", fin);
+    row.style.transform = `translateX(${dx}px)`;
+    row.classList.toggle("borrar", fin); if (wrap) wrap.classList.toggle("armed", fin);
   }, {passive:false});
   const soltar = () => {
-    if (!row) return; const r = row; row = null;
+    if (!row) return; const r = row, w = wrap; row = null; wrap = null;
     const borrar = r.classList.contains("borrar");
     r.style.transition = "transform .2s ease, opacity .2s ease";
     if (borrar) {
-      r.style.transform = "translateX(-110%)"; r.style.opacity = "0";
+      r.style.transform = "translateX(-110%)";
       const n = Number(r.dataset.i), quitado = F.items[n];
       setTimeout(() => {
         F.items.splice(n, 1); F.iOpen = null; renderItems(); renderTotals();
         toastUndo("Prenda eliminada", async () => { if (!F) return; F.items.splice(n, 0, quitado); renderItems(); renderTotals(); });
       }, 180);
-    } else { r.style.transform = ""; r.style.opacity = ""; r.classList.remove("borrar"); }
+    } else { r.style.transform = ""; r.style.opacity = ""; r.classList.remove("borrar"); if (w) { w.classList.remove("armed"); setTimeout(() => w.classList.remove("on"), 220); } }
   };
   box.addEventListener("touchend", soltar); box.addEventListener("touchcancel", soltar);
 }
