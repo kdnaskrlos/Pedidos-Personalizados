@@ -1072,7 +1072,7 @@ const updateDoc = (...a) => sinEsperar(fsUpdateDoc(...a));
 const deleteDoc = (...a) => sinEsperar(fsDeleteDoc(...a));
 const writeBatch = db => { const b = fsWriteBatch(db), c = b.commit.bind(b); b.commit = () => sinEsperar(c()); return b; };
 
-const VERSION = "v3.24";
+const VERSION = "v3.25";
 /* ================= Utilidades ================= */
 const $ = (s, r = document) => r.querySelector(s);
 const esc = s => String(s ?? "").replace(/[&<>"']/g, c => ({"&":"&amp;","<":"&lt;",">":"&gt;",'"':"&quot;","'":"&#39;"}[c]));
@@ -1796,13 +1796,16 @@ function grupos(p){
 function servsDe(p){ return Array.isArray(p.servicios) ? [...p.servicios] : p.servicio ? String(p.servicio).split(", ").filter(Boolean) : []; }
 // Tallas 2XL en adelante ("Unisex Plus") llevan su propio precio
 const esPlus = t => /^([2-9])\s*XL$|^X{2,}L$/i.test(String(t || "").trim());
-const prKey = i => i.prenda ? [i.prenda, i.horma, esPlus(i.talla) ? i.talla : ""].filter(Boolean).join(" · ") : "";
+// Niño y Niña comparten el mismo precio
+const hormaPrecio = h => /^niñ[oa]s?$/i.test(String(h || "").trim()) ? "Niño/Niña" : h;
+const prKey = i => i.prenda ? [i.prenda, hormaPrecio(i.horma), esPlus(i.talla) ? i.talla : ""].filter(Boolean).join(" · ") : "";
 function precioDe(p, prenda){
   if (p.pr) return num(p.pr[prenda]);
   if (Array.isArray(p.precios)) {
     // Busca el precio exacto; si es un pedido viejo, el de la misma prenda sin talla u horma
     const partes = String(prenda).split(" · ");
-    for (let n = partes.length; n > 0; n--) { const k = partes.slice(0, n).join(" · "), x = p.precios.find(z => z.n === k); if (x) return num(x.v); }
+    const busca = k => p.precios.find(z => z.n === k || (k.includes("Niño/Niña") && (z.n === k.replace("Niño/Niña", "Niño") || z.n === k.replace("Niño/Niña", "Niña"))));
+    for (let n = partes.length; n > 0; n--) { const x = busca(partes.slice(0, n).join(" · ")); if (x) return num(x.v); }
   }
   return num(p.precio);
 }
