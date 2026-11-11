@@ -999,6 +999,15 @@ html,body{overflow-x:clip}
 .agrow .agth.noimg svg.i{width:18px;height:18px}
 .agrow .oc2-urgi{margin-left:0}
 .agrow .oc2-due{flex:none;white-space:nowrap}
+/* v3.57 visor de imágenes deslizable */
+.lbx.gal{padding:0;display:block;touch-action:none;user-select:none;-webkit-user-select:none}
+.lbvp{position:absolute;inset:0;overflow:hidden}
+.lbtrack{display:flex;height:100%;will-change:transform}
+.lbs{flex:0 0 100%;height:100%;display:grid;place-items:center;padding:20px;box-sizing:border-box}
+.lbs img{max-width:100%;max-height:100%;border-radius:8px;pointer-events:none}
+.lbdots{position:absolute;left:0;right:0;bottom:max(18px,env(safe-area-inset-bottom));display:flex;justify-content:center;gap:7px;pointer-events:none}
+.lbdots b{width:7px;height:7px;border-radius:99px;background:#fff6;transition:background .2s,transform .2s}
+.lbdots b.on{background:#fff;transform:scale(1.25)}
 @media (max-width:1000px){.hello{padding-bottom:8px;margin-top:-6px}.hello h1{font-size:25px}}
 @media (max-width:1000px){.tiles.t5>:last-child{grid-column:1/-1}}
 @media (max-width:1000px){.pill.demo .m-pr{display:inline}}
@@ -1109,7 +1118,7 @@ const updateDoc = (...a) => sinEsperar(fsUpdateDoc(...a));
 const deleteDoc = (...a) => sinEsperar(fsDeleteDoc(...a));
 const writeBatch = db => { const b = fsWriteBatch(db), c = b.commit.bind(b); b.commit = () => sinEsperar(c()); return b; };
 
-const VERSION = "v3.56";
+const VERSION = "v3.57";
 /* ================= Utilidades ================= */
 const $ = (s, r = document) => r.querySelector(s);
 const esc = s => String(s ?? "").replace(/[&<>"']/g, c => ({"&":"&amp;","<":"&lt;",">":"&gt;",'"':"&quot;","'":"&#39;"}[c]));
@@ -2459,7 +2468,41 @@ function chooseTipo(cliente){
     const b = e.target.closest("[data-t]"); if (b) { el.close(); openForm(null, b.dataset.t, cliente); }
   };
 }
-function lightbox(src){ const lb = document.createElement("div"); lb.className = "lbx"; lb.innerHTML = `<img src="${esc(src)}" alt="">`; overlay(lb); lb.onclick = () => lb.close(); }
+// Visor de imágenes: con varias se desliza entre ellas (mismo movimiento que el calendario); tocar cierra
+function lightbox(src, lista){
+  const fotos = (lista && lista.length ? lista : [src]).filter(Boolean); let i = Math.max(0, fotos.indexOf(src));
+  const lb = document.createElement("div"); lb.className = "lbx gal";
+  lb.innerHTML = `<div class="lbvp"><div class="lbtrack">${fotos.map(s => `<div class="lbs"><img src="${esc(s)}" alt="" draggable="false"></div>`).join("")}</div></div>${fotos.length > 1 ? `<div class="lbdots">${fotos.map((_, k) => `<b${k === i ? ' class="on"' : ""}></b>`).join("")}</div>` : ""}`;
+  overlay(lb);
+  const tr = lb.querySelector(".lbtrack"), n = fotos.length;
+  const pos = (dx, t) => { tr.style.transition = t ? `transform ${t}s cubic-bezier(.22,.9,.3,1)` : "none"; tr.style.transform = `translate3d(calc(${-i * 100}% + ${dx}px),0,0)`; };
+  const puntos = () => lb.querySelectorAll(".lbdots b").forEach((b, k) => b.classList.toggle("on", k === i));
+  const ir = (k, rapido) => { i = Math.max(0, Math.min(n - 1, k)); pos(0, rapido ? .18 : .26); puntos(); };
+  pos(0);
+  let x0 = null, y0 = 0, modo = "", dx = 0, xs = [], pid = null, movio = false;
+  lb.addEventListener("pointerdown", e => { x0 = e.clientX; y0 = e.clientY; modo = ""; dx = 0; movio = false; pid = e.pointerId; xs = [[performance.now(), x0]]; });
+  lb.addEventListener("pointermove", e => {
+    if (x0 === null || e.pointerId !== pid) return;
+    const mx = e.clientX - x0, my = e.clientY - y0;
+    if (!modo) { if (Math.abs(mx) < 6 && Math.abs(my) < 6) return; modo = Math.abs(mx) > Math.abs(my) && n > 1 ? "x" : "y"; movio = true; if (modo === "x") try { lb.setPointerCapture(pid); } catch {} }
+    if (modo !== "x") return;
+    e.preventDefault();
+    dx = (i === 0 && mx > 0) || (i === n - 1 && mx < 0) ? mx / 3 : mx; // resistencia en los extremos
+    xs.push([performance.now(), e.clientX]); if (xs.length > 5) xs.shift();
+    pos(dx);
+  });
+  const soltar = e => {
+    if (x0 === null || e.pointerId !== pid) return; x0 = null;
+    if (!movio) return lb.close(); // un toque cierra
+    if (modo !== "x") return;
+    const a = xs[0], b = xs[xs.length - 1], vel = b[0] - a[0] > 8 ? (b[1] - a[1]) / (b[0] - a[0]) : 0;
+    const rapido = Math.abs(vel) > .35 && Math.sign(vel) === Math.sign(dx) && Math.abs(dx) > 20;
+    ir(rapido || Math.abs(dx) > lb.clientWidth * .2 ? i + (dx < 0 ? 1 : -1) : i, rapido);
+  };
+  lb.addEventListener("pointerup", soltar); lb.addEventListener("pointercancel", e => { if (e.pointerId === pid) { x0 = null; ir(i); } });
+  lb.tabIndex = -1; lb.focus();
+  lb.addEventListener("keydown", e => { if (e.key === "ArrowRight") ir(i + 1); if (e.key === "ArrowLeft") ir(i - 1); if (e.key === "Escape") lb.close(); });
+}
 
 /* ================= Fotos (comprimidas dentro de Firestore) ================= */
 const fotoCache = {};
@@ -3175,7 +3218,7 @@ function renderImgs(){
     + `<button type="button" class="addimg" id="btnCam">${I("camera")}Tomar foto</button><button type="button" class="addimg" id="btnGal">${I("image")}Galería</button>`;
   $("#btnCam", F._ov).onclick = () => $("#fileCam", F._ov).click();
   $("#btnGal", F._ov).onclick = () => $("#fileGal", F._ov).click();
-  box.onclick = e => { const r = e.target.closest("[data-rmimg]"); if (r) { F.imagenes.splice(Number(r.dataset.rmimg), 1); return renderImgs(); } const i = e.target.closest("img"); if (i && i.src) lightbox(i.src); };
+  box.onclick = e => { const r = e.target.closest("[data-rmimg]"); if (r) { F.imagenes.splice(Number(r.dataset.rmimg), 1); return renderImgs(); } const i = e.target.closest("img"); if (i && i.src) lightbox(i.src, [...box.querySelectorAll(".imgbox img")].map(x => x.src)); };
   loadFotos(box);
 }
 async function addFiles(files){
@@ -3324,7 +3367,7 @@ function openDetail(id){
       ${est === "listo" ? `<div class="dgrid">${p.avisado ? `<a class="btn wa big" id="d-rec" href="${esc(waLink(p, cfg().plantillaRetiro))}" target="_blank" rel="noopener">${I("msg")}Recordar</a>` : `<a class="btn wa big" id="d-wa" href="${esc(waLink(p))}" target="_blank" rel="noopener">${I("msg")}Avisar al cliente</a>`}<button class="btn listo" id="d-ent">${I("box")}Entregado</button></div>` : ""}
     </div>`, "pdmd");
   loadFotos(ov);
-  ov.querySelectorAll(".imgbox img").forEach(i => i.onclick = () => i.src && lightbox(i.src));
+  ov.querySelectorAll(".imgbox img").forEach(i => i.onclick = () => i.src && lightbox(i.src, [...ov.querySelectorAll(".imgbox img")].map(x => x.src)));
   const upd = async (data, msg) => { if (await cambiar(id, data, msg)) ov.close(); };
   const on = (s, fn) => { const b = $(s, ov); if (b) b.onclick = fn; };
   on("#d-edit", () => { ov.close(); openForm(id); });
