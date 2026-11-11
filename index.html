@@ -922,7 +922,7 @@ html,body{overscroll-behavior-y:none}
 .agday{display:flex;align-items:baseline;justify-content:space-between;gap:8px;border-top:1px solid var(--line);padding-top:10px}
 .agday b{font-size:15px;font-weight:800}
 .agday span{font-size:12.5px;color:var(--muted);font-weight:600}
-.aglist{display:flex;flex-direction:column;gap:8px;border-top:1px solid var(--line);padding-top:10px}
+.aglist{display:block;margin-top:4px}
 .aglist:empty{display:none}
 /* v3.10 agenda por debajo del pedido abierto; botón de prueba al final del Resumen */
 .dp-ov.agov{z-index:45}
@@ -992,6 +992,13 @@ html,body{overflow-x:clip}
 .shell{overflow-x:clip}
 /* v3.50 sin barra horizontal al pasar de paso; tecla Listo */
 .mb{overflow-x:hidden}
+/* v3.53 filas compactas del calendario */
+.agrow{padding:8px 10px;gap:10px}
+.agrow .agth{flex:none;width:40px;height:40px;border-radius:9px;object-fit:cover;background:var(--surface-2);border:1px solid var(--line)}
+.agrow .agth.noimg{display:grid;place-items:center;color:var(--c)}
+.agrow .agth.noimg svg.i{width:18px;height:18px}
+.agrow .oc2-urgi{margin-left:0}
+.agrow .oc2-due{flex:none;white-space:nowrap}
 @media (max-width:1000px){.hello{padding-bottom:8px;margin-top:-6px}.hello h1{font-size:25px}}
 @media (max-width:1000px){.tiles.t5>:last-child{grid-column:1/-1}}
 @media (max-width:1000px){.pill.demo .m-pr{display:inline}}
@@ -1102,7 +1109,7 @@ const updateDoc = (...a) => sinEsperar(fsUpdateDoc(...a));
 const deleteDoc = (...a) => sinEsperar(fsDeleteDoc(...a));
 const writeBatch = db => { const b = fsWriteBatch(db), c = b.commit.bind(b); b.commit = () => sinEsperar(c()); return b; };
 
-const VERSION = "v3.52";
+const VERSION = "v3.53";
 /* ================= Utilidades ================= */
 const $ = (s, r = document) => r.querySelector(s);
 const esc = s => String(s ?? "").replace(/[&<>"']/g, c => ({"&":"&amp;","<":"&lt;",">":"&gt;",'"':"&quot;","'":"&#39;"}[c]));
@@ -2531,6 +2538,15 @@ function openCalendar(current, onPick, opts = {}){
 }
 
 /* ===== Calendario de pedidos (por fecha de entrega), como una agenda ===== */
+// Fila compacta del calendario (como en Avisos) con miniatura de la imagen
+function agRow(p){
+  const T = TIPOS[p.tipo], im = (p.imagenes || [])[0], d = dueShort(p);
+  return `<div class="arow agrow" style="--c:${T.c}" data-open="${esc(p._id)}" role="button" tabindex="0">
+    ${im ? `<img class="agth" data-mini="${esc(im)}" alt="" decoding="async">` : `<span class="agth noimg">${I(T.icon)}</span>`}
+    <div class="atx"><b>${esc(p.cliente && p.cliente.nombre)}</b><small>${esc(p.tema || "Sin nombre de diseño")}</small></div>
+    ${p.urgente ? `<span class="oc2-urgi" title="Urgente">${I("alert")}</span>` : d.t ? `<span class="oc2-due ${d.c}">${esc(d.t)}</span>` : ""}
+  </div>`;
+}
 function openAgenda(){
   const v = today0(); v.setDate(1);
   let sel = ymd(today0()), moviendo = false;
@@ -2557,7 +2573,7 @@ function openAgenda(){
     const sc = ov.querySelector(".agpop") ? ov.querySelector(".agpop").scrollTop : 0;
     ov.innerHTML = `<div class="dp-pop agpop"><div class="dph"><button data-nav="-1">‹</button><b>${MESES[m]} ${y}</b><button data-nav="1">›</button></div>
       <div class="agvp"><div class="agtrack">${[-1, 0, 1].map(k => grilla(...mesDe(k), g)).join("")}</div></div>
-      <div class="aglist">${l.map(cardHTML).join("")}</div></div>`;
+      ${l.length ? `<div class="alist aglist">${l.map(agRow).join("")}</div>` : ""}</div>`;
     if (sc) ov.querySelector(".agpop").scrollTop = sc;
     loadFotos(ov);
   };
@@ -2584,7 +2600,16 @@ function openAgenda(){
     if (e.target === ov) return ov.close();
     if (arrastro) { arrastro = false; return; }
     const n = e.target.closest("[data-nav]"); if (n) return irA(Number(n.dataset.nav));
-    const d = e.target.closest("[data-d]"); if (d) { sel = d.dataset.d; return draw(); }
+    const d = e.target.closest("[data-d]"); if (d) {
+      // Al cambiar de día, la ventana crece o se encoge suave según los pedidos de ese día
+      const p0 = ov.querySelector(".agpop"), h0 = p0 ? p0.getBoundingClientRect().height : 0;
+      sel = d.dataset.d; draw();
+      const p1 = ov.querySelector(".agpop"); if (!p1 || MENOS_MOV) return;
+      const h1 = p1.getBoundingClientRect().height;
+      if (Math.abs(h1 - h0) > 2) { p1.style.overflow = "hidden"; p1.animate([{height:h0 + "px"}, {height:h1 + "px"}], {duration:260, easing:"cubic-bezier(.22,.9,.3,1)"}).onfinish = () => p1.style.overflow = ""; }
+      const lst = p1.querySelector(".aglist"); if (lst) lst.animate([{opacity:0, transform:"translateY(-6px)"}, {opacity:1, transform:"none"}], {duration:220, delay:60, easing:"ease-out", fill:"backwards"});
+      return;
+    }
     const o = e.target.closest("[data-open]"); if (o) openDetail(o.dataset.open);
   };
   // La cuadrícula sigue al dedo; al soltar pasa de mes si se arrastró lo suficiente o con un movimiento rápido
