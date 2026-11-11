@@ -1120,7 +1120,7 @@ const updateDoc = (...a) => sinEsperar(fsUpdateDoc(...a));
 const deleteDoc = (...a) => sinEsperar(fsDeleteDoc(...a));
 const writeBatch = db => { const b = fsWriteBatch(db), c = b.commit.bind(b); b.commit = () => sinEsperar(c()); return b; };
 
-const VERSION = "v3.58";
+const VERSION = "v3.59";
 /* ================= Utilidades ================= */
 const $ = (s, r = document) => r.querySelector(s);
 const esc = s => String(s ?? "").replace(/[&<>"']/g, c => ({"&":"&amp;","<":"&lt;",">":"&gt;",'"':"&quot;","'":"&#39;"}[c]));
@@ -1133,7 +1133,9 @@ const daysUntil = s => Math.round((parseYmd(s) - today0()) / 86400000);
 const MESES = ["enero","febrero","marzo","abril","mayo","junio","julio","agosto","septiembre","octubre","noviembre","diciembre"];
 const DIAS = ["domingo","lunes","martes","miércoles","jueves","viernes","sábado"];
 const fmtDate = s => { if (!s) return ""; const d = parseYmd(s); return `${DIAS[d.getDay()].slice(0,3)} ${d.getDate()} ${MESES[d.getMonth()].slice(0,3)} ${d.getFullYear()}`; };
-const fmtDT = iso => { if (!iso) return ""; const d = new Date(iso); return `${pad(d.getDate())}/${pad(d.getMonth()+1)}/${d.getFullYear()} ${pad(d.getHours())}:${pad(d.getMinutes())}`; };
+// Hora en formato de 12 horas: 3:05 pm
+const hora12 = d => { const h = d.getHours(); return `${h % 12 || 12}:${pad(d.getMinutes())} ${h < 12 ? "am" : "pm"}`; };
+const fmtDT = iso => { if (!iso) return ""; const d = new Date(iso); return `${pad(d.getDate())}/${pad(d.getMonth()+1)}/${d.getFullYear()} ${hora12(d)}`; };
 // Lee montos escritos como 50000, 50.000, 50.000,50 o 12.5
 const num = v => {
   if (typeof v === "number") return isFinite(v) ? v : 0;
