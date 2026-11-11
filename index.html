@@ -1109,7 +1109,7 @@ const updateDoc = (...a) => sinEsperar(fsUpdateDoc(...a));
 const deleteDoc = (...a) => sinEsperar(fsDeleteDoc(...a));
 const writeBatch = db => { const b = fsWriteBatch(db), c = b.commit.bind(b); b.commit = () => sinEsperar(c()); return b; };
 
-const VERSION = "v3.54";
+const VERSION = "v3.55";
 /* ================= Utilidades ================= */
 const $ = (s, r = document) => r.querySelector(s);
 const esc = s => String(s ?? "").replace(/[&<>"']/g, c => ({"&":"&amp;","<":"&lt;",">":"&gt;",'"':"&quot;","'":"&#39;"}[c]));
@@ -1523,25 +1523,23 @@ function refrescar(b){
   const fin = () => setTimeout(() => location.reload(), 500);
   if ("serviceWorker" in navigator) navigator.serviceWorker.getRegistration().then(r => r && r.update()).catch(() => {}).finally(fin); else fin();
 }
-// Equipo: abrir/cerrar un usuario con la misma transición suave de las tarjetas de prendas
-function abrirUsuario(uid){
-  const antes = S.uOpen, h0 = {};
-  document.querySelectorAll("[data-ucard]").forEach(el => h0[el.dataset.ucard] = el.getBoundingClientRect().height);
-  S.uOpen = uid; renderQ = false; doRender();
+// Desplegables (usuarios en Equipo, listas en Ajustes): se abren/cierran con transición suave de altura
+function animarDesplegable(attr, antes, nuevo, cambiar){
+  const h0 = {};
+  document.querySelectorAll(`[${attr}]`).forEach(el => h0[el.getAttribute(attr)] = el.getBoundingClientRect().height);
+  cambiar(); renderQ = false; doRender();
   if (MENOS_MOV) return;
-  [uid, antes].forEach(k => {
+  [nuevo, antes].forEach(k => {
     if (!k) return;
-    const el = document.querySelector(`[data-ucard="${CSS.escape(k)}"]`); if (!el || !h0[k]) return;
+    const el = document.querySelector(`[${attr}="${CSS.escape(k)}"]`); if (!el || !h0[k]) return;
     const h1 = el.getBoundingClientRect().height; if (Math.abs(h1 - h0[k]) < 2) return;
     el.style.overflow = "hidden";
     const a = el.animate([{height:h0[k] + "px"}, {height:h1 + "px"}], {duration:280, easing:"cubic-bezier(.22,.9,.3,1)"});
-    if (k === uid) [...el.children].slice(1).forEach((r, i) => r.animate([{opacity:0, transform:"translateY(-6px)"}, {opacity:1, transform:"none"}], {duration:240, delay:40 + i * 35, easing:"ease-out", fill:"backwards"}));
+    if (k === nuevo) [...el.children].slice(1).forEach((r, i) => r.animate([{opacity:0, transform:"translateY(-6px)"}, {opacity:1, transform:"none"}], {duration:240, delay:40 + i * 35, easing:"ease-out", fill:"backwards"}));
     a.onfinish = a.oncancel = () => { el.style.overflow = ""; };
   });
 }
-// Teclado: en los campos de una línea la tecla Enter muestra "Listo" y al tocarla se oculta el teclado
-document.addEventListener("focusin", e => { const t = e.target; if (t.tagName === "INPUT" && !t.hasAttribute("enterkeyhint")) t.setAttribute("enterkeyhint", t.form && t.type !== "search" ? "go" : "done"); });
-document.addEventListener("keydown", e => { const t = e.target; if (e.key === "Enter" && !e.defaultPrevented && t.tagName === "INPUT" && !t.form) { e.preventDefault(); t.blur(); } });
+function abrirUsuario(uid){ animarDesplegable("data-ucard", S.uOpen, uid, () => S.uOpen = uid); }
 function render(){ guardarArranque(); if (renderQ) return; renderQ = true; requestAnimationFrame(() => { renderQ = false; doRender(); }); }
 function doRender(){
   document.body.classList.toggle("fixedv", S.view === "resumen");
@@ -2137,7 +2135,7 @@ function listaHTML([k, label]){
   const chip = (v, i) => k === "colores"
     ? `<span class="lchip"><i style="${swatchStyle(v[1])}"></i>${esc(v[0])}<button type="button" data-lrm="${k}|${i}" aria-label="Quitar">${I("x")}</button></span>`
     : `<span class="lchip">${esc(v)}<button type="button" data-lrm="${k}|${i}" aria-label="Quitar">${I("x")}</button></span>`;
-  return `<div class="lst ${open ? "open" : ""}">
+  return `<div class="lst ${open ? "open" : ""}" data-lcard="${k}">
     <button type="button" class="lst-h" data-lst="${k}"><b>${label}</b><span class="lst-n">${items.length}</span><span class="lst-c">${I("chev")}</span></button>
     ${open ? `<div class="lst-b"><div class="lchips">${items.map(chip).join("")}</div>
       <div class="ladd">${k === "colores" ? `<input type="color" id="lcol" value="#888888" aria-label="Color">` : ""}<input class="inp" id="lin" placeholder="Agregar ${k === "colores" ? "color" : "opción"}" autocomplete="off"><button type="button" class="btn primary" data-ladd="${k}">${I("plus")}Agregar</button></div></div>` : ""}
@@ -2203,7 +2201,7 @@ function bindMain(){
     if (d.posponer) { const id = d.posponer; const man = new Date(); man.setDate(man.getDate() + 1); openCalendar(ymd(man), f => { if (daysUntil(f) <= 0) { toast("Elige desde mañana", true); return false; } cambiar(id, {posponerHasta:f}, "Pospuesto", "Error al posponer"); }, {confirmar:true}); return; }
     if (d.entregar) { cambiar(d.entregar, {estado:"entregado", entregadoEn:new Date().toISOString()}, "Entregado"); return; }
     if (d.open) return openDetail(d.open);
-    if (d.lst) { S.lopen = S.lopen === d.lst ? null : d.lst; render(); return; }
+    if (d.lst) { const k = S.lopen === d.lst ? null : d.lst; animarDesplegable("data-lcard", S.lopen, k, () => S.lopen = k); return; }
     if (d.lrm) { const [k, i] = d.lrm.split("|"); const cat = JSON.parse(JSON.stringify(cfg().cat)); if (cat[k].length <= 1) return toast("Mínimo una opción", true); cat[k].splice(Number(i), 1); return guardarListas(cat); }
     if (d.ladd) { const k = d.ladd, v = ($("#lin").value || "").trim(); if (!v) return $("#lin").focus(); const cat = JSON.parse(JSON.stringify(cfg().cat)); const names = cat[k].map(x => norm(Array.isArray(x) ? x[0] : x)); if (names.includes(norm(v))) return toast("Ya existe", true); cat[k].push(k === "colores" ? [v, $("#lcol").value] : v); return guardarListas(cat); }
     if (d.utog) { abrirUsuario(S.uOpen === d.utog ? null : d.utog); return; }
