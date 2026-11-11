@@ -1109,7 +1109,7 @@ const updateDoc = (...a) => sinEsperar(fsUpdateDoc(...a));
 const deleteDoc = (...a) => sinEsperar(fsDeleteDoc(...a));
 const writeBatch = db => { const b = fsWriteBatch(db), c = b.commit.bind(b); b.commit = () => sinEsperar(c()); return b; };
 
-const VERSION = "v3.55";
+const VERSION = "v3.56";
 /* ================= Utilidades ================= */
 const $ = (s, r = document) => r.querySelector(s);
 const esc = s => String(s ?? "").replace(/[&<>"']/g, c => ({"&":"&amp;","<":"&lt;",">":"&gt;",'"':"&quot;","'":"&#39;"}[c]));
@@ -1540,6 +1540,13 @@ function animarDesplegable(attr, antes, nuevo, cambiar){
   });
 }
 function abrirUsuario(uid){ animarDesplegable("data-ucard", S.uOpen, uid, () => S.uOpen = uid); }
+// Teclado: en todos los campos de texto la tecla Enter muestra "Listo" y al tocarla se oculta el teclado
+document.addEventListener("focusin", e => { const t = e.target; if ((t.tagName === "INPUT" || t.tagName === "TEXTAREA") && !t.hasAttribute("enterkeyhint")) t.setAttribute("enterkeyhint", t.form ? "go" : "done"); });
+document.addEventListener("keydown", e => {
+  const t = e.target; if (e.key !== "Enter" || e.isComposing || !(t.tagName === "INPUT" || t.tagName === "TEXTAREA")) return;
+  if (!t.form && !e.defaultPrevented) e.preventDefault(); // en el inicio de sesión Enter sigue entrando
+  setTimeout(() => t.blur(), 0);
+});
 function render(){ guardarArranque(); if (renderQ) return; renderQ = true; requestAnimationFrame(() => { renderQ = false; doRender(); }); }
 function doRender(){
   document.body.classList.toggle("fixedv", S.view === "resumen");
