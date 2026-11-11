@@ -1102,7 +1102,7 @@ const updateDoc = (...a) => sinEsperar(fsUpdateDoc(...a));
 const deleteDoc = (...a) => sinEsperar(fsDeleteDoc(...a));
 const writeBatch = db => { const b = fsWriteBatch(db), c = b.commit.bind(b); b.commit = () => sinEsperar(c()); return b; };
 
-const VERSION = "v3.50";
+const VERSION = "v3.51";
 /* ================= Utilidades ================= */
 const $ = (s, r = document) => r.querySelector(s);
 const esc = s => String(s ?? "").replace(/[&<>"']/g, c => ({"&":"&amp;","<":"&lt;",">":"&gt;",'"':"&quot;","'":"&#39;"}[c]));
@@ -2820,7 +2820,7 @@ function goStep(n){
   const last = n === PASOS.length - 1;
   $("#prev", ov).style.visibility = n === 0 ? "hidden" : "";
   $("#next", ov).hidden = last;
-  $("#save", ov).className = "btn" + (last ? " c" : ""); $("#save", ov).hidden = !last;
+  $("#save", ov).className = "btn" + (last ? " c" : ""); $("#save", ov).hidden = !last && !!F._nuevo; // al editar un pedido existente se puede guardar desde cualquier paso
   $("#save", ov).style.cssText = last ? `--c:${TIPOS[F.tipo].c}` : "";
   $("#errsum", ov).innerHTML = "";
   if (F.iOpen != null) { F.iOpen = null; if (F.items.length > 3) renderItems(); }
