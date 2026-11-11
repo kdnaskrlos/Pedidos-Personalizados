@@ -990,6 +990,8 @@ html,body{overscroll-behavior-y:none}
 /* v3.49 la animación de cambio de pantalla no debe ensanchar la página (movía la barra de íconos) */
 html,body{overflow-x:clip}
 .shell{overflow-x:clip}
+/* v3.50 sin barra horizontal al pasar de paso; tecla Listo */
+.mb{overflow-x:hidden}
 @media (max-width:1000px){.hello{padding-bottom:8px;margin-top:-6px}.hello h1{font-size:25px}}
 @media (max-width:1000px){.tiles.t5>:last-child{grid-column:1/-1}}
 @media (max-width:1000px){.pill.demo .m-pr{display:inline}}
@@ -1100,7 +1102,7 @@ const updateDoc = (...a) => sinEsperar(fsUpdateDoc(...a));
 const deleteDoc = (...a) => sinEsperar(fsDeleteDoc(...a));
 const writeBatch = db => { const b = fsWriteBatch(db), c = b.commit.bind(b); b.commit = () => sinEsperar(c()); return b; };
 
-const VERSION = "v3.49";
+const VERSION = "v3.50";
 /* ================= Utilidades ================= */
 const $ = (s, r = document) => r.querySelector(s);
 const esc = s => String(s ?? "").replace(/[&<>"']/g, c => ({"&":"&amp;","<":"&lt;",">":"&gt;",'"':"&quot;","'":"&#39;"}[c]));
@@ -1520,6 +1522,9 @@ function abrirUsuario(uid){
     a.onfinish = a.oncancel = () => { el.style.overflow = ""; };
   });
 }
+// Teclado: en los campos de una línea la tecla Enter muestra "Listo" y al tocarla se oculta el teclado
+document.addEventListener("focusin", e => { const t = e.target; if (t.tagName === "INPUT" && !t.hasAttribute("enterkeyhint")) t.setAttribute("enterkeyhint", t.form && t.type !== "search" ? "go" : "done"); });
+document.addEventListener("keydown", e => { const t = e.target; if (e.key === "Enter" && !e.defaultPrevented && t.tagName === "INPUT" && !t.form) { e.preventDefault(); t.blur(); } });
 function render(){ guardarArranque(); if (renderQ) return; renderQ = true; requestAnimationFrame(() => { renderQ = false; doRender(); }); }
 function doRender(){
   document.body.classList.toggle("fixedv", S.view === "resumen");
@@ -1588,7 +1593,7 @@ function autoTab(){
 }
 function filtrar(tipo){
   let l = pedidosList().filter(p => p.tipo === tipo && matchQ(p, S.q));
-  const f = S.filtro;
+  const f = S.q ? "" : S.filtro; // al buscar, se busca en todos los apartados
   if (f === "pendientes") l = l.filter(p => (p.estado || "pendiente") === "pendiente");
   if (f === "avisar") l = l.filter(p => p.estado === "listo" && !p.avisado);
   if (f === "listos") l = l.filter(p => p.estado === "listo");
@@ -1864,7 +1869,7 @@ function viewPedidos(a, pr){
     <div class="hello"><h1>Pedidos</h1><span class="date">${I("list")}${pedidosList().length} pedido${pedidosList().length === 1 ? "" : "s"} en total</span></div>
     <div class="toolbar">
       <label class="search">${I("search")}<input id="q" placeholder="Buscar cliente, código o nombre en la prenda…" value="${esc(S.q)}" autocomplete="off"></label>
-      <div class="seg">${fl.map(([k, t]) => `<button data-filtro="${k}" aria-pressed="${S.filtro === k}">${t}</button>`).join("")}</div>
+      <div class="seg">${fl.map(([k, t]) => `<button data-filtro="${k}" aria-pressed="${!S.q && S.filtro === k}">${t}</button>`).join("")}</div>
     </div>
     ${tipos.length > 1 ? `<div class="tipotabs">${tipos.map(t => `<button style="--c:${TIPOS[t].c}" data-tab="${t}" aria-pressed="${S.tab === t}">${TIPOS[t].label.toUpperCase()} · ${filtrar(t).length}</button>`).join("")}</div>` : ""}
     <div class="cols" style="${tipos.length === 1 ? "grid-template-columns:minmax(0,1fr)" : ""}">${tipos.map(col).join("")}</div>`;
@@ -2189,7 +2194,7 @@ function bindMain(){
     if (d.deluser) { const u = S.usuarios[d.deluser]; return confirmar(`¿Eliminar a ${u.nombre}?`, "No podrá entrar más. Sus pedidos se conservan.", "Eliminar", async () => { const bt = writeBatch(S.db); bt.delete(doc(S.db, "usuarios/" + d.deluser)); bt.delete(doc(S.db, "logins/" + u.usuario)); await bt.commit(); toast("Usuario eliminado"); }); }
   };
   const q = $("#q");
-  if (q) q.oninput = () => { S.q = q.value; clearTimeout(q._t); q._t = setTimeout(render, 160); };
+  if (q) q.oninput = () => { S.q = q.value; clearTimeout(q._t); q._t = setTimeout(() => { if (S.q) autoTab(); render(); }, 160); };
   $("#themeBtn").onclick = () => { const t = document.documentElement.dataset.theme === "dark" ? "light" : "dark"; document.documentElement.dataset.theme = t; try { localStorage.setItem("cs-tema", t); } catch(e) {} };
   if ($("#demoBtn")) $("#demoBtn").onclick = toggleDemo;
   if ($("#instBtn")) $("#instBtn").onclick = async () => { S.installEvt.prompt(); await S.installEvt.userChoice; S.installEvt = null; render(); };
@@ -2347,7 +2352,7 @@ function setView(v){
   S.view = v; S.q = ""; render(); scrollTo(0, 0);
 }
 const MENOS_MOV = matchMedia("(prefers-reduced-motion: reduce)").matches;
-const ANIM = {duration:220, easing:"cubic-bezier(.22,.9,.3,1)"};
+const ANIM = {duration:150, easing:"cubic-bezier(.22,.9,.3,1)"};
 function overlay(el){
   document.body.appendChild(el);
   NAV.stack.push(el); navPush();
@@ -2355,7 +2360,7 @@ function overlay(el){
   // Entrada: el fondo aparece y la ventana sube suavemente
   const caja = () => el.firstElementChild && el.firstElementChild !== el ? el.firstElementChild : null;
   if (!MENOS_MOV) {
-    el.animate([{opacity:0}, {opacity:1}], {duration:180, easing:"ease-out"});
+    el.animate([{opacity:0}, {opacity:1}], {duration:120, easing:"ease-out"});
     const c = caja(); if (c) c.animate([{opacity:0, transform:"translateY(18px) scale(.985)"}, {opacity:1, transform:"none"}], ANIM);
   }
   el.close = fromPop => {
@@ -2366,8 +2371,8 @@ function overlay(el){
     if (![...document.querySelectorAll(".ov,.dp-ov,.lbx,.tsplit")].some(x => x !== el && !x._cerrando)) document.body.style.overflow = "";
     // Salida: la ventana baja y se desvanece antes de quitarse
     if (MENOS_MOV) return el.remove();
-    const c = caja(); if (c) c.animate([{opacity:1, transform:"none"}, {opacity:0, transform:"translateY(14px) scale(.985)"}], {duration:160, easing:"ease-in", fill:"forwards"});
-    el.animate([{opacity:1}, {opacity:0}], {duration:170, easing:"ease-in", fill:"forwards"}).onfinish = () => el.remove();
+    const c = caja(); if (c) c.animate([{opacity:1, transform:"none"}, {opacity:0, transform:"translateY(14px) scale(.985)"}], {duration:120, easing:"ease-in", fill:"forwards"});
+    el.animate([{opacity:1}, {opacity:0}], {duration:130, easing:"ease-in", fill:"forwards"}).onfinish = () => el.remove();
     setTimeout(() => el.isConnected && el.remove(), 400);
   };
   return el;
@@ -2815,7 +2820,7 @@ function goStep(n){
   const last = n === PASOS.length - 1;
   $("#prev", ov).style.visibility = n === 0 ? "hidden" : "";
   $("#next", ov).hidden = last;
-  $("#save", ov).className = "btn" + (last ? " c" : "");
+  $("#save", ov).className = "btn" + (last ? " c" : ""); $("#save", ov).hidden = !last;
   $("#save", ov).style.cssText = last ? `--c:${TIPOS[F.tipo].c}` : "";
   $("#errsum", ov).innerHTML = "";
   if (F.iOpen != null) { F.iOpen = null; if (F.items.length > 3) renderItems(); }
@@ -2919,7 +2924,12 @@ function animarPrendas(cambio){
 // Quitar una prenda: la tarjeta se desvanece y su espacio se cierra suavemente; luego se reacomodan las demás
 function quitarPrenda(n, wrap, deslizado, luego){
   const it = F.items[n];
-  const fin = () => { if (!F) return; animarPrendas(() => { const k = F.items.indexOf(it); if (k >= 0) F.items.splice(k, 1); F.iOpen = null; renderItems(); }); renderTotals(); if (luego) luego(); };
+  const fin = () => {
+    if (!F) return; animarPrendas(() => { const k = F.items.indexOf(it); if (k >= 0) F.items.splice(k, 1); F.iOpen = null; renderItems(); }); renderTotals(); if (luego) luego();
+    // Si no quedan prendas, el botón "Agregar prenda" aparece suave
+    const vac = !F.items.length && F._ov && F._ov.querySelector(".iempty");
+    if (vac && !MENOS_MOV) vac.animate([{opacity:0, transform:"scale(.96)"}, {opacity:1, transform:"none"}], {duration:220, easing:"cubic-bezier(.22,.9,.3,1)"});
+  };
   if (!wrap || !wrap.animate) return fin();
   const h = wrap.getBoundingClientRect().height, mb = getComputedStyle(wrap).marginBottom;
   wrap.style.overflow = "hidden"; wrap.style.pointerEvents = "none";
