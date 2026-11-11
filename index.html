@@ -1109,7 +1109,7 @@ const updateDoc = (...a) => sinEsperar(fsUpdateDoc(...a));
 const deleteDoc = (...a) => sinEsperar(fsDeleteDoc(...a));
 const writeBatch = db => { const b = fsWriteBatch(db), c = b.commit.bind(b); b.commit = () => sinEsperar(c()); return b; };
 
-const VERSION = "v3.53";
+const VERSION = "v3.54";
 /* ================= Utilidades ================= */
 const $ = (s, r = document) => r.querySelector(s);
 const esc = s => String(s ?? "").replace(/[&<>"']/g, c => ({"&":"&amp;","<":"&lt;",">":"&gt;",'"':"&quot;","'":"&#39;"}[c]));
@@ -1123,7 +1123,17 @@ const MESES = ["enero","febrero","marzo","abril","mayo","junio","julio","agosto"
 const DIAS = ["domingo","lunes","martes","miércoles","jueves","viernes","sábado"];
 const fmtDate = s => { if (!s) return ""; const d = parseYmd(s); return `${DIAS[d.getDay()].slice(0,3)} ${d.getDate()} ${MESES[d.getMonth()].slice(0,3)} ${d.getFullYear()}`; };
 const fmtDT = iso => { if (!iso) return ""; const d = new Date(iso); return `${pad(d.getDate())}/${pad(d.getMonth()+1)}/${d.getFullYear()} ${pad(d.getHours())}:${pad(d.getMinutes())}`; };
-const num = v => { const n = parseFloat(String(v ?? "").replace(/\s/g,"").replace(",", ".")); return isFinite(n) ? n : 0; };
+// Lee montos escritos como 50000, 50.000, 50.000,50 o 12.5
+const num = v => {
+  if (typeof v === "number") return isFinite(v) ? v : 0;
+  let s = String(v ?? "").replace(/\s/g, "");
+  if (s.includes(",")) s = s.replace(/\./g, "").replace(",", ".");
+  else if (/^-?\d{1,3}(\.\d{3})+$/.test(s)) s = s.replace(/\./g, "");
+  const n = parseFloat(s); return isFinite(n) ? n : 0;
+};
+// Montos: se escriben sin puntos y al terminar se muestran como 50.000
+const fmtMonto = v => { const s = String(v ?? "").trim(); if (!s) return ""; const n = num(s); return n ? new Intl.NumberFormat("es-VE", {maximumFractionDigits:2, useGrouping:"always"}).format(n) : s; };
+document.addEventListener("focusout", e => { const t = e.target; if (!t.classList || !t.classList.contains("monto")) return; const f = fmtMonto(t.value); if (f !== t.value) { t.value = f; t.dispatchEvent(new Event("input", {bubbles:true})); } });
 const norm = s => String(s||"").toLowerCase().normalize("NFD").replace(/[̀-ͯ]/g, "");
 function money(v, mon){
   const n = Number(v) || 0;
@@ -2726,10 +2736,10 @@ function openForm(id, tipo, cliente, borrador){
           <div class="f" id="f-precio"><label>Precio por unidad <span class="req">*</span></label><div class="prl" id="prl"></div><span class="msg"></span></div>
           <div class="g2 keep">
             <div class="f"><label>Moneda</label><select class="inp" id="in-mon">${["COP","USD","Bs"].map(m => `<option ${F.moneda === m ? "selected" : ""}>${m}</option>`).join("")}</select></div>
-            <div class="f" id="f-abono"><label>Abono</label><input class="inp" id="in-abono" inputmode="decimal" value="${esc(F.abono)}"></div>
+            <div class="f" id="f-abono"><label>Abono</label><input class="inp monto" id="in-abono" inputmode="decimal" value="${esc(fmtMonto(F.abono))}"></div>
           </div>
           <span class="msg" id="pago-msg"></span>
-          <div class="f" id="f-motivo"><label>Motivo por el que no hay abono <span class="req">*</span></label><input class="inp" id="in-motivo" value="${esc(F.motivoSinAbono || "")}"><span class="msg"></span></div>
+          <div class="f" id="f-motivo"><label>Motivo por el que no hay abono</label><input class="inp" id="in-motivo" value="${esc(F.motivoSinAbono || "")}"><span class="msg"></span></div>
           <div class="totals t2" id="totals"></div>
         </div>
       </section>
@@ -2872,7 +2882,6 @@ function erroresPaso(i){
     const prs = Object.keys(prendasDe(F));
     if (!prs.length) e.push(["f-precio", "Agrega prendas primero"]);
     else if (prs.some(k => !(num(F.pr[k]) > 0))) e.push(["f-precio", "Falta un precio"]);
-    if (!(num(F.abono) > 0) && !(F.motivoSinAbono || "").trim()) e.push(["f-motivo", "Falta el motivo sin abono"]);
   }
   if (i === 3 && F.imagenes.some(x => x.subiendo)) e.push(["", "Espera las imágenes"]);
   return e;
@@ -3146,7 +3155,7 @@ function renderPrecios(){
   const box = $("#prl", F._ov); if (!box) return;
   const g = prendasDe(F), ks = Object.keys(g);
   ks.forEach(k => { if (F.pr[k] === undefined) F.pr[k] = ""; });
-  box.innerHTML = ks.length ? ks.map(k => `<div class="prrow"><span class="prn"><b>${esc(k.split(" · ")[0])}</b><small>${k.includes(" · ") ? esc(k.split(" · ").slice(1).join(" · ").replace("Niño/Niña", [...new Set((F.items || []).filter(i => prKey(i) === k).map(i => i.horma))].join(" y "))) + " · " : ""}${g[k]} pieza${g[k] === 1 ? "" : "s"}</small></span><input class="inp num${F._prShow && !(num(F.pr[k]) > 0) ? " bad" : ""}" data-pr="${esc(k)}" inputmode="decimal" placeholder="0" value="${esc(F.pr[k])}"></div>`).join("") : `<div class="prempty">Agrega prendas en el paso anterior</div>`;
+  box.innerHTML = ks.length ? ks.map(k => `<div class="prrow"><span class="prn"><b>${esc(k.split(" · ")[0])}</b><small>${k.includes(" · ") ? esc(k.split(" · ").slice(1).join(" · ").replace("Niño/Niña", [...new Set((F.items || []).filter(i => prKey(i) === k).map(i => i.horma))].join(" y "))) + " · " : ""}${g[k]} pieza${g[k] === 1 ? "" : "s"}</small></span><input class="inp num monto${F._prShow && !(num(F.pr[k]) > 0) ? " bad" : ""}" data-pr="${esc(k)}" inputmode="decimal" value="${esc(fmtMonto(F.pr[k]))}"></div>`).join("") : `<div class="prempty">Agrega prendas en el paso anterior</div>`;
 }
 function renderTotals(){
   const t = totales(F), ab = num(F.abono);
