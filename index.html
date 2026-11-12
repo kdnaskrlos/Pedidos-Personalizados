@@ -29,7 +29,7 @@ setTimeout(window.__ver, 2500);</script>
    barra lateral de íconos (abajo en el teléfono), tarjetas pastel, tema claro por defecto. */
 :root{
   --bg:#ffffff; --surface:#ffffff; --surface-2:#f6f8fa; --line:#e5e9ee; --ink:#111827; --muted:#6b7280;
-  --accent:#16a34a; --accent-ink:#ffffff; --accent-soft:#dcfce7;
+  --accent:#15803d; --accent-ink:#ffffff; --accent-soft:#dcfce7;
   --t-pers:#0d9488; --t-sub:#c2410c; --t-info:#2563eb; --t-violet:#7c3aed; --t-wa:#16a34a;
   --ok:#16a34a; --warn:#b45309; --err:#dc2626;
   --f:"Plus Jakarta Sans",system-ui,-apple-system,"Segoe UI",sans-serif;
@@ -112,7 +112,7 @@ button.pill:hover{border-color:var(--ink)}
 .btn.primary:hover{filter:brightness(1.05)}
 .btn.c{background:var(--c);border-color:var(--c);color:#fff}
 .btn.danger{color:var(--err);border-color:color-mix(in srgb,var(--err) 40%,var(--line))}
-.btn.wa{background:#16a34a;border-color:#16a34a;color:#fff}
+.btn.wa{background:#15803d;border-color:#15803d;color:#fff}
 .btn.sm{padding:5px 10px;font-size:12px;min-height:30px}
 .btn:disabled{opacity:.45;cursor:default;filter:none}
 .card{background:var(--surface);border:1px solid var(--line);border-radius:var(--r);padding:18px;display:flex;flex-direction:column;gap:14px;min-width:0}
@@ -393,7 +393,7 @@ table.mx{border-collapse:collapse;width:100%;font-size:13px}
 .aday.err{color:var(--err);background:color-mix(in srgb,var(--err) 10%,var(--surface))}
 .aday.warn{color:var(--warn);background:color-mix(in srgb,var(--warn) 12%,var(--surface))}
 .aw,.ac2{flex:none;width:36px;height:36px;border-radius:10px;display:grid;place-items:center;border:1px solid var(--line);background:var(--surface);color:var(--ink)}
-.aw{background:#16a34a;border-color:#16a34a;color:#fff}
+.aw{background:#15803d;border-color:#15803d;color:#fff}
 .aw svg.i,.ac2 svg.i{width:18px;height:18px}
 .aempty{font-size:13px;color:var(--muted);padding:10px 12px;border:1px dashed var(--line);border-radius:var(--r)}
 /* pie del detalle */
@@ -772,7 +772,7 @@ table.mx{border-collapse:collapse;width:100%;font-size:13px}
 @media (prefers-reduced-motion:reduce){.oc2-urgi{animation:none}}
 .oc2-meta .oc2-due{margin-left:auto}
 /* v2.53 pronta entrega en amarillo */
-:root{--soon:#ca8a04}
+:root{--soon:#a16207}
 :root[data-theme="dark"]{--soon:#facc15}
 .pddate:not(.err):not(.ok):not(.info):not(.vio){background:#fff7d1;border-color:#f3dc7c}
 .pddate:not(.err):not(.ok):not(.info):not(.vio) .pdrel,.pddate:not(.err):not(.ok):not(.info):not(.vio) .pdcal small{color:#a16207}
@@ -1010,6 +1010,23 @@ html,body{overflow-x:clip}
 .lbdots b.on{background:#fff;transform:scale(1.25)}
 .lbx-x{position:absolute;top:max(14px,env(safe-area-inset-top));right:14px;z-index:2;width:40px;height:40px;border-radius:99px;border:0;background:#ffffff26;color:#fff;display:grid;place-items:center;cursor:pointer}
 .lbx-x svg.i{width:20px;height:20px}
+/* v3.60 mejoras del reporte de diseño: contraste, etiquetas en texto normal, toques de 44 px */
+.f>label,.lbl{font-size:13px;text-transform:none;letter-spacing:0;font-weight:600}
+.sec{letter-spacing:.06em}
+.tile .lb{letter-spacing:.05em}
+.inp{border-color:#d1d5db}
+:root[data-theme="dark"] .inp{border-color:#3a4452}
+.oc2-due.err,.aday.err{color:#b91c1c}
+:root[data-theme="dark"] .oc2-due.err,:root[data-theme="dark"] .aday.err{color:#fca5a5}
+.rfb{min-width:44px;min-height:44px;justify-content:center;padding:0}
+.dph button{width:44px;height:44px;font-size:24px}
+.lchip button{width:32px;height:32px;margin:-5px -3px -5px 0}
+.lchip{padding-right:6px}
+.pdmd .drow2{display:flex}
+.pdmd .drow2 .btn{flex:1}
+.pdmd .drow2 .btn.ico{flex:0 0 52px;padding:0}
+.pdlock{display:inline-flex;align-items:center;gap:5px}
+.pdlock svg.i{width:14px;height:14px}
 @media (max-width:1000px){.hello{padding-bottom:8px;margin-top:-6px}.hello h1{font-size:25px}}
 @media (max-width:1000px){.tiles.t5>:last-child{grid-column:1/-1}}
 @media (max-width:1000px){.pill.demo .m-pr{display:inline}}
@@ -1120,7 +1137,7 @@ const updateDoc = (...a) => sinEsperar(fsUpdateDoc(...a));
 const deleteDoc = (...a) => sinEsperar(fsDeleteDoc(...a));
 const writeBatch = db => { const b = fsWriteBatch(db), c = b.commit.bind(b); b.commit = () => sinEsperar(c()); return b; };
 
-const VERSION = "v3.59";
+const VERSION = "v3.60";
 /* ================= Utilidades ================= */
 const $ = (s, r = document) => r.querySelector(s);
 const esc = s => String(s ?? "").replace(/[&<>"']/g, c => ({"&":"&amp;","<":"&lt;",">":"&gt;",'"':"&quot;","'":"&#39;"}[c]));
@@ -1223,7 +1240,7 @@ const DEF = {
 };
 const TIPOS = {
   personalizado: {label:"Personalizado", c:"var(--t-pers)", pre:"P", icon:"palette"},
-  sublimacion: {label:"Sublimación completa", c:"var(--t-sub)", pre:"S", icon:"shirt"}
+  sublimacion: {label:"Sublimación completa", corto:"Sublimación", c:"var(--t-sub)", pre:"S", icon:"shirt"}
 };
 const swatchStyle = h => h === "full" ? "background:conic-gradient(#ef4444,#f59e0b,#22c55e,#3b82f6,#a855f7,#ef4444)" : h ? `background:${esc(h)}` : "background:repeating-linear-gradient(45deg,#ccc 0 4px,#fff 4px 8px)";
 
@@ -1903,10 +1920,10 @@ function viewPedidos(a, pr){
   return `
     <div class="hello"><h1>Pedidos</h1><span class="date">${I("list")}${pedidosList().length} pedido${pedidosList().length === 1 ? "" : "s"} en total</span></div>
     <div class="toolbar">
-      <label class="search">${I("search")}<input id="q" placeholder="Buscar cliente, código o nombre en la prenda…" value="${esc(S.q)}" autocomplete="off"></label>
+      <label class="search">${I("search")}<input id="q" placeholder="Buscar cliente, código o diseño" value="${esc(S.q)}" autocomplete="off"></label>
       <div class="seg">${fl.map(([k, t]) => `<button data-filtro="${k}" aria-pressed="${!S.q && S.filtro === k}">${t}</button>`).join("")}</div>
     </div>
-    ${tipos.length > 1 ? `<div class="tipotabs">${tipos.map(t => `<button style="--c:${TIPOS[t].c}" data-tab="${t}" aria-pressed="${S.tab === t}">${TIPOS[t].label.toUpperCase()} · ${filtrar(t).length}</button>`).join("")}</div>` : ""}
+    ${tipos.length > 1 ? `<div class="tipotabs">${tipos.map(t => `<button style="--c:${TIPOS[t].c}" data-tab="${t}" aria-pressed="${S.tab === t}">${(TIPOS[t].corto || TIPOS[t].label).toUpperCase()} · ${filtrar(t).length}</button>`).join("")}</div>` : ""}
     <div class="cols" style="${tipos.length === 1 ? "grid-template-columns:minmax(0,1fr)" : ""}">${tipos.map(col).join("")}</div>`;
 }
 function dueTag(p){
@@ -2082,7 +2099,7 @@ function cardHTML(p){
     <div class="oc2-main">
       <div class="oc2-top"><b class="oc2-name">${esc(p.cliente && p.cliente.nombre)}</b>${p.urgente ? `<span class="oc2-urgi" title="Urgente" aria-label="Urgente">${I("alert")}</span>` : ""}</div>
       <div class="oc2-items">${esc(p.tema || "Sin nombre de diseño")}</div>
-      <div class="oc2-meta">${p.servicio ? `<span class="sv">${esc(p.servicio)}</span>` : ""}<span>${t.piezas} pz</span>${(p.asignados || []).length || (p.denegados || []).length ? `<span>${I("lock")}</span>` : ""}${due.t ? `<span class="oc2-due ${due.c}">${esc(due.t)}</span>` : ""}</div>
+      <div class="oc2-meta">${p.servicio ? `<span class="sv">${esc(p.servicio)}</span>` : ""}<span>${t.piezas} pz</span>${due.t ? `<span class="oc2-due ${due.c}">${esc(due.t)}</span>` : ""}</div>
     </div>
   </div>`;
 }
@@ -2429,6 +2446,8 @@ function confirmar(title, text, okTxt, fn){
 }
 /* ===== Pedido en curso (borrador local por si la app se cierra) ===== */
 const draftKey = () => "cs-borrador-" + ((S.me && S.me.usuario) || "");
+// Número sin el código del país (el código ya se ve en el selector)
+const telLocal = e164 => { const pp = prettyPhone(e164); return ccOf(e164) ? pp.replace(/^\+\d+\s*/, "") : pp; };
 function leerBorrador(){ try { const d = JSON.parse(localStorage.getItem(draftKey()) || "null"); return d && d.F && TIPOS[d.F.tipo] ? d : null; } catch(e) { return null; } }
 function borrarBorrador(){ try { localStorage.removeItem(draftKey()); } catch(e) {} }
 function guardarBorrador(){
@@ -2760,7 +2779,7 @@ function openForm(id, tipo, cliente, borrador){
           <div class="g2">
             <div class="f ac" id="f-nombre"><label>Nombre y apellido <span class="req">*</span></label><input class="inp" id="in-nombre" autocomplete="off" value="${esc(F.cliente.nombre)}"><div id="acl"></div><span class="msg"></span></div>
             <div class="f" id="f-tel"><label>WhatsApp <span class="req">*</span></label>
-              <div class="phone"><select id="in-pais">${PAISES.map(p => `<option value="${p.c}" ${p.c === (F.cliente.telefono ? (ccOf(F.cliente.telefono) || "58") : (c.pais || "58")) ? "selected" : ""}>${p.f} ${p.c ? "+" + p.c : "Otro"}</option>`).join("")}</select><input id="in-tel" inputmode="tel" autocomplete="off" value="${esc(F.cliente.telefono ? prettyPhone(F.cliente.telefono) : "")}"></div>
+              <div class="phone"><select id="in-pais">${PAISES.map(p => `<option value="${p.c}" ${p.c === (F.cliente.telefono ? (ccOf(F.cliente.telefono) || "58") : (c.pais || "58")) ? "selected" : ""}>${p.f} ${p.c ? "+" + p.c : "Otro"}</option>`).join("")}</select><input id="in-tel" inputmode="tel" autocomplete="off" value="${esc(F.cliente.telefono ? telLocal(F.cliente.telefono) : "")}"></div>
               <span class="msg" id="tel-msg"></span></div>
           </div>
         </div>
@@ -2807,10 +2826,10 @@ function openForm(id, tipo, cliente, borrador){
         </div>
         ${puedeBloquear ? `<div class="fsec"><div class="sec">${I("lock")}Acceso denegado para</div>
           <div class="opts">${empleados.map(u => `<button type="button" class="opt deny" data-deny="${esc(u.usuario)}" aria-pressed="${F.denegados.includes(u.usuario)}">${esc(u.nombre)}</button>`).join("") || `<span class="note">Aún no hay personas en el equipo.</span>`}</div></div>` : ""}
-        <p class="hist">${orig ? `Registrado el ${fmtDT(orig.creadoEn)} por ${esc(nameOf(orig.creadoPor))}${orig.editadoEn ? ` · Última edición ${fmtDT(orig.editadoEn)} por ${esc(nameOf(orig.editadoPor))}` : ""}` : `Fecha de registro: ${fmtDate(ymd(new Date()))} (se guarda sola y no cambia al editar)`}</p>
+        <p class="hist">${orig ? `Registrado el ${fmtDT(orig.creadoEn)} por ${esc(nameOf(orig.creadoPor))}${orig.editadoEn ? ` · Última edición ${fmtDT(orig.editadoEn)} por ${esc(nameOf(orig.editadoPor))}` : ""}` : `Registro: ${fmtDate(ymd(new Date()))}`}</p>
       </section>
     </div>
-    <div class="mf"><button class="btn" id="prev">${I("undo")}Atrás</button><span style="flex:1"></span><button class="btn" id="save">${I("check")}Guardar</button><button class="btn c" style="--c:${T.c}" id="next">Siguiente</button></div>`, "wide", true);
+    <div class="mf"><button class="btn" id="prev">${I("undo")}Atrás</button><span style="flex:1"></span><button class="btn" id="save">${I("check")}Guardar</button><button class="btn primary" id="next">Siguiente</button></div>`, "wide", true);
   F._ov = ov;
   // Tocar un espacio vacío contrae la prenda abierta (cuando están en modo compacto)
   ov.addEventListener("click", e => {
@@ -2835,7 +2854,7 @@ function openForm(id, tipo, cliente, borrador){
   }; // la app no sugiere ni recuerda clientes anteriores
   inNom.onblur = () => setTimeout(() => acl.innerHTML = "", 200);
   acl.onmousedown = e => e.preventDefault();
-  acl.onclick = e => { const b = e.target.closest("[data-pick]"); if (!b) return; const cl = S.clientes[b.dataset.pick]; F.cliente.nombre = cl.nombre; inNom.value = cl.nombre; inTel.value = prettyPhone(b.dataset.pick); inPais.value = ccOf(b.dataset.pick) || "58"; checkTel(); acl.innerHTML = ""; clearErr("f-nombre"); };
+  acl.onclick = e => { const b = e.target.closest("[data-pick]"); if (!b) return; const cl = S.clientes[b.dataset.pick]; F.cliente.nombre = cl.nombre; inNom.value = cl.nombre; inTel.value = telLocal(b.dataset.pick); inPais.value = ccOf(b.dataset.pick) || "58"; checkTel(); acl.innerHTML = ""; clearErr("f-nombre"); };
   const checkTel = final => {
     const r = parsePhone(inTel.value, inPais.value), box = $("#f-tel", ov), msg = $("#tel-msg", ov);
     box.classList.remove("err", "okf");
@@ -2862,7 +2881,7 @@ function openForm(id, tipo, cliente, borrador){
     return r;
   };
   inTel.oninput = () => { const cc = detectarPais(inTel.value); if (cc && cc !== inPais.value) inPais.value = cc; checkTel(); };
-  inTel.onblur = () => { const r = checkTel(true); if (r.ok) { const cc = ccOf(r.e164); if (cc) inPais.value = cc; inTel.value = r.pretty; } };
+  inTel.onblur = () => { const r = checkTel(true); if (r.ok) { const cc = ccOf(r.e164); if (cc) inPais.value = cc; inTel.value = r.e164 ? telLocal(r.e164) : r.pretty; } };
   inPais.onchange = () => checkTel();
   if (inTel.value) checkTel();
   F._checkTel = () => parsePhone(inTel.value, inPais.value);
@@ -2908,8 +2927,8 @@ function goStep(n){
   const last = n === PASOS.length - 1;
   $("#prev", ov).style.visibility = n === 0 ? "hidden" : "";
   $("#next", ov).hidden = last;
-  $("#save", ov).className = "btn" + (last ? " c" : ""); $("#save", ov).hidden = !last && !!F._nuevo; // al editar un pedido existente se puede guardar desde cualquier paso
-  $("#save", ov).style.cssText = last ? `--c:${TIPOS[F.tipo].c}` : "";
+  $("#save", ov).className = "btn" + (last ? " primary" : ""); $("#save", ov).hidden = !last && !!F._nuevo; // al editar un pedido existente se puede guardar desde cualquier paso
+  $("#save", ov).style.cssText = "";
   $("#errsum", ov).innerHTML = "";
   if (F.iOpen != null) { F.iOpen = null; if (F.items.length > 3) renderItems(); }
   if (n === 2) { renderPrecios(); renderTotals(); }
@@ -3360,12 +3379,12 @@ function openDetail(id){
       </div>
       ${(p.imagenes || []).length ? `<div class="pdcard"><div class="pdlbl">REFERENCIAS</div><div class="imgs">${p.imagenes.map(im => `<div class="imgbox"><img data-foto="${esc(im)}" alt=""></div>`).join("")}</div></div>` : ""}
       ${p.nota ? `<div class="pdcard"><div class="pdlbl">NOTA</div><div class="pdnote">${esc(p.nota)}</div></div>` : ""}
-      <p class="hist pdhist">Registrado: ${fmtDT(p.creadoEn)} por ${esc(nameOf(p.creadoPor))}${p.editadoEn ? `<br>Última edición: ${fmtDT(p.editadoEn)} por ${esc(nameOf(p.editadoPor))}` : ""}${p.listoEn ? `<br>Completado: ${fmtDT(p.listoEn)}` : ""}${p.avisadoEn ? `<br>Cliente avisado: ${fmtDT(p.avisadoEn)}` : ""}${p.entregadoEn ? `<br>Entregado: ${fmtDT(p.entregadoEn)}` : ""}${(p.asignados || []).length ? `<br>Visible solo para: ${esc(p.asignados.map(nameOf).join(", "))}` : ""}</p>
+      <p class="hist pdhist">Registrado: ${fmtDT(p.creadoEn)} por ${esc(nameOf(p.creadoPor))}${p.editadoEn ? `<br>Última edición: ${fmtDT(p.editadoEn)} por ${esc(nameOf(p.editadoPor))}` : ""}${p.listoEn ? `<br>Completado: ${fmtDT(p.listoEn)}` : ""}${p.avisadoEn ? `<br>Cliente avisado: ${fmtDT(p.avisadoEn)}` : ""}${p.entregadoEn ? `<br>Entregado: ${fmtDT(p.entregadoEn)}` : ""}${(p.asignados || []).length ? `<br>Visible solo para: ${esc(p.asignados.map(nameOf).join(", "))}` : ""}${(p.denegados || []).length ? `<br><span class="pdlock">${I("lock")}Acceso restringido para: ${esc(p.denegados.map(nameOf).join(", "))}</span>` : ""}</p>
     </div>
     <div class="mf dfoot">
       <div class="drow2">
         ${est !== "pendiente" ? `<button class="btn" id="d-reab">${I("undo")}Reabrir</button>` : ""}
-        ${pr.eliminar ? `<button class="btn danger" id="d-del">${I("trash")}Eliminar</button>` : ""}
+        ${pr.eliminar ? `<button class="btn danger ico" id="d-del" title="Eliminar pedido" aria-label="Eliminar pedido">${I("trash")}</button>` : ""}
         <button class="btn" id="d-edit">${I("edit")}Editar</button>
       </div>
       ${est === "pendiente" ? `<button class="btn pdlisto" id="d-listo">${I("check")}Marcar pedido listo</button>` : ""}
