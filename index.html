@@ -1054,6 +1054,7 @@ html,body{overflow-x:clip}
 .ie-crop i[data-h=n]::after,.ie-crop i[data-h=s]::after{content:"";position:absolute;left:8px;right:8px;top:10px;height:4px;border-radius:2px;background:#fff}
 .ie-crop i[data-h=w]::after,.ie-crop i[data-h=e]::after{content:"";position:absolute;top:8px;bottom:8px;left:10px;width:4px;border-radius:2px;background:#fff}
 .ie-bar{display:flex;justify-content:center;align-items:center;gap:14px;padding:12px 12px max(14px,env(safe-area-inset-bottom))}
+.lbx-x.lbx-ed{right:auto;left:14px}
 @media (max-width:1000px){.hello{padding-bottom:8px;margin-top:-6px}.hello h1{font-size:25px}}
 @media (max-width:1000px){.tiles.t5>:last-child{grid-column:1/-1}}
 @media (max-width:1000px){.pill.demo .m-pr{display:inline}}
@@ -1164,7 +1165,7 @@ const updateDoc = (...a) => sinEsperar(fsUpdateDoc(...a));
 const deleteDoc = (...a) => sinEsperar(fsDeleteDoc(...a));
 const writeBatch = db => { const b = fsWriteBatch(db), c = b.commit.bind(b); b.commit = () => sinEsperar(c()); return b; };
 
-const VERSION = "v3.63";
+const VERSION = "v3.64";
 /* ================= Utilidades ================= */
 const $ = (s, r = document) => r.querySelector(s);
 const esc = s => String(s ?? "").replace(/[&<>"']/g, c => ({"&":"&amp;","<":"&lt;",">":"&gt;",'"':"&quot;","'":"&#39;"}[c]));
@@ -2521,13 +2522,14 @@ function chooseTipo(cliente){
   };
 }
 // Visor de imágenes: con varias se desliza entre ellas (mismo movimiento que el calendario); tocar cierra
-function lightbox(src, lista){
+function lightbox(src, lista, editar){
   const fotos = (lista && lista.length ? lista : [src]).filter(Boolean); let i = Math.max(0, fotos.indexOf(src));
   const lb = document.createElement("div"); lb.className = "lbx gal";
-  lb.innerHTML = `<button class="lbx-x" aria-label="Cerrar">${I("x")}</button><div class="lbvp"><div class="lbtrack">${fotos.map(s => `<div class="lbs"><img src="${esc(s)}" alt="" draggable="false"></div>`).join("")}</div></div>${fotos.length > 1 ? `<div class="lbdots">${fotos.map((_, k) => `<b${k === i ? ' class="on"' : ""}></b>`).join("")}</div>` : ""}`;
+  lb.innerHTML = `<button class="lbx-x" aria-label="Cerrar">${I("x")}</button>${editar ? `<button class="lbx-x lbx-ed" aria-label="Editar imagen" title="Editar imagen">${I("edit")}</button>` : ""}<div class="lbvp"><div class="lbtrack">${fotos.map(s => `<div class="lbs"><img src="${esc(s)}" alt="" draggable="false"></div>`).join("")}</div></div>${fotos.length > 1 ? `<div class="lbdots">${fotos.map((_, k) => `<b${k === i ? ' class="on"' : ""}></b>`).join("")}</div>` : ""}`;
   overlay(lb);
   const tr = lb.querySelector(".lbtrack"), n = fotos.length;
   lb.querySelector(".lbx-x").addEventListener("click", () => lb.close());
+  if (editar) lb.querySelector(".lbx-ed").addEventListener("click", () => { const s = fotos[i]; lb.close(); setTimeout(() => editar(s), 140); });
   const pos = (dx, t) => { tr.style.transition = t ? `transform ${t}s cubic-bezier(.22,.9,.3,1)` : "none"; tr.style.transform = `translate3d(calc(${-i * 100}% + ${dx}px),0,0)`; };
   const puntos = () => lb.querySelectorAll(".lbdots b").forEach((b, k) => b.classList.toggle("on", k === i));
   const ir = (k, rapido) => { i = Math.max(0, Math.min(n - 1, k)); pos(0, rapido ? .18 : .26); puntos(); };
@@ -3267,12 +3269,15 @@ function renderTotals(){
 }
 function renderImgs(){
   const box = $("#imgs", F._ov);
-  box.innerHTML = F.imagenes.map((im, n) => `<div class="imgbox">${im.preview ? `<img src="${esc(im.preview)}" alt="">` : `<img data-foto="${esc(im.id)}" alt="">`}<button type="button" class="rm" data-rmimg="${n}">${I("x")}</button>${!im.subiendo && !im.error ? `<button type="button" class="ed" data-edimg="${n}" title="Editar imagen" aria-label="Editar imagen">${I("edit")}</button>` : ""}${im.subiendo ? `<div class="st">Subiendo…</div>` : im.error ? `<div class="st" style="background:#b91c1c">Error</div>` : ""}</div>`).join("")
+  box.innerHTML = F.imagenes.map((im, n) => `<div class="imgbox">${im.preview ? `<img src="${esc(im.preview)}" alt="">` : `<img data-foto="${esc(im.id)}" alt="">`}<button type="button" class="rm" data-rmimg="${n}">${I("x")}</button>${im.subiendo ? `<div class="st">Subiendo…</div>` : im.error ? `<div class="st" style="background:#b91c1c">Error</div>` : ""}</div>`).join("")
     + `<button type="button" class="addimg" id="btnCam">${I("camera")}Tomar foto</button><button type="button" class="addimg" id="btnGal">${I("image")}Galería</button>`;
   $("#btnCam", F._ov).onclick = () => $("#fileCam", F._ov).click();
   $("#btnGal", F._ov).onclick = () => $("#fileGal", F._ov).click();
-  box.onclick = e => { const r = e.target.closest("[data-rmimg]"); if (r) { F.imagenes.splice(Number(r.dataset.rmimg), 1); return renderImgs(); }
-    const ed = e.target.closest("[data-edimg]"); if (ed) { const im = ed.parentElement.querySelector("img"); if (im && im.src) editarImagen(Number(ed.dataset.edimg), im.src); return; } const i = e.target.closest("img"); if (i && i.src) lightbox(i.src, [...box.querySelectorAll(".imgbox img")].map(x => x.src)); };
+  box.onclick = e => { const r = e.target.closest("[data-rmimg]"); if (r) { F.imagenes.splice(Number(r.dataset.rmimg), 1); return renderImgs(); } const i = e.target.closest("img"); if (i && i.src) {
+      // El lápiz para editar está dentro del visor
+      const imgs = [...box.querySelectorAll(".imgbox img")];
+      lightbox(i.src, imgs.map(x => x.src), s => { const k = imgs.findIndex(x => x.src === s); const im = F && F.imagenes[k]; if (k < 0 || !im || im.subiendo || im.error) return false; editarImagen(k, s); });
+    } };
   loadFotos(box);
 }
 // Editor de imagen de referencia: rotar 90° y recortar libremente
