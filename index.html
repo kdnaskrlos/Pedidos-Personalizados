@@ -982,7 +982,7 @@ html,body{overscroll-behavior-y:none}
 .rfb:active{color:var(--accent)}
 .rfb.gira svg{animation:sp .7s linear infinite;color:var(--accent)}
 /* v3.39 tarjeta de sublimación en 2 columnas y N° en gris tenue como "Nombre" */
-.irow3.sub .r1,.irow3.dos .r1{grid-template-columns:repeat(2,minmax(0,1fr))}
+.irow3.sub .r1{grid-template-columns:repeat(2,minmax(0,1fr))}
 .irow3 .r3 .nu:not(.on){color:color-mix(in srgb,var(--muted) 45%,transparent)}
 /* v3.40 campo de cantidad con fondo blanco */
 .irow3 .qty .qin{background:var(--surface)}
@@ -1137,7 +1137,7 @@ const updateDoc = (...a) => sinEsperar(fsUpdateDoc(...a));
 const deleteDoc = (...a) => sinEsperar(fsDeleteDoc(...a));
 const writeBatch = db => { const b = fsWriteBatch(db), c = b.commit.bind(b); b.commit = () => sinEsperar(c()); return b; };
 
-const VERSION = "v3.61";
+const VERSION = "v3.62";
 /* ================= Utilidades ================= */
 const $ = (s, r = document) => r.querySelector(s);
 const esc = s => String(s ?? "").replace(/[&<>"']/g, c => ({"&":"&amp;","<":"&lt;",">":"&gt;",'"':"&quot;","'":"&#39;"}[c]));
@@ -3068,18 +3068,16 @@ function renderItems(){
         <input class="inp nm" data-fld="nombre" placeholder="Nombre" value="${esc(it.nombre || "")}">
         <button type="button" class="pbtn nu ${it.numero ? "on" : ""}" data-pick="numero"><span>${esc(it.numero ? "N° " + it.numero : "N°")}</span></button>
       </div>
-    </div>` : `<div class="irow3 dos${F.items.length > 3 ? " selc" : ""}" data-i="${i}">
+    </div>` : `<div class="irow3${F.items.length > 3 ? " selc" : ""}" data-i="${i}">
       <div class="r1">
-        ${pb("prenda", it.prenda, "Prenda")}
+        ${pb("etiqueta", isSub ? "" : it.etiqueta, "Etiqueta", "", isSub)}
+        ${pb("talla", it.talla, "Talla")}
         ${qtyHTML(it)}
       </div>
       <div class="r1">
-        ${pb("talla", it.talla, "Talla")}
+        ${pb("prenda", it.prenda, "Prenda")}
+        ${isSub ? pb("color", "", "Color", `<i class="sw0" style="${swatchStyle("full")}"></i>`, true) : pb("color", it.color, "Color", `<i class="sw0" style="${swatchStyle(hexOf(it.color))}"></i>`)}
         ${pb("horma", it.horma, "Horma")}
-      </div>
-      <div class="r1">
-        ${pb("color", it.color, "Color", `<i class="sw0" style="${swatchStyle(hexOf(it.color))}"></i>`)}
-        ${pb("etiqueta", it.etiqueta, "Etiqueta")}
       </div>
       <div class="r3">
         <input class="inp nm" data-fld="nombre" placeholder="Nombre" value="${esc(it.nombre || "")}">
