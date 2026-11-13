@@ -467,7 +467,7 @@ table.mx{border-collapse:collapse;width:100%;font-size:13px}
 .pkc i{width:30px;height:30px;border-radius:50%;border:1px solid #0002;display:block}
 .pkc[aria-pressed="true"]{border-color:var(--accent);box-shadow:0 0 0 2px var(--accent) inset;background:var(--accent-soft)}
 .pk.otro{width:100%;color:var(--muted)}
-.pkc.otro{width:calc(25% - 6px)}
+.pkc.otro{width:auto}
 .pkotro{display:flex;gap:8px}
 .pkotro[hidden]{display:none}
 
@@ -1165,7 +1165,7 @@ const updateDoc = (...a) => sinEsperar(fsUpdateDoc(...a));
 const deleteDoc = (...a) => sinEsperar(fsDeleteDoc(...a));
 const writeBatch = db => { const b = fsWriteBatch(db), c = b.commit.bind(b); b.commit = () => sinEsperar(c()); return b; };
 
-const VERSION = "v3.64";
+const VERSION = "v3.65";
 /* ================= Utilidades ================= */
 const $ = (s, r = document) => r.querySelector(s);
 const esc = s => String(s ?? "").replace(/[&<>"']/g, c => ({"&":"&amp;","<":"&lt;",">":"&gt;",'"':"&quot;","'":"&#39;"}[c]));
@@ -3019,13 +3019,23 @@ function pickPopup({title, kind, options, sections, current, otro, onPick}){
   const btn = o => kind === "color"
     ? `<button type="button" class="pkc" data-v="${esc(o.v)}" aria-pressed="${o.v === current}"><i style="${swatchStyle(o.h)}"></i><span>${esc(o.v)}</span></button>`
     : `<button type="button" class="pk ${kind === "talla" ? "sz" : ""}" data-v="${esc(o.v)}" aria-pressed="${o.v === current}">${esc(o.label || o.v)}</button>`;
-  const grid = list => `<div class="pkgrid ${kind}">${list.map(btn).join("")}</div>`;
-  const cuerpo = sections ? sections.map(s => `<div class="pksec">${esc(s.title)}</div>${grid(s.options)}`).join("") : grid(options);
+  // "Otro" va de último dentro de la misma cuadrícula y ocupa el espacio libre de la última fila
+  const otroBtn = otro ? `<button type="button" class="${kind === "color" ? "pkc" : "pk"} otro" id="pkOtro">${kind === "color" ? `<i style="${swatchStyle("")}"></i><span>Otro</span>` : "Otro…"}</button>` : "";
+  const grid = (list, extra) => `<div class="pkgrid ${kind}">${list.map(btn).join("")}${extra || ""}</div>`;
+  const cuerpo = sections ? sections.map((s, k) => `<div class="pksec">${esc(s.title)}</div>${grid(s.options, k === sections.length - 1 ? otroBtn : "")}`).join("") : grid(options, otroBtn);
   const pop = modal(`<div class="mh"><h2>${esc(title)}</h2><button class="ib" data-close>${I("x")}</button></div>
     <div class="mb">${cuerpo}
-      ${otro ? `<button type="button" class="${kind === "color" ? "pkc" : "pk"} otro" id="pkOtro">${kind === "color" ? `<i style="${swatchStyle("")}"></i><span>Otro</span>` : "Otro…"}</button>
-      <div class="pkotro" id="pkOtroBox" hidden><input class="inp" id="pkOtroIn" placeholder="Escribe cuál"><button type="button" class="btn primary" id="pkOtroOk">Usar</button></div>` : ""}
+      ${otro ? `<div class="pkotro" id="pkOtroBox" hidden><input class="inp" id="pkOtroIn" placeholder="Escribe cuál"><button type="button" class="btn primary" id="pkOtroOk">Usar</button></div>` : ""}
     </div>`, "sm pop pick");
+  // "Otro" rellena lo que queda libre de la última fila (o la fila completa si no queda espacio)
+  const ob = $("#pkOtro", pop);
+  const llenar = () => {
+    const g = ob.parentElement, t = getComputedStyle(g).gridTemplateColumns;
+    const cols = kind === "color" ? 4 : (t && t !== "none" ? t.split(" ").filter(Boolean).length : 0);
+    if (!cols) return requestAnimationFrame(llenar);
+    ob.style.gridColumn = `span ${cols - ((g.children.length - 1) % cols)}`;
+  };
+  if (ob) llenar();
   pop.querySelector(".mb").onclick = e => {
     const b = e.target.closest("[data-v]"); if (b) { pop.close(); onPick(b.dataset.v); return; }
     if (e.target.closest("#pkOtro")) { $("#pkOtroBox", pop).hidden = false; $("#pkOtro", pop).hidden = true; $("#pkOtroIn", pop).focus(); }
