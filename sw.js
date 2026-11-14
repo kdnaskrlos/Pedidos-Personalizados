@@ -1,8 +1,8 @@
 // Permite instalar la app y abrirla al instante, con o sin internet.
 // Los pedidos NO se guardan aquí: los maneja Firebase (con su propia caché sin conexión).
-const CACHE = "pedidos-v166";
+const CACHE = "pedidos-v167";
 const LIBS = "libs-v1"; // Firebase y la fuente: archivos con versión fija, se guardan una vez
-const SHELL = ["./", "./index.html", "./config.js", "./manifest.webmanifest", "./icono-192.png", "./icono-512.png"];
+const SHELL = ["./", "./index.html", "./config.js", "./manifest.webmanifest", "./icono-192.png", "./icono-512.png", "./icono-maskable-512.png", "./apple-touch-icon.png"];
 self.addEventListener("install", e => { e.waitUntil(caches.open(CACHE).then(c => c.addAll(SHELL.map(u => new Request(u, {cache:"reload"})))).then(() => self.skipWaiting())); });
 self.addEventListener("activate", e => { e.waitUntil(caches.keys().then(ks => Promise.all(ks.filter(k => k !== CACHE && k !== LIBS).map(k => caches.delete(k)))).then(() => self.clients.claim())); });
 self.addEventListener("fetch", e => {
