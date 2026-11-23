@@ -1150,6 +1150,7 @@ html,body{overflow-x:clip}
 
 <script type="module">
 import { firebaseConfig } from "./config.js";
+import { centavos, centavosHistoricos, cantidad, clavePrecio, precioHistorico, validarPago } from "./pagos.mjs";
 import { initializeApp, deleteApp } from "https://www.gstatic.com/firebasejs/10.12.2/firebase-app.js";
 import { getAuth, onAuthStateChanged, signInWithEmailAndPassword, createUserWithEmailAndPassword, signOut, updatePassword, reauthenticateWithCredential, EmailAuthProvider } from "https://www.gstatic.com/firebasejs/10.12.2/firebase-auth.js";
 import { initializeFirestore, getFirestore, persistentLocalCache, persistentMultipleTabManager, doc, collection, query, where, onSnapshot, getDoc, getDocFromCache, getDocs, setDoc as fsSetDoc, updateDoc as fsUpdateDoc, deleteDoc as fsDeleteDoc, writeBatch as fsWriteBatch, runTransaction } from "https://www.gstatic.com/firebasejs/10.12.2/firebase-firestore.js";
@@ -1181,22 +1182,17 @@ const fmtDate = s => { if (!s) return ""; const d = parseYmd(s); return `${DIAS[
 // Hora en formato de 12 horas: 3:05 pm
 const hora12 = d => { const h = d.getHours(); return `${h % 12 || 12}:${pad(d.getMinutes())} ${h < 12 ? "am" : "pm"}`; };
 const fmtDT = iso => { if (!iso) return ""; const d = new Date(iso); return `${pad(d.getDate())}/${pad(d.getMonth()+1)}/${d.getFullYear()} ${hora12(d)}`; };
-// Lee montos escritos como 50000, 50.000, 50.000,50 o 12.5
-const num = v => {
-  if (typeof v === "number") return isFinite(v) ? v : 0;
-  let s = String(v ?? "").replace(/\s/g, "");
-  if (s.includes(",")) s = s.replace(/\./g, "").replace(",", ".");
-  else if (/^-?\d{1,3}(\.\d{3})+$/.test(s)) s = s.replace(/\./g, "");
-  const n = parseFloat(s); return isFinite(n) ? n : 0;
+// El formato de edición usa punto de miles y coma decimal.
+const fmtMonto = v => {
+  const texto = String(v ?? "").trim(), n = centavos(v);
+  return n === null ? texto : new Intl.NumberFormat("es-VE", {maximumFractionDigits:2, useGrouping:"always"}).format(n / 100);
 };
-// Montos: se escriben sin puntos y al terminar se muestran como 50.000
-const fmtMonto = v => { const s = String(v ?? "").trim(); if (!s) return ""; const n = num(s); return n ? new Intl.NumberFormat("es-VE", {maximumFractionDigits:2, useGrouping:"always"}).format(n) : s; };
 document.addEventListener("focusout", e => { const t = e.target; if (!t.classList || !t.classList.contains("monto")) return; const f = fmtMonto(t.value); if (f !== t.value) { t.value = f; t.dispatchEvent(new Event("input", {bubbles:true})); } });
 const norm = s => String(s||"").toLowerCase().normalize("NFD").replace(/[̀-ͯ]/g, "");
 function money(v, mon){
   const n = Number(v) || 0;
   if (mon === "Bs") return "Bs " + n.toLocaleString("es-VE", {minimumFractionDigits:2, maximumFractionDigits:2});
-  if (mon === "COP") return "COP " + n.toLocaleString("es-CO", {maximumFractionDigits:0});
+  if (mon === "COP") return "COP " + n.toLocaleString("es-CO", {maximumFractionDigits:2});
   return "$ " + n.toLocaleString("en-US", {minimumFractionDigits:2, maximumFractionDigits:2});
 }
 function toast(msg, bad){ if (bad && S.me && S.me.rol !== "admin" && /permission|permiso|denied|denegado/i.test(String(msg))) { console.warn("aviso oculto:", msg); return; } document.querySelectorAll(".toast").forEach(x => x.remove()); const t = document.createElement("div"); t.className = "toast" + (bad ? " bad" : ""); t.textContent = msg; document.body.appendChild(t); setTimeout(() => t.remove(), bad ? 4500 : 2500); }
@@ -1967,32 +1963,44 @@ function dueTag(p){
 const itemLine = i => `${i.prenda} ${i.color} ${i.talla}${i.nombre ? " — " + i.nombre : ""}${i.numero ? " #" + i.numero : ""}`;
 function grupos(p){
   const g = {};
-  (p.items || []).forEach(i => { const k = `${i.prenda} ${i.color}${i.horma ? " (" + i.horma + ")" : ""}`; g[k] = g[k] || {}; g[k][i.talla] = (g[k][i.talla] || 0) + (i.cant || 1); });
+  (p.items || []).forEach(i => { const k = `${i.prenda} ${i.color}${i.horma ? " (" + i.horma + ")" : ""}`; g[k] = g[k] || {}; g[k][i.talla] = (g[k][i.talla] || 0) + unidadesDe(i, p); });
   return Object.entries(g).map(([k, t]) => `${k}: ${Object.entries(t).map(([s, n]) => `${s}×${n}`).join(", ")}`);
 }
 function servsDe(p){ return Array.isArray(p.servicios) ? [...p.servicios] : p.servicio ? String(p.servicio).split(", ").filter(Boolean) : []; }
 // Tallas 2XL en adelante ("Unisex Plus") llevan su propio precio
-const esPlusTxt = t => /^([2-9])\s*XL$|^X{2,}L$/i.test(String(t || "").trim());
+const esPlusTxt = t => /^(?:(?:[2-9]|[1-9]\d+)\s*XL|X{2,}L)$/i.test(String(t || "").trim());
 const esPlus = t => { const v = String(t || "").trim(); return !!v && cfg().cat.tallasPlus.includes(v); };
-// Niño y Niña comparten el mismo precio
-const hormaPrecio = h => /^niñ[oa]s?$/i.test(String(h || "").trim()) ? "Niño/Niña" : h;
-const prKey = i => i.prenda ? [i.prenda, hormaPrecio(i.horma), esPlus(i.talla) ? i.talla : ""].filter(Boolean).join(" · ") : "";
-function precioDe(p, prenda){
-  if (p.pr) return num(p.pr[prenda]);
-  if (Array.isArray(p.precios)) {
-    // Busca el precio exacto; si es un pedido viejo, el de la misma prenda sin talla u horma
-    const partes = String(prenda).split(" · ");
-    const busca = k => p.precios.find(z => z.n === k || (k.includes("Niño/Niña") && (z.n === k.replace("Niño/Niña", "Niño") || z.n === k.replace("Niño/Niña", "Niña"))));
-    for (let n = partes.length; n > 0; n--) { const x = busca(partes.slice(0, n).join(" · ")); if (x) return num(x.v); }
+const prKey = (i, p) => clavePrecio(i, cfg().cat.tallasPlus, Array.isArray(p?.precios) ? p.precios : []);
+const precioMenor = (p, clave) => p.pr ? (centavos(p.pr[clave]) ?? 0) : precioHistorico(p, clave);
+const precioDe = (p, clave) => precioMenor(p, clave) / 100;
+const unidadesDe = (i, p) => cantidad(i.cant) ?? (p.pr ? 0 : 1);
+const importeLinea = (p, i) => unidadesDe(i, p) * precioMenor(p, prKey(i, p)) / 100;
+function prendasDe(p){
+  const grupos = Object.create(null);
+  for (const i of (p.items || [])) {
+    const k = prKey(i, p);
+    if (k) grupos[k] = (grupos[k] || 0) + unidadesDe(i, p);
   }
-  return num(p.precio);
+  return grupos;
 }
-function prendasDe(p){ const g = {}; (p.items || []).forEach(i => { const k = prKey(i); if (k) g[k] = (g[k] || 0) + (Number(i.cant) || 1); }); return g; }
 function totales(p){
-  const piezas = (p.items || []).reduce((s, i) => s + (Number(i.cant) || 1), 0);
-  const total = (p.items || []).reduce((s, i) => s + (Number(i.cant) || 1) * precioDe(p, prKey(i)), 0);
-  return {piezas, total, abono:num(p.abono), saldo:Math.max(0, total - num(p.abono))};
+  let piezas = 0, total = 0;
+  for (const i of (p.items || [])) {
+    const unidades = unidadesDe(i, p);
+    piezas += unidades;
+    total += unidades * precioMenor(p, prKey(i, p));
+  }
+  const abono = centavosHistoricos(p.abono);
+  return {piezas, total:total / 100, abono:abono / 100, saldo:(total - abono) / 100};
 }
+const pagoDelFormulario = () => validarPago(F.items.filter(i => !itemVacio(i)), i => F.pr[prKey(i)], F.abono, F.moneda);
+const erroresPago = {
+  precio:"Escribe un precio positivo de hasta dos decimales por prenda",
+  total:"El total supera el importe permitido",
+  abono:"Escribe un abono no negativo de hasta dos decimales",
+  sobrepago:"El abono no puede ser mayor que el total",
+  moneda:"Elige una moneda válida"
+};
 function dueShort(p){
   if (p.estado === "entregado") return {t:"Entregado", c:"ok"};
   if (p.estado === "listo") return p.avisado ? {t:"Sin retirar", c:"vio"} : {t:"Por avisar", c:"info"};
@@ -2789,8 +2797,8 @@ function openForm(id, tipo, cliente, borrador){
   F.imagenes = (F.imagenes || []).map(id => ({id}));
   F.servicios = servsDe(F);
   const prBorr = borrador && !orig && borrador.pr ? Object.assign({}, borrador.pr) : null;
-  { const pr = {}; delete F.pr; (F.items || []).forEach(i => { const k = prKey(i); if (k && pr[k] === undefined) { const v = precioDe(F, k); pr[k] = v ? String(v) : ""; } }); F.pr = pr; }
-  if (prBorr) F.pr = Object.assign(F.pr, prBorr);
+  { const pr = Object.create(null); delete F.pr; (F.items || []).forEach(i => { const k = prKey(i, F); if (k && pr[k] === undefined) { const v = precioDe(F, k); pr[k] = v ? String(v) : ""; } }); F.pr = pr; }
+  if (prBorr) Object.assign(F.pr, prBorr);
   const pasoBorr = prBorr || borrador ? Math.min(3, Number(borrador.step) || 0) : 0;
   F.step = 0; F.visto = [true, false, false, false];
   const marcas = c.cat.marcas.includes(F.etiqueta) || !F.etiqueta ? c.cat.marcas : [...c.cat.marcas, F.etiqueta];
@@ -2838,8 +2846,8 @@ function openForm(id, tipo, cliente, borrador){
         <div class="fsec"><div class="sec">${I("cash")}Pago</div>
           <div class="f" id="f-precio"><label>Precio por unidad <span class="req">*</span></label><div class="prl" id="prl"></div><span class="msg"></span></div>
           <div class="g2 keep">
-            <div class="f"><label>Moneda</label><select class="inp" id="in-mon">${["COP","USD","Bs"].map(m => `<option ${F.moneda === m ? "selected" : ""}>${m}</option>`).join("")}</select></div>
-            <div class="f" id="f-abono"><label>Abono</label><input class="inp monto" id="in-abono" inputmode="decimal" value="${esc(fmtMonto(F.abono))}"></div>
+            <div class="f" id="f-moneda"><label>Moneda</label><select class="inp" id="in-mon">${["COP","USD","Bs"].map(m => `<option ${F.moneda === m ? "selected" : ""}>${m}</option>`).join("")}</select><span class="msg"></span></div>
+            <div class="f" id="f-abono"><label>Abono</label><input class="inp monto" id="in-abono" inputmode="decimal" value="${esc(fmtMonto(F.abono))}"><span class="msg"></span></div>
           </div>
           <span class="msg" id="pago-msg"></span>
           <div class="f" id="f-motivo"><label>Motivo por el que no hay abono</label><input class="inp" id="in-motivo" value="${esc(F.motivoSinAbono || "")}"><span class="msg"></span></div>
@@ -2919,9 +2927,9 @@ function openForm(id, tipo, cliente, borrador){
 
   $("#in-tema", ov).oninput = e => { mayus(e.target, true); F.tema = e.target.value; clearErr("f-tema"); };
   $("#in-nota", ov).oninput = e => F.nota = e.target.value;
-  $("#in-mon", ov).onchange = e => { F.moneda = e.target.value; renderTotals(); };
+  $("#in-mon", ov).onchange = e => { F.moneda = e.target.value; clearErr("f-moneda"); renderTotals(); };
   $("#prl", ov).oninput = e => { const x = e.target.closest("[data-pr]"); if (!x) return; F.pr[x.dataset.pr] = x.value; x.classList.remove("bad"); if (!erroresPaso(2).some(z => z[0] === "f-precio")) clearErr("f-precio"); renderTotals(); };
-  $("#in-abono", ov).oninput = e => { F.abono = e.target.value; renderTotals(); };
+  $("#in-abono", ov).oninput = e => { F.abono = e.target.value; clearErr("f-abono"); renderTotals(); };
   $("#in-motivo", ov).oninput = e => { F.motivoSinAbono = e.target.value; clearErr("f-motivo"); };
   ov.addEventListener("click", e => {
     const b = e.target.closest("[data-servicio],[data-prendade],[data-urg],[data-deny]"); if (!b) return;
@@ -2979,12 +2987,13 @@ function erroresPaso(i){
     const incompl = F.items.findIndex(x => !itemVacio(x) && (reqItem().some(f => !x[f])));
     if (!llenas.length) e.push(["f-items", "Agrega una prenda"]);
     else if (incompl >= 0) e.push(["f-items", "Completa lo marcado en rojo"]);
+    else if (llenas.some(x => cantidad(x.cant) === null)) e.push(["f-items", "Las unidades deben ser un entero positivo"]);
   }
   if (i === 2) {
     if (!F.fechaEntrega) e.push(["f-fecha", "Elige la fecha"]);
-    const prs = Object.keys(prendasDe(F));
-    if (!prs.length) e.push(["f-precio", "Agrega prendas primero"]);
-    else if (prs.some(k => !(num(F.pr[k]) > 0))) e.push(["f-precio", "Falta un precio"]);
+    const {error} = pagoDelFormulario();
+    const campo = {precio:"f-precio", total:"f-precio", abono:"f-abono", sobrepago:"f-abono", moneda:"f-moneda"}[error];
+    if (campo) e.push([campo, erroresPago[error]]);
   }
   if (i === 3 && F.imagenes.some(x => x.subiendo)) e.push(["", "Espera las imágenes"]);
   return e;
@@ -2993,7 +3002,7 @@ function marcarErrores(errs){
   const ov = F._ov;
   if (errs.some(([id]) => id === "f-tel")) { const t = F._checkTel(); $("#f-tel", ov).classList.add("err"); $("#tel-msg", ov).innerHTML = `<span class="ti bad">${I("alert")}${esc(t.msg)}</span>`; $("#tel-msg", ov)._h = null; }
   if (errs.some(([id]) => id === "f-items")) marcarFilas();
-  if (errs.some(([id]) => id === "f-precio")) ov.querySelectorAll("#prl [data-pr]").forEach(x => x.classList.toggle("bad", !(num(F.pr[x.dataset.pr]) > 0)));
+  if (errs.some(([id]) => id === "f-precio")) ov.querySelectorAll("#prl [data-pr]").forEach(x => x.classList.toggle("bad", !(centavos(F.pr[x.dataset.pr]) > 0)));
   errs.forEach(([id, msg]) => {
     const el = id && $("#" + id, ov); if (!el) return;
     el.classList.add("err");
@@ -3086,10 +3095,10 @@ function quitarPrenda(n, wrap, deslizado, luego){
   wrap.animate([{height:h + "px", marginBottom:mb}, {height:"0px", marginBottom:"0px"}], {duration:240, delay:deslizado ? 0 : 110, easing:"cubic-bezier(.4,0,.2,1)", fill:"forwards"}).onfinish = fin;
 }
 function cambiarAbierta(n){ animarPrendas(() => { F.iOpen = n; renderItems(); }); }
-const qtyHTML = it => `<div class="qty">${it.cant === 1 ? `<button type="button" class="del" data-del title="Quitar">${I("trash")}</button>` : `<button type="button" data-q="-1">−</button>`}<input class="qin" type="text" inputmode="numeric" pattern="[0-9]*" data-cant value="${it.cant || 1}" placeholder="1" aria-label="Unidades"><button type="button" data-q="1">+</button></div>`;
+const qtyHTML = it => `<div class="qty">${cantidad(it.cant) === 1 ? `<button type="button" class="del" data-del title="Quitar">${I("trash")}</button>` : `<button type="button" data-q="-1">−</button>`}<input class="qin" type="text" inputmode="numeric" pattern="[0-9]*" data-cant value="${esc(it.cant ?? "")}" aria-label="Unidades"><button type="button" data-q="1">+</button></div>`;
 function renderItems(){
   const ov = F._ov, c = cfg().cat;
-  const box = $("#items", ov), n = F.items.filter(i => !itemVacio(i)).reduce((s, i) => s + (Number(i.cant) || 1), 0);
+  const box = $("#items", ov), n = F.items.filter(i => !itemVacio(i)).reduce((s, i) => s + unidadesDe(i, F), 0);
   $("#itcount", ov).textContent = n ? `${n} pieza${n > 1 ? "s" : ""}` : "";
   const hexOf = name => (c.colores.find(x => x[0] === name) || [])[1] || "";
   const isSub = F.tipo === "sublimacion";
@@ -3133,22 +3142,20 @@ function renderItems(){
     if (row.hasAttribute("data-abrir")) { cambiarAbierta(Number(row.dataset.i)); const r = box.querySelector(`[data-i="${F.iOpen}"]`); if (r) setTimeout(() => r.scrollIntoView({behavior:"smooth", block:"nearest"}), 290); return; }
     const n = Number(row.dataset.i), it = F.items[n], t = e.target.closest("button"); if (!t) return;
     if (t.dataset.pick) return elegir(it, t.dataset.pick);
-    if (t.dataset.q) { it.cant = Math.max(1, it.cant + Number(t.dataset.q)); renderItems(); renderTotals(); }
+    if (t.dataset.q) { it.cant = Math.min(Number.MAX_SAFE_INTEGER, Math.max(1, (cantidad(it.cant) ?? 1) + Number(t.dataset.q))); renderItems(); renderTotals(); }
     if (t.hasAttribute("data-del")) { const quitado = F.items[n]; quitarPrenda(n, row.closest(".iswipe") || row, false, () => toastUndo("Prenda eliminada", async () => { if (!F) return; animarPrendas(() => { F.items.splice(n, 0, quitado); renderItems(); }); renderTotals(); })); }
   };
   box.oninput = e => {
     const row = e.target.closest("[data-i]"); if (!row) return;
     const it = F.items[Number(row.dataset.i)], f = e.target.dataset.fld;
     if (f === "nombre") it.nombre = e.target.value;
-    if (e.target.hasAttribute("data-cant")) { e.target.value = e.target.value.replace(/\D/g, "").slice(0, 4); const n = parseInt(e.target.value) || 0; if (n > 0) { it.cant = n; renderTotals(); } }
+    if (e.target.hasAttribute("data-cant")) {
+      it.cant = e.target.value;
+      e.target.classList.toggle("bad", cantidad(it.cant) === null);
+      renderTotals();
+    }
   };
-  const onIn = e => { if (e.target.hasAttribute("data-cant")) { e.target.placeholder = ""; e.target.value = ""; } };
-  const onOut = e => {
-    if (!e.target.hasAttribute("data-cant")) return;
-    const row = e.target.closest("[data-i]"), it = F.items[Number(row.dataset.i)];
-    it.cant = Math.max(1, parseInt(e.target.value) || Number(it.cant) || 1); renderItems(); renderTotals();
-  };
-  if (!box._qbound) { box._qbound = true; box.addEventListener("focusin", onIn); box.addEventListener("focusout", onOut); deslizarBorrar(box); }
+  if (!box._qbound) { box._qbound = true; deslizarBorrar(box); }
   // Si había un aviso en rojo de las prendas, se vuelve a revisar: desaparece cuando ya no aplica
   const fi = $("#f-items", ov);
   if (fi && fi.classList.contains("err")) {
@@ -3258,9 +3265,10 @@ function elegirMarca(){
 }
 function marcarFilas(){
   const box = $("#items", F._ov);
-  if (F.items.length > 3) { const k = F.items.findIndex(it => !itemVacio(it) && reqItem().some(f => !it[f])); if (k >= 0 && k !== F.iOpen) { F.iOpen = k; renderItems(); } }
+  if (F.items.length > 3) { const k = F.items.findIndex(it => !itemVacio(it) && (reqItem().some(f => !it[f]) || cantidad(it.cant) === null)); if (k >= 0 && k !== F.iOpen) { F.iOpen = k; renderItems(); } }
   F.items.forEach((it, i) => {
     if (itemVacio(it) && F.items.length > 1) return;
+    if (cantidad(it.cant) === null) box.querySelector(`[data-i="${i}"] [data-cant]`)?.classList.add("bad");
     reqItem().forEach(f => { if (!it[f]) box.querySelector(`[data-i="${i}"] [data-err="${f}"]`)?.classList.add("bad"); });
   });
 }
@@ -3268,13 +3276,16 @@ function renderPrecios(){
   const box = $("#prl", F._ov); if (!box) return;
   const g = prendasDe(F), ks = Object.keys(g);
   ks.forEach(k => { if (F.pr[k] === undefined) F.pr[k] = ""; });
-  box.innerHTML = ks.length ? ks.map(k => `<div class="prrow"><span class="prn"><b>${esc(k.split(" · ")[0])}</b><small>${k.includes(" · ") ? esc(k.split(" · ").slice(1).join(" · ").replace("Niño/Niña", [...new Set((F.items || []).filter(i => prKey(i) === k).map(i => i.horma))].join(" y "))) + " · " : ""}${g[k]} pieza${g[k] === 1 ? "" : "s"}</small></span><input class="inp num monto${F._prShow && !(num(F.pr[k]) > 0) ? " bad" : ""}" data-pr="${esc(k)}" inputmode="decimal" value="${esc(fmtMonto(F.pr[k]))}"></div>`).join("") : `<div class="prempty">Agrega prendas en el paso anterior</div>`;
+  box.innerHTML = ks.length ? ks.map(k => `<div class="prrow"><span class="prn"><b>${esc(k.split(" · ")[0])}</b><small>${k.includes(" · ") ? esc(k.split(" · ").slice(1).join(" · ").replace("Niño/Niña", [...new Set((F.items || []).filter(i => prKey(i) === k).map(i => i.horma))].join(" y "))) + " · " : ""}${g[k]} pieza${g[k] === 1 ? "" : "s"}</small></span><input class="inp num monto${F._prShow && !(centavos(F.pr[k]) > 0) ? " bad" : ""}" data-pr="${esc(k)}" inputmode="decimal" value="${esc(fmtMonto(F.pr[k]))}"></div>`).join("") : `<div class="prempty">Agrega prendas en el paso anterior</div>`;
 }
 function renderTotals(){
-  const t = totales(F), ab = num(F.abono);
-  $("#totals", F._ov).innerHTML = `<div class="tot"><small>Total</small><b class="num">${esc(money(t.total, F.moneda))}</b></div><div class="tot"><small>Saldo</small><b class="num" style="color:${t.saldo > 0 ? "var(--err)" : "var(--ok)"}">${esc(money(t.saldo, F.moneda))}</b></div>`;
+  const t = totales(F), ab = centavos(F.abono);
+  const {error} = pagoDelFormulario();
+  const saldo = ["abono","total"].includes(error) ? "—" : money(t.saldo, F.moneda);
+  $("#totals", F._ov).innerHTML = `<div class="tot"><small>Total</small><b class="num">${esc(error === "total" ? "—" : money(t.total, F.moneda))}</b></div><div class="tot"><small>Saldo</small><b class="num" style="color:${t.saldo !== 0 ? "var(--err)" : "var(--ok)"}">${esc(saldo)}</b></div>`;
   const m = $("#pago-msg", F._ov);
-  if (ab > t.total && t.total > 0) { m.className = "msg warn"; m.textContent = "⚠ El abono es mayor que el total"; } else m.textContent = "";
+  m.className = "msg warn";
+  m.textContent = ["abono","sobrepago","total"].includes(error) ? erroresPago[error] : "";
   $("#f-motivo", F._ov).hidden = ab > 0;
 }
 function renderImgs(){
@@ -3374,13 +3385,17 @@ async function saveForm(ov, orig){
     avisarSinCampo(todos[primero]);
     return;
   }
-  const tel = F._checkTel(), isP = F.tipo === "personalizado";
+  const tel = F._checkTel(), isP = F.tipo === "personalizado", pago = pagoDelFormulario();
+  const precios = Object.keys(prendasDe(F)).map(k => ({n:k, v:centavos(F.pr[k]) / 100}));
+  const unitarios = new Set(precios.map(p => p.v));
   const now = new Date().toISOString(), nombre = F.cliente.nombre.trim().replace(/\s+/g, " "), pr = perm();
   const data = {
     cliente:{nombre, telefono:tel.e164}, tema:(F.tema || "").trim(), servicio:isP ? F.servicios.join(", ") : "", servicios:isP ? [...F.servicios] : [], prendaDe:isP ? F.prendaDe : "tienda",
     etiqueta:isP ? [...new Set(F.items.filter(i => !itemVacio(i)).map(i => i.etiqueta).filter(Boolean))].join(", ") : "",
-    items:F.items.filter(i => !itemVacio(i)).map(i => ({etiqueta:isP ? (i.etiqueta || "") : "", prenda:i.prenda, color:isP ? i.color : "Fullprint", horma:i.horma || "", talla:i.talla, cant:Number(i.cant) || 1, nombre:(i.nombre || "").trim(), numero:(i.numero || "").trim()})),
-    fechaEntrega:F.fechaEntrega, precios:Object.keys(prendasDe(F)).map(k => ({n:k, v:num(F.pr[k])})), precio:(() => { const v = [...new Set(Object.keys(prendasDe(F)).map(k => num(F.pr[k])))]; return v.length === 1 ? v[0] : 0; })(), moneda:F.moneda, abono:num(F.abono), motivoSinAbono:num(F.abono) > 0 ? "" : (F.motivoSinAbono || "").trim(), urgente:!!F.urgente,
+    items:F.items.filter(i => !itemVacio(i)).map(i => ({etiqueta:isP ? (i.etiqueta || "") : "", prenda:i.prenda, color:isP ? i.color : "Fullprint", horma:i.horma || "", talla:i.talla, cant:cantidad(i.cant), nombre:(i.nombre || "").trim(), numero:(i.numero || "").trim()})),
+    fechaEntrega:F.fechaEntrega, precios, precio:unitarios.size === 1 ? precios[0].v : 0,
+    moneda:F.moneda, abono:pago.abono / 100, pagoVersion:1, totalMenor:pago.total, abonoMenor:pago.abono,
+    motivoSinAbono:pago.abono > 0 ? "" : (F.motivoSinAbono || "").trim(), urgente:!!F.urgente,
     imagenes:F.imagenes.filter(i => i.id && !i.error).map(i => i.id), nota:(F.nota || "").trim(),
     editadoEn:now, editadoPor:S.me.usuario
   };
@@ -3400,8 +3415,8 @@ async function saveForm(ov, orig){
     // Avisar al administrador qué cambió un empleado
     const J = x => JSON.stringify(x === undefined ? null : x);
     const campos = [["Cliente", o => [o.cliente && o.cliente.nombre, o.cliente && o.cliente.telefono]], ["Diseño", o => o.tema], ["Estampado", o => o.servicio], ["Quién pone la prenda", o => o.prendaDe],
-      ["Prendas", o => (o.items || []).map(i => [i.etiqueta, i.prenda, i.color, i.horma, i.talla, Number(i.cant) || 1, i.nombre || "", i.numero || ""])], ["Fecha de entrega", o => o.fechaEntrega],
-      ["Precios", o => (o.items || []).map(i => precioDe(o, prKey(i)))], ["Pago", o => [num(o.abono), o.moneda]], ["Urgente", o => !!o.urgente], ["Referencias", o => o.imagenes || []], ["Nota", o => (o.nota || "").trim()]];
+      ["Prendas", o => (o.items || []).map(i => [i.etiqueta, i.prenda, i.color, i.horma, i.talla, unidadesDe(i, o), i.nombre || "", i.numero || ""])], ["Fecha de entrega", o => o.fechaEntrega],
+      ["Precios", o => (o.items || []).map(i => precioDe(o, prKey(i, o)))], ["Pago", o => [centavosHistoricos(o.abono), o.moneda]], ["Urgente", o => !!o.urgente], ["Referencias", o => o.imagenes || []], ["Nota", o => (o.nota || "").trim()]];
     const cambios = campos.filter(([, f]) => J(f(orig)) !== J(f(data))).map(([n]) => n);
     if (cambios.length) Object.assign(data, {revisar:true, revisarCambios:[...new Set([...(orig.revisar ? orig.revisarCambios || [] : []), ...cambios])], revisarPor:S.me.usuario, revisarEn:now});
   }
@@ -3426,10 +3441,10 @@ async function saveForm(ov, orig){
 /* ================= Detalle ================= */
 function waLink(p, plantilla){
   const c = cfg(), t = totales(p), pz = {};
-  (p.items || []).forEach(i => pz[i.prenda] = (pz[i.prenda] || 0) + (i.cant || 1));
+  (p.items || []).forEach(i => pz[i.prenda] = (pz[i.prenda] || 0) + unidadesDe(i, p));
   const resumen = Object.entries(pz).map(([k, n]) => `${n} ${k}`).join(", ");
   const msg = (plantilla || c.plantilla).replace(/\{cliente\}/g, (p.cliente.nombre || "").split(" ")[0]).replace(/\{negocio\}/g, c.negocio).replace(/\{codigo\}/g, p.codigo).replace(/\{resumen\}/g, resumen)
-    .replace(/\{saldo\}/g, t.saldo > 0 ? money(t.saldo, p.moneda) : "ninguno, ¡ya está pagado!").replace(/\{total\}/g, money(t.total, p.moneda)).replace(/\{fecha\}/g, fmtDate(p.fechaEntrega));
+    .replace(/\{saldo\}/g, t.saldo < 0 ? `sobrepago de ${money(-t.saldo, p.moneda)}` : t.saldo > 0 ? money(t.saldo, p.moneda) : "ninguno, ¡ya está pagado!").replace(/\{total\}/g, money(t.total, p.moneda)).replace(/\{fecha\}/g, fmtDate(p.fechaEntrega));
   return `https://wa.me/${p.cliente.telefono}?text=${encodeURIComponent(msg)}`;
 }
 function resumenTexto(p){
@@ -3442,7 +3457,7 @@ function resumenTexto(p){
 }
 function tallyTable(p){
   const c = cfg().cat, order = [...c.tallasAdulto, ...c.tallasPlus, ...c.tallasNino], g = {}, ts = new Set();
-  (p.items || []).forEach(i => { const k = `${i.prenda} ${i.color}${i.horma ? " · " + i.horma : ""}`; g[k] = g[k] || {}; g[k][i.talla] = (g[k][i.talla] || 0) + (i.cant || 1); ts.add(i.talla); });
+  (p.items || []).forEach(i => { const k = `${i.prenda} ${i.color}${i.horma ? " · " + i.horma : ""}`; g[k] = g[k] || {}; g[k][i.talla] = (g[k][i.talla] || 0) + unidadesDe(i, p); ts.add(i.talla); });
   const ix = t => order.indexOf(t) < 0 ? 999 : order.indexOf(t);
   const tl = [...ts].sort((a, b) => ix(a) - ix(b));
   return `<div class="gridwrap"><table class="tally"><thead><tr><th>Prenda</th>${tl.map(t => `<th>${esc(t)}</th>`).join("")}<th>Total</th></tr></thead><tbody>${Object.entries(g).map(([k, r]) => `<tr><td>${esc(k)}</td>${tl.map(t => `<td class="num">${r[t] || ""}</td>`).join("")}<td class="num"><b>${Object.values(r).reduce((a, b) => a + b, 0)}</b></td></tr>`).join("")}</tbody></table></div>`;
@@ -3476,13 +3491,14 @@ function openDetail(id){
         ${extra.length ? `<div class="pdextra">${extra.map(x => `<span>${esc(x)}</span>`).join("")}</div>` : ""}
         <hr>
         <div class="pdrow"><span class="pdlbl">PRENDAS</span><span class="pdmut">${t.piezas} ${t.piezas === 1 ? "pieza" : "piezas"}</span></div>
-        <ul class="pdit">${(p.items || []).map(i => { const sub = [i.talla ? "Talla " + i.talla : "", i.horma, i.etiqueta, i.nombre, i.numero ? "N° " + i.numero : ""].filter(Boolean); return `<li><span class="q num">${i.cant}</span><span class="d"><b>${esc(i.prenda)} ${esc(i.color.toLowerCase())}</b>${sub.length ? `<small>${esc(sub.join(" · "))}</small>` : ""}</span><span class="pr num">${esc(money((Number(i.cant) || 1) * precioDe(p, prKey(i)), p.moneda))}</span></li>`; }).join("")}</ul>
+        <ul class="pdit">${(p.items || []).map(i => { const sub = [i.talla ? "Talla " + i.talla : "", i.horma, i.etiqueta, i.nombre, i.numero ? "N° " + i.numero : ""].filter(Boolean); return `<li><span class="q num">${esc(unidadesDe(i, p))}</span><span class="d"><b>${esc(i.prenda)} ${esc(i.color.toLowerCase())}</b>${sub.length ? `<small>${esc(sub.join(" · "))}</small>` : ""}</span><span class="pr num">${esc(money(importeLinea(p, i), p.moneda))}</span></li>`; }).join("")}</ul>
       </div>
       <div class="pdcard">
         <div class="pdrow"><span class="pdlbl ic">${I("cash")}PAGO</span></div>
         <hr>
         <div class="pdrow"><b class="pdtl">Total</b><b class="pdtot num">${esc(money(t.total, p.moneda))}</b></div>
-        <div class="pdpay"><div class="ab"><small>ABONO</small><b class="num">${esc(money(t.abono, p.moneda))}</b></div><div class="sa ${t.saldo > 0 ? "" : "ok"}"><small>SALDO</small><b class="num">${esc(money(t.saldo, p.moneda))}</b></div></div>
+        <div class="pdpay"><div class="ab"><small>ABONO</small><b class="num">${esc(money(t.abono, p.moneda))}</b></div><div class="sa ${t.saldo !== 0 ? "" : "ok"}"><small>SALDO</small><b class="num">${esc(money(t.saldo, p.moneda))}</b></div></div>
+        ${t.saldo < 0 ? `<p class="msg warn">El abono supera el total.</p>` : ""}
         ${p.motivoSinAbono ? `<p class="pdmut"><b>Sin abono:</b> ${esc(p.motivoSinAbono)}</p>` : ""}
       </div>
       ${(p.imagenes || []).length ? `<div class="pdcard"><div class="pdlbl">REFERENCIAS</div><div class="imgs">${p.imagenes.map(im => `<div class="imgbox"><img data-foto="${esc(im)}" alt=""></div>`).join("")}</div></div>` : ""}
