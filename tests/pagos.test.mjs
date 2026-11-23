@@ -1,6 +1,6 @@
 import assert from "node:assert/strict";
 import { test } from "node:test";
-import { cantidad, centavos, clavePrecio, precioHistorico, validarPago, validarPagoEnCentavos, actualizarPagoPendiente } from "../pagos.mjs";
+import { MAX_PARTIDAS, cantidad, centavos, clavePrecio, precioHistorico, validarPago, validarPagoEnCentavos, actualizarPagoPendiente } from "../pagos.mjs";
 
 test("lee montos completos y conserva dos decimales", () => {
   for (const [valor, esperado] of [
@@ -57,10 +57,11 @@ test("lee precios históricos por prenda y horma sin modificar el pedido", () =>
   assert.equal(JSON.stringify(pedido), antes);
 });
 
-test("valida todas las partidas de un pedido grande y conserva el abono", () => {
+test("valida pedidos en centavos hasta el límite compartido y conserva el abono", () => {
   const partida = {cant:3,precioMenor:111};
-  const partes = Array.from({length:200}, () => partida);
-  assert.equal(validarPagoEnCentavos(partes, 5, "COP").saldo, 200 * 333 - 5);
+  const partes = Array.from({length:MAX_PARTIDAS}, () => partida);
+  assert.equal(validarPagoEnCentavos(partes, 5, "COP").saldo, MAX_PARTIDAS * 333 - 5);
+  assert.equal(validarPagoEnCentavos([...partes,partida], 5, "COP").error, "partidas");
   assert.equal(validarPagoEnCentavos([partida,{cant:2,precioMenor:11.5}], 0, "USD").error, "precio");
 });
 
@@ -77,7 +78,5 @@ test("actualiza un envío pendiente del formato anterior sin cambiar total, sald
   assert.equal(actualizado.abonoMenor,25);
   assert.deepEqual(actualizado.imagenes,["foto"]);
   assert.equal(anterior.pagoVersion,1);
-  const grande = {...anterior, items:Array.from({length:12}, () => anterior.items[0]), totalMenor:12 * 2022};
-  assert.equal(actualizarPagoPendiente(grande, i => clavePrecio(i)).items.length,12);
   assert.throws(() => actualizarPagoPendiente({...anterior,totalMenor:0}, i => clavePrecio(i)), {code:"pago-pendiente"});
 });

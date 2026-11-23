@@ -9,7 +9,5 @@
       ]
     }
   ],
-  "fieldOverrides": [
-    {"collectionGroup": "validacionesPago", "fieldPath": "items", "indexes": []}
-  ]
+  "fieldOverrides": []
 }

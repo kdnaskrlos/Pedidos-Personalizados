@@ -1150,9 +1150,9 @@ html,body{overflow-x:clip}
 
 <script type="module">
 import { firebaseConfig } from "./config.js";
-import { consecutivoDe, documentosFoto, registrarPedido, necesitaValidacionPago, prepararValidacionPago, encolarValidacionPago } from "./pedidos-sync.mjs";
+import { consecutivoDe, documentosFoto, registrarPedido } from "./pedidos-sync.mjs";
 import { guardarPendiente, leerPendientes, borrarPendiente, guardarFotoLocal, leerFotoLocal, borrarFotoLocal } from "./cola-local.mjs";
-import { centavos, centavosHistoricos, cantidad, clavePrecio, precioHistorico, validarPago, validarPagoEnCentavos, actualizarPagoPendiente } from "./pagos.mjs";
+import { MAX_PARTIDAS, centavos, centavosHistoricos, cantidad, clavePrecio, precioHistorico, validarPago, validarPagoEnCentavos, actualizarPagoPendiente } from "./pagos.mjs";
 import { initializeApp, deleteApp } from "https://www.gstatic.com/firebasejs/10.12.2/firebase-app.js";
 import { getAuth, onAuthStateChanged, signInWithEmailAndPassword, createUserWithEmailAndPassword, signOut, updatePassword, reauthenticateWithCredential, EmailAuthProvider } from "https://www.gstatic.com/firebasejs/10.12.2/firebase-auth.js";
 import { initializeFirestore, getFirestore, persistentLocalCache, persistentMultipleTabManager, doc, collection, query, where, onSnapshot, getDoc, getDocFromCache, getDocFromServer, getDocsFromServer, setDoc as fsSetDoc, updateDoc as fsUpdateDoc, deleteDoc as fsDeleteDoc, writeBatch as fsWriteBatch, runTransaction } from "https://www.gstatic.com/firebasejs/10.12.2/firebase-firestore.js";
@@ -1168,7 +1168,7 @@ const updateDoc = (...a) => sinEsperar(fsUpdateDoc(...a));
 const deleteDoc = (...a) => sinEsperar(fsDeleteDoc(...a));
 const writeBatch = db => { const b = fsWriteBatch(db), c = b.commit.bind(b); b.commit = () => sinEsperar(c()); return b; };
 
-const VERSION = "v3.69";
+const VERSION = "v3.68";
 /* ================= Utilidades ================= */
 const $ = (s, r = document) => r.querySelector(s);
 const esc = s => String(s ?? "").replace(/[&<>"']/g, c => ({"&":"&amp;","<":"&lt;",">":"&gt;",'"':"&quot;","'":"&#39;"}[c]));
@@ -1955,7 +1955,7 @@ function validarPedidoRespaldo(p){
       || (p.imagenes && (!Array.isArray(p.imagenes) || p.imagenes.some(id => typeof id !== "string" || !id || id.includes("/")))))
     throw new Error("El respaldo incluye un pedido con formato inválido");
   if (p.pagoVersion === 1) {
-    const pago = validarPago(p.items, i => precioUnitario(p, i) / 100, p.abono, p.moneda);
+    const pago = validarPago(p.items, i => precioUnitario(p, i) / 100, p.abono, p.moneda, Infinity);
     if (pago.error || pago.total !== p.totalMenor || pago.abono !== p.abonoMenor)
       throw new Error("El respaldo contiene un pago histórico inconsistente");
   } else if (p.pagoVersion === 2) {
@@ -2005,14 +2005,7 @@ async function restaurarArchivo(f){
       if (anterior) reemplazados++; else nuevos++;
       const pedido = {...v, restaurado:true};
       pedidos.set(id, pedido);
-      if (necesitaValidacionPago(pedido)) {
-        const revision = crypto.randomUUID(), identidad = identidadCola(S.me, S.uid);
-        const {ref} = await prepararValidacionPago(S.db, SDK_PEDIDOS, identidad, id, revision, pedido);
-        const lote = fsWriteBatch(S.db);
-        lote.set(doc(S.db, "pedidos", id), {...pedido, revisionPago:revision});
-        lote.delete(ref);
-        await lote.commit();
-      } else ops.push([`pedidos/${id}`, pedido]);
+      ops.push([`pedidos/${id}`, pedido]);
     }
     const vinculos = vinculosFotos(pedidos);
     for (const [id, foto] of Object.entries(C.fotos || {})) {
@@ -2172,7 +2165,8 @@ const erroresPago = {
   total:"El total supera el importe permitido",
   abono:"Escribe un abono no negativo de hasta dos decimales",
   sobrepago:"El abono no puede ser mayor que el total",
-  moneda:"Elige una moneda válida"
+  moneda:"Elige una moneda válida",
+  partidas:`El máximo es de ${MAX_PARTIDAS} partidas por pedido`
 };
 function dueShort(p){
   if (p.estado === "entregado") return {t:"Entregado", c:"ok"};
@@ -3285,6 +3279,7 @@ function erroresPaso(i){
     const llenas = F.items.filter(x => !itemVacio(x));
     const incompl = F.items.findIndex(x => !itemVacio(x) && (reqItem().some(f => !x[f])));
     if (!llenas.length) e.push(["f-items", "Agrega una prenda"]);
+    else if (llenas.length > MAX_PARTIDAS) e.push(["f-items", erroresPago.partidas]);
     else if (incompl >= 0) e.push(["f-items", "Completa lo marcado en rojo"]);
     else if (llenas.some(x => cantidad(x.cant) === null)) e.push(["f-items", "Las unidades deben ser un entero positivo"]);
   }
@@ -3747,22 +3742,11 @@ async function saveForm(ov, orig){
   let envioLocal = false;
   try {
     if (orig) {
-      const batch = fsWriteBatch(S.db);
-      let preparacion;
-      if (necesitaValidacionPago(data)) {
-        const revision = crypto.randomUUID(), identidad = identidadCola(S.me, uid);
-        preparacion = encolarValidacionPago(S.db, {doc, setDoc:fsSetDoc}, identidad, orig._id, revision, data);
-        data.revisionPago = revision;
-        batch.delete(preparacion.ref);
-      }
+      const batch = writeBatch(S.db);
       batch.update(doc(S.db, "pedidos", orig._id), data);
       for (const [id, foto] of documentosFoto(orig._id, fotos, S.me.usuario, now))
         batch.set(doc(S.db, "fotos", id), foto);
-      const guardar = Promise.all([...(preparacion?.escrituras || []), batch.commit()]);
-      if (preparacion) guardar.catch(() => {
-        if (S.uid === uid) fsDeleteDoc(preparacion.ref).catch(() => {});
-      });
-      envioLocal = (await sinEsperar(guardar)) === "local";
+      envioLocal = (await batch.commit()) === "local";
     } else {
       if (data.lectores === undefined) Object.assign(data, {asignados:[], denegados:[], publico:true, lectores:[creador]});
       Object.assign(data, {tipo:form.tipo, creadoEn:now, creadoPor:creador, estado:"pendiente", avisado:false});

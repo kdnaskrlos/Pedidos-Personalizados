@@ -7,7 +7,7 @@ import { promisify } from "node:util";
 import { test } from "node:test";
 import { chromium, devices } from "playwright-core";
 import { initializeTestEnvironment } from "@firebase/rules-unit-testing";
-import { doc, getDocFromServer, writeBatch } from "firebase/firestore";
+import { doc, writeBatch } from "firebase/firestore";
 
 const projectId = "demo-pedidos-codex";
 const root = new URL("../", import.meta.url);
@@ -117,7 +117,6 @@ async function crearSublimado(page, tema, opciones = {}) {
     await page.locator(".pkgrid [data-v]").first().click();
     await page.locator('[data-pick="talla"]').last().click();
     await page.locator('.pkgrid [data-v="3XL"]').click();
-    for (let i = 2; i < (opciones.partidas ?? 2); i++) await page.locator("#dupItem").click();
   }
   await page.locator("#next").click();
   await page.locator("#in-fecha").click();
@@ -143,7 +142,7 @@ async function crearSublimado(page, tema, opciones = {}) {
   await oculto(page.locator("#save"));
 }
 
-test("escritorio y móvil: pedidos offline, edición de 12 partidas, recuperación con PIN y fotos históricas", {timeout:150000}, async () => {
+test("escritorio y móvil: login, altas offline en varios clientes, recarga, sincronización y funciones del pedido", {timeout:150000}, async () => {
   const {server,url} = await appDePrueba();
   let navegador, env;
   const errores = [];
@@ -271,7 +270,7 @@ test("escritorio y móvil: pedidos offline, edición de 12 partidas, recuperaci�
     await visible(page.getByText("Restaurado: 0 recuperados, 1 actualizados",{exact:true}));
     // El restablecimiento ocurre antes de que el móvil vuelva a tener contacto con Firestore.
     await mobile.setOffline(true);
-    await crearSublimado(cel,"Pedido recuperado",{foto:true,multi:true,partidas:12});
+    await crearSublimado(cel,"Pedido recuperado",{foto:true,multi:true});
     await visible(cel.locator('[data-act="cola"]'));
     await page.locator('.side [data-view="equipo"]:visible').click();
     await page.locator('[data-utog]').filter({hasText:"Equipo de prueba"}).click();
@@ -292,59 +291,14 @@ test("escritorio y móvil: pedidos offline, edición de 12 partidas, recuperaci�
     await oculto(cel.locator('[data-act="cola"]'));
     assert.equal(await recuperado.count(),1);
     assert.match(await recuperado.innerText(),/S-0004/);
-    const idRecuperado = await recuperado.getAttribute("data-open");
     await recuperado.click();
     await visible(cel.getByText(/Nota Pedido Recuperado/i));
-    assert.match(await cel.locator(".pdpay").innerText(),/43\.40/);
+    assert.match(await cel.locator(".pdpay").innerText(),/22\.10/);
     await cel.waitForFunction(() => document.querySelector(".pdmd img[data-foto]")?.naturalWidth > 0);
-    assert.equal(await cel.locator(".pdit li").count(),12);
-    await cel.waitForFunction(() => !!JSON.parse(localStorage.getItem("cs-arranque") || "null")?.me?.identidadCola);
-    await mobile.setOffline(true);
-    await cel.locator("#d-edit").click();
-    await cel.locator('[data-go="2"]').click();
-    await cel.locator("#in-abono").fill("1,25");
-    await cel.locator("#save").click();
-    await oculto(cel.locator("#save"));
-    await visible(cel.getByText("Cambio pendiente de sincronización",{exact:true}));
-    await cel.reload();
-    await visible(cel.locator(".shell"));
-    await mobile.setOffline(false);
+    await cel.locator(".pdback").click();
 
-    // La comprobación consulta el emulador desde otro cliente, fuera de la caché del móvil.
+    // Simula un pedido y una foto ya existentes antes de actualizar las reglas.
     env = await initializeTestEnvironment({projectId,firestore:{host:dbHost,port:Number(dbPort)}});
-    await env.withSecurityRulesDisabled(async context => {
-      const db = context.firestore();
-      const ref = doc(db,"pedidos",idRecuperado);
-      const fin = Date.now() + 10000;
-      let guardado;
-      do {
-        guardado = (await getDocFromServer(ref)).data();
-        if (guardado?.abonoMenor === 125) break;
-        await new Promise(resolve => setTimeout(resolve, 250));
-      } while (Date.now() < fin);
-      assert.equal(guardado?.abonoMenor,125);
-      assert.equal(guardado.items.length,12);
-      assert.equal(guardado.totalMenor,4365);
-      assert.equal(guardado.codigo,"S-0004");
-    });
-    await pedidosNav(cel).click();
-
-    await page.locator('.side [data-view="ajustes"]:visible').click();
-    const descargaGrande = page.waitForEvent("download");
-    await page.locator("#rLocal").click();
-    const respaldoGrande = JSON.parse(await readFile(await (await descargaGrande).path(),"utf8"));
-    const pedidoRespaldado = respaldoGrande.colecciones.pedidos[idRecuperado];
-    assert.equal(pedidoRespaldado.items.length,12);
-    respaldoGrande.colecciones.pedidos = {
-      [idRecuperado]:{...pedidoRespaldado,editadoEn:"2091-01-01T00:00:00Z",nota:"Pedido grande restaurado"}
-    };
-    await page.locator("#rFile").setInputFiles({
-      name:"respaldo-grande.json",mimeType:"application/json",buffer:Buffer.from(JSON.stringify(respaldoGrande))
-    });
-    await page.locator("#okc").click();
-    await visible(page.getByText("Restaurado: 0 recuperados, 1 actualizados",{exact:true}));
-
-    // Simula un pedido grande y una foto existentes antes de actualizar las reglas.
     const foto = "referencia-historica";
     const bytes = await readFile(new URL("icono-192.png",root));
     await env.withSecurityRulesDisabled(async context => {
@@ -352,7 +306,7 @@ test("escritorio y móvil: pedidos offline, edición de 12 partidas, recuperaci�
       lote.set(doc(db,"pedidos","pedido-historico"),{
         tipo:"sublimacion",codigo:"S-0011",creadoPor:"equipoprueba",creadoEn:"2024-01-01",estado:"pendiente",
         tema:"Pedido histórico",nota:"Nota histórica",cliente:{nombre:"Cuenta histórica",telefono:"584120000000"},
-        items:Array.from({length:12}, () => ({prenda:"Franela",horma:"Unisex",color:"Fullprint",talla:"M",cant:2})),
+        items:[{prenda:"Franela",horma:"Unisex",color:"Fullprint",talla:"M",cant:2}],
         moneda:"USD",precio:5.20,abono:1.00,imagenes:[foto],publico:true,lectores:["equipoprueba"]
       });
       lote.set(doc(db,"fotos",foto),{data:"data:image/png;base64," + bytes.toString("base64"),por:"equipoprueba"});
@@ -368,7 +322,7 @@ test("escritorio y móvil: pedidos offline, edición de 12 partidas, recuperaci�
     await cel.reload();
     await pedidosNav(cel).click();
     await historico.click();
-    assert.match(await cel.locator(".pdpay").innerText(),/123\.80/);
+    assert.match(await cel.locator(".pdpay").innerText(),/9\.40/);
     await visible(cel.getByText("Nota histórica"));
     await cel.waitForFunction(() => document.querySelector(".pdmd img[data-foto]")?.naturalWidth > 0);
     assert.deepEqual(errores,[]);

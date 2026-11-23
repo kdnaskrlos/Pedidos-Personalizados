@@ -1,4 +1,5 @@
 export const MAX_CENTAVOS = 1_000_000_000_000;
+export const MAX_PARTIDAS = 8;
 const MONEDAS = new Set(["COP", "USD", "Bs"]);
 
 function leerCentavos(valor, maximo) {
@@ -53,17 +54,18 @@ export function precioHistorico(pedido, clave) {
   return centavosHistoricos(pedido.precio);
 }
 
-export function validarPago(items, precio, abono, moneda) {
-  return calcularPago(items, i => centavos(precio(i)), typeof abono === "string" && !abono.trim() ? 0 : centavos(abono), moneda);
+export function validarPago(items, precio, abono, moneda, limite = MAX_PARTIDAS) {
+  return calcularPago(items, i => centavos(precio(i)), typeof abono === "string" && !abono.trim() ? 0 : centavos(abono), moneda, limite);
 }
 
 export function validarPagoEnCentavos(items, abonoMenor, moneda) {
   return calcularPago(items, i => i.precioMenor, abonoMenor, moneda);
 }
 
-function calcularPago(items, precioMenor, abono, moneda) {
+function calcularPago(items, precioMenor, abono, moneda, limite = MAX_PARTIDAS) {
   if (!MONEDAS.has(moneda)) return {error:"moneda"};
   if (!items.length) return {error:"precio"};
+  if (items.length > limite) return {error:"partidas"};
   let total = 0, piezas = 0;
   for (const item of items) {
     const unidades = cantidad(item.cant);
