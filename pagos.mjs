@@ -1,7 +1,7 @@
 export const MAX_CENTAVOS = 1_000_000_000_000;
 const MONEDAS = new Set(["COP", "USD", "Bs"]);
 
-export function centavos(valor) {
+function leerCentavos(valor, maximo) {
   if (typeof valor !== "number" && typeof valor !== "string") return null;
   const texto = String(valor).trim();
   const agrupado = typeof valor === "string" && /^-?\d{1,3}(?:\.\d{3})+(?:,\d{1,2})?$/.test(texto);
@@ -9,15 +9,17 @@ export function centavos(valor) {
   const partes = /^(-?)(\d+)(?:\.(\d{1,2}))?$/.exec(normal);
   if (!partes) return null;
   const importe = Number(partes[2]) * 100 + Number((partes[3] || "").padEnd(2, "0"));
-  if (!Number.isSafeInteger(importe) || importe > MAX_CENTAVOS) return null;
+  if (!Number.isSafeInteger(importe) || importe > maximo) return null;
   return partes[1] && importe ? -importe : importe;
 }
 
+export const centavos = valor => leerCentavos(valor, MAX_CENTAVOS);
+
 export function centavosHistoricos(valor) {
-  const exacto = centavos(valor);
+  const exacto = leerCentavos(valor, Number.MAX_SAFE_INTEGER);
   if (exacto !== null) return exacto;
   // Algunos pedidos anteriores ya se guardaron como números con más de dos decimales.
-  return typeof valor === "number" && Number.isFinite(valor) && Math.abs(valor) <= MAX_CENTAVOS / 100
+  return typeof valor === "number" && Number.isFinite(valor) && Math.abs(valor) <= Number.MAX_SAFE_INTEGER / 100
     ? Math.sign(valor) * Math.round(Math.abs(valor) * 100) : 0;
 }
 

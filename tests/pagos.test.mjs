@@ -53,5 +53,6 @@ test("lee precios históricos por prenda y horma sin modificar el pedido", () =>
   assert.equal(precioHistorico(pedido, clavePrecio(items[0])), 1012);
   assert.equal(precioHistorico(pedido, clavePrecio(items[2])), 213);
   assert.equal(precioHistorico(pedido, "Otro"), 1100);
+  assert.equal(precioHistorico({precio:11_000_000_000}, "Otro"), 1_100_000_000_000);
   assert.equal(JSON.stringify(pedido), antes);
 });

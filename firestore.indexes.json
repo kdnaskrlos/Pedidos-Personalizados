@@ -1,0 +1,13 @@
+{
+  "indexes": [
+    {
+      "collectionGroup": "pedidos",
+      "queryScope": "COLLECTION",
+      "fields": [
+        {"fieldPath": "tipo", "order": "ASCENDING"},
+        {"fieldPath": "lectores", "arrayConfig": "CONTAINS"}
+      ]
+    }
+  ],
+  "fieldOverrides": []
+}
