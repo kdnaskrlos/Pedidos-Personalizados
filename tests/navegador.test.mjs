@@ -1,10 +1,13 @@
 import assert from "node:assert/strict";
 import { execFile } from "node:child_process";
 import { createServer } from "node:http";
+import { existsSync } from "node:fs";
 import { readFile } from "node:fs/promises";
 import { promisify } from "node:util";
 import { test } from "node:test";
 import { chromium, devices } from "playwright-core";
+import { initializeTestEnvironment } from "@firebase/rules-unit-testing";
+import { doc, writeBatch } from "firebase/firestore";
 
 const projectId = "demo-pedidos-codex";
 const root = new URL("../", import.meta.url);
@@ -80,7 +83,7 @@ async function appDePrueba() {
 const visible = selector => selector.waitFor({state:"visible"});
 const oculto = selector => selector.waitFor({state:"hidden"});
 async function iniciar(page, url, usuario, pin) {
-  await page.goto(url);
+  if (url) await page.goto(url);
   await page.locator("#lu").fill(usuario);
   await page.locator("#lp").fill(pin);
   await page.locator("#loginForm button").click();
@@ -108,11 +111,20 @@ async function crearSublimado(page, tema, opciones = {}) {
     await visible(page.getByText("Las unidades deben ser un entero positivo",{exact:false}));
   }
   await page.locator("[data-cant]").fill("2");
+  if (opciones.multi) {
+    await page.locator("#addItem").click();
+    await page.locator('[data-pick="prenda"]').last().click();
+    await page.locator(".pkgrid [data-v]").first().click();
+    await page.locator('[data-pick="talla"]').last().click();
+    await page.locator('.pkgrid [data-v="3XL"]').click();
+  }
   await page.locator("#next").click();
   await page.locator("#in-fecha").click();
   await page.getByRole("button",{name:"Mañana",exact:true}).click();
   await page.locator("#in-mon").selectOption("USD");
-  await page.locator("#prl input").fill("10,11");
+  const precios = page.locator("#prl input");
+  await precios.first().fill("10,11");
+  if (opciones.multi) await precios.last().fill("2,13");
   if (opciones.errores) {
     await page.locator("#in-abono").fill("21");
     await visible(page.locator("#pago-msg").getByText("El abono no puede ser mayor que el total"));
@@ -132,10 +144,12 @@ async function crearSublimado(page, tema, opciones = {}) {
 
 test("escritorio y móvil: login, altas offline en varios clientes, recarga, sincronización y funciones del pedido", {timeout:150000}, async () => {
   const {server,url} = await appDePrueba();
-  let navegador;
+  let navegador, env;
   const errores = [];
   try {
-    navegador = await chromium.launch({executablePath:process.env.CHROMIUM_PATH || "/usr/bin/chromium",args:["--no-sandbox"]});
+    const chromiumLocal = "/usr/bin/chromium";
+    const executablePath = process.env.CHROMIUM_PATH || (existsSync(chromiumLocal) ? chromiumLocal : chromium.executablePath());
+    navegador = await chromium.launch({executablePath,args:["--no-sandbox"]});
     const desktop = await navegador.newContext({viewport:{width:1440,height:900},reducedMotion:"reduce"});
     const mobile = await navegador.newContext({...devices["Pixel 7"],reducedMotion:"reduce"});
     const paginas = [await desktop.newPage(),await mobile.newPage()];
@@ -254,12 +268,70 @@ test("escritorio y móvil: login, altas offline en varios clientes, recarga, sin
     });
     await page.locator("#okc").click();
     await visible(page.getByText("Restaurado: 0 recuperados, 1 actualizados",{exact:true}));
+    // El restablecimiento ocurre antes de que el móvil vuelva a tener contacto con Firestore.
+    await mobile.setOffline(true);
+    await crearSublimado(cel,"Pedido recuperado",{foto:true,multi:true});
+    await visible(cel.locator('[data-act="cola"]'));
+    await page.locator('.side [data-view="equipo"]:visible').click();
+    await page.locator('[data-utog]').filter({hasText:"Equipo de prueba"}).click();
+    await page.locator("[data-reset]").click();
+    await page.locator("#okc").click();
+    await visible(page.locator(".cred"));
+    const nuevoPin = (await page.locator(".cred").innerText()).match(/PIN: (\d{8})/)?.[1];
+    assert.ok(nuevoPin);
+    await page.getByRole("button",{name:"Listo",exact:true}).click();
+    await mobile.setOffline(false);
+    await visible(cel.getByRole("heading",{name:"Acceso desactivado"}));
+    await cel.locator("#lo").click();
+    await visible(cel.locator("#loginForm"));
+    await iniciar(cel,null,"equipoprueba",nuevoPin);
+    await pedidosNav(cel).click();
+    const recuperado = cel.locator(".oc2:visible").filter({hasText:/Pedido Recuperado/i});
+    await visible(recuperado);
+    await oculto(cel.locator('[data-act="cola"]'));
+    assert.equal(await recuperado.count(),1);
+    assert.match(await recuperado.innerText(),/S-0004/);
+    await recuperado.click();
+    await visible(cel.getByText(/Nota Pedido Recuperado/i));
+    assert.match(await cel.locator(".pdpay").innerText(),/22\.10/);
+    await cel.waitForFunction(() => document.querySelector(".pdmd img[data-foto]")?.naturalWidth > 0);
+    await cel.locator(".pdback").click();
+
+    // Simula un pedido y una foto ya existentes antes de actualizar las reglas.
+    env = await initializeTestEnvironment({projectId,firestore:{host:dbHost,port:Number(dbPort)}});
+    const foto = "referencia-historica";
+    const bytes = await readFile(new URL("icono-192.png",root));
+    await env.withSecurityRulesDisabled(async context => {
+      const db = context.firestore(), lote = writeBatch(db);
+      lote.set(doc(db,"pedidos","pedido-historico"),{
+        tipo:"sublimacion",codigo:"S-0011",creadoPor:"equipoprueba",creadoEn:"2024-01-01",estado:"pendiente",
+        tema:"Pedido histórico",nota:"Nota histórica",cliente:{nombre:"Cuenta histórica",telefono:"584120000000"},
+        items:[{prenda:"Franela",horma:"Unisex",color:"Fullprint",talla:"M",cant:2}],
+        moneda:"USD",precio:5.20,abono:1.00,imagenes:[foto],publico:true,lectores:["equipoprueba"]
+      });
+      lote.set(doc(db,"fotos",foto),{data:"data:image/png;base64," + bytes.toString("base64"),por:"equipoprueba"});
+      await lote.commit();
+    });
+    const historico = cel.locator(".oc2:visible").filter({hasText:"Pedido histórico"});
+    await visible(historico);
+    assert.match(await historico.innerText(),/S-0011/);
+    await page.locator('.side [data-view="ajustes"]:visible').click();
+    await page.locator("#rFotos").click();
+    await page.locator("#okc").click();
+    await visible(page.getByText("1 fotos vinculadas",{exact:true}));
+    await cel.reload();
+    await pedidosNav(cel).click();
+    await historico.click();
+    assert.match(await cel.locator(".pdpay").innerText(),/9\.40/);
+    await visible(cel.getByText("Nota histórica"));
+    await cel.waitForFunction(() => document.querySelector(".pdmd img[data-foto]")?.naturalWidth > 0);
     assert.deepEqual(errores,[]);
     assert.deepEqual(inesperadas,[]);
   } catch(e) {
     if (errores.length) throw new Error(errores.join("\n"), {cause:e});
     throw e;
   } finally {
+    await env?.cleanup();
     await navegador?.close();
     await new Promise(resolve => server.close(resolve));
   }

@@ -1,4 +1,5 @@
 export const MAX_CENTAVOS = 1_000_000_000_000;
+export const MAX_PARTIDAS = 8;
 const MONEDAS = new Set(["COP", "USD", "Bs"]);
 
 function leerCentavos(valor, maximo) {
@@ -53,22 +54,41 @@ export function precioHistorico(pedido, clave) {
   return centavosHistoricos(pedido.precio);
 }
 
-export function validarPago(items, precio, abono, moneda) {
+export function validarPago(items, precio, abono, moneda, limite = MAX_PARTIDAS) {
+  return calcularPago(items, i => centavos(precio(i)), typeof abono === "string" && !abono.trim() ? 0 : centavos(abono), moneda, limite);
+}
+
+export function validarPagoEnCentavos(items, abonoMenor, moneda) {
+  return calcularPago(items, i => i.precioMenor, abonoMenor, moneda);
+}
+
+function calcularPago(items, precioMenor, abono, moneda, limite = MAX_PARTIDAS) {
   if (!MONEDAS.has(moneda)) return {error:"moneda"};
   if (!items.length) return {error:"precio"};
+  if (items.length > limite) return {error:"partidas"};
   let total = 0, piezas = 0;
   for (const item of items) {
     const unidades = cantidad(item.cant);
     if (unidades === null) return {error:"cantidad"};
-    const unitario = centavos(precio(item));
-    if (!(unitario > 0)) return {error:"precio"};
+    const unitario = precioMenor(item);
+    if (!Number.isSafeInteger(unitario) || unitario <= 0 || unitario > MAX_CENTAVOS) return {error:"precio"};
     piezas += unidades;
     total += unidades * unitario;
     if (!Number.isSafeInteger(piezas) || !Number.isSafeInteger(total) || total > MAX_CENTAVOS)
       return {error:"total"};
   }
-  const pagado = typeof abono === "string" && !abono.trim() ? 0 : centavos(abono);
-  if (pagado === null || pagado < 0) return {error:"abono"};
-  if (pagado > total) return {error:"sobrepago"};
-  return {piezas, total, abono:pagado, saldo:total - pagado};
+  if (!Number.isSafeInteger(abono) || abono < 0) return {error:"abono"};
+  if (abono > total) return {error:"sobrepago"};
+  return {piezas, total, abono, saldo:total - abono};
+}
+
+export function actualizarPagoPendiente(pedido, clave) {
+  if (pedido.pagoVersion !== 1) return pedido;
+  const {precio, precios, abono, ...migrado} = pedido;
+  const items = pedido.items.map(i => ({...i, precioMenor:precioHistorico(pedido, clave(i))}));
+  const pago = validarPagoEnCentavos(items, migrado.abonoMenor, migrado.moneda);
+  if (pago.error || pago.total !== migrado.totalMenor || centavos(abono) !== migrado.abonoMenor) {
+    throw Object.assign(new Error("El pago pendiente requiere revisión"), {code:"pago-pendiente"});
+  }
+  return {...migrado, items, pagoVersion:2};
 }

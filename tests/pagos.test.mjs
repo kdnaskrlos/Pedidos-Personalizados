@@ -1,6 +1,6 @@
 import assert from "node:assert/strict";
 import { test } from "node:test";
-import { cantidad, centavos, clavePrecio, precioHistorico, validarPago } from "../pagos.mjs";
+import { MAX_PARTIDAS, cantidad, centavos, clavePrecio, precioHistorico, validarPago, validarPagoEnCentavos, actualizarPagoPendiente } from "../pagos.mjs";
 
 test("lee montos completos y conserva dos decimales", () => {
   for (const [valor, esperado] of [
@@ -55,4 +55,28 @@ test("lee precios históricos por prenda y horma sin modificar el pedido", () =>
   assert.equal(precioHistorico(pedido, "Otro"), 1100);
   assert.equal(precioHistorico({precio:11_000_000_000}, "Otro"), 1_100_000_000_000);
   assert.equal(JSON.stringify(pedido), antes);
+});
+
+test("valida pedidos en centavos hasta el límite compartido y conserva el abono", () => {
+  const partida = {cant:3,precioMenor:111};
+  const partes = Array.from({length:MAX_PARTIDAS}, () => partida);
+  assert.equal(validarPagoEnCentavos(partes, 5, "COP").saldo, MAX_PARTIDAS * 333 - 5);
+  assert.equal(validarPagoEnCentavos([...partes,partida], 5, "COP").error, "partidas");
+  assert.equal(validarPagoEnCentavos([partida,{cant:2,precioMenor:11.5}], 0, "USD").error, "precio");
+});
+
+test("actualiza un envío pendiente del formato anterior sin cambiar total, saldo ni fotos", () => {
+  const anterior = {
+    pagoVersion:1, moneda:"USD", items:[{prenda:"Franela",cant:2},{prenda:"Short",cant:3}],
+    precios:[{n:"Franela",v:10.11},{n:"Short",v:2.13}], precio:0,
+    abono:0.25, abonoMenor:25, totalMenor:2661, imagenes:["foto"]
+  };
+  const actualizado = actualizarPagoPendiente(anterior, i => clavePrecio(i));
+  assert.equal(actualizado.pagoVersion,2);
+  assert.deepEqual(actualizado.items.map(i => i.precioMenor),[1011,213]);
+  assert.equal(actualizado.totalMenor,2661);
+  assert.equal(actualizado.abonoMenor,25);
+  assert.deepEqual(actualizado.imagenes,["foto"]);
+  assert.equal(anterior.pagoVersion,1);
+  assert.throws(() => actualizarPagoPendiente({...anterior,totalMenor:0}, i => clavePrecio(i)), {code:"pago-pendiente"});
 });

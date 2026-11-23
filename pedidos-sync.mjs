@@ -16,8 +16,8 @@ export function documentosFoto(pedidoId, fotos, por, creadoEn) {
   });
 }
 
-export async function registrarPedido(db, {doc, getDocFromServer, runTransaction}, uid, {id, pedido, fotos}) {
-  const envio = doc(db, "usuarios", uid, "envios", id);
+export async function registrarPedido(db, {doc, getDocFromServer, runTransaction}, uid, {id, pedido, fotos}, identidad = uid, normalizar = p => p) {
+  const envio = doc(db, "usuarios", identidad, "envios", id);
   const destino = doc(db, "pedidos", id);
   const contador = doc(db, "contadores", pedido.tipo);
 
@@ -28,6 +28,7 @@ export async function registrarPedido(db, {doc, getDocFromServer, runTransaction
         const recibo = await tx.get(envio);
         if (recibo.exists()) return recibo.data().codigo;
 
+        const datos = normalizar(pedido);
         const estado = (await tx.get(contador)).data();
         if (estado?.alineado !== true || !Number.isSafeInteger(estado.n) || estado.n < 0) {
           throw Object.assign(new Error("Falta alinear los contadores"), {code:"contador-pendiente"});
@@ -38,7 +39,7 @@ export async function registrarPedido(db, {doc, getDocFromServer, runTransaction
         reservado = n;
         const codigo = PREFIJOS[pedido.tipo] + "-" + String(n).padStart(4, "0");
         tx.set(contador, {n, alineado:true, ultimoId:id});
-        tx.set(destino, {...pedido, codigo, consecutivo:n, creadorUid:uid});
+        tx.set(destino, {...datos, codigo, consecutivo:n, creadorUid:uid});
         tx.set(envio, {tipo:pedido.tipo, codigo, n});
         for (const [fotoId, foto] of documentosFoto(id, fotos, pedido.creadoPor, pedido.creadoEn))
           tx.set(doc(db, "fotos", fotoId), foto);

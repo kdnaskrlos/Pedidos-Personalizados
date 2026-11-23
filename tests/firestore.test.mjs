@@ -6,6 +6,7 @@ import { initializeTestEnvironment, assertFails, assertSucceeds } from "@firebas
 import {
   collection, deleteDoc, doc, getDoc, getDocFromServer, getDocs, query, runTransaction, setDoc, setLogLevel, updateDoc, where, writeBatch
 } from "firebase/firestore";
+import { MAX_PARTIDAS } from "../pagos.mjs";
 import { registrarPedido } from "../pedidos-sync.mjs";
 
 const PROJECT = "demo-pedidos-codex";
@@ -25,9 +26,8 @@ const pedido = (usuario, opts) => ({
   tipo:"personalizado", creadoPor:usuario, creadoEn:"2026-01-01T12:00:00.000Z",
   estado:"pendiente", avisado:false, publico:true, lectores:[usuario], denegados:[], asignados:[],
   cliente:{nombre:"Cliente sintético",telefono:"580000000000"}, tema:"Prueba", fechaEntrega:"2027-01-01",
-  items:[{prenda:"Franela",horma:"Unisex",talla:"M",color:"Negro",cant:2}],
-  precios:[{n:"Franela · Unisex",v:10.11}], precio:10.11, moneda:"USD", abono:0.25,
-  pagoVersion:1, totalMenor:2022, abonoMenor:25, imagenes:[], nota:"Nota sintética", ...opts
+  items:[{prenda:"Franela",horma:"Unisex",talla:"M",color:"Negro",cant:2,precioMenor:1011}],
+  moneda:"USD", pagoVersion:2, totalMenor:2022, abonoMenor:25, imagenes:[], nota:"Nota sintética", ...opts
 });
 const fotoId = randomUUID();
 const img = "data:image/jpeg;base64,AA==";
@@ -40,7 +40,7 @@ const leer = (db, p) => getDoc(ruta(db,p)).then(s => s.data());
 const guardar = (db, p, v) => setDoc(ruta(db,p),v);
 const cambiar = (db, p, v) => updateDoc(ruta(db,p),v);
 const borrar = (db, p) => deleteDoc(ruta(db,p));
-const alta = (db, uid, p, id = randomUUID(), fotos = []) => registrarPedido(db,sdk,uid,{id,pedido:p,fotos});
+const alta = (db, uid, p, id = randomUUID(), fotos = [], identidad = uid) => registrarPedido(db,sdk,uid,{id,pedido:p,fotos},identidad);
 
 before(async () => {
   env = await initializeTestEnvironment({projectId:PROJECT, firestore:{host,port:Number(port),rules:reglas}});
@@ -178,8 +178,8 @@ test("dos clientes concurrentes reciben consecutivos distintos y un reintento co
 
 test("rechaza pagos directos inválidos y revierte contador, recibo, pedido y fotografías", async () => {
   const id = randomUUID(), foto = randomUUID();
-  for (const datos of [{abono:-1,abonoMenor:-100},{abono:21,abonoMenor:2100},{abono:0.21},{moneda:"EUR"},
-    {precio:Infinity},{totalMenor:NaN},{totalMenor:2022.5},{totalMenor:1000},{items:[{cant:1.5}]},{precios:[{n:"Prenda",v:-2}]}]) {
+  for (const datos of [{abonoMenor:-100},{abonoMenor:2100},{abono:0.21},{moneda:"EUR"},
+    {precio:Infinity},{totalMenor:NaN},{totalMenor:2022.5},{totalMenor:1000},{items:[{cant:1.5}]},{precios:[{n:"Prenda",v:-2}]},{pagoVersion:1}]) {
     await assertFails(alta(ana,"ana",pedido("ana",datos),id));
   }
   await assertFails(cambiar(luis,"pedidos/publico",{abono:50,abonoMenor:5000}));
@@ -191,6 +191,69 @@ test("rechaza pagos directos inválidos y revierte contador, recibo, pedido y fo
   const fotos = Array.from({length:12},() => ({id:randomUUID(),data:img,mini:img}));
   assert.equal(await alta(ana,"ana",pedido("ana",{imagenes:fotos.map(f => f.id)}),id,fotos),"P-0050");
   for (const f of fotos) assert.equal((await leer(luis,"fotos/" + f.id + "_m")).pedidoId,id);
+});
+
+test("verifica cada partida y el total de pedidos múltiples por API, incluso en el límite", async () => {
+  const base = pedido("ana").items[0];
+  const partida = (cant, precioMenor) => ({...base,cant,precioMenor});
+  const items = [partida(3,1011), {...partida(5,213),prenda:"Short",horma:"Niño",talla:"6"}, partida(1,750)];
+  const p = pedido("ana",{items,totalMenor:4848,abonoMenor:4800});
+  const id = randomUUID();
+  for (const alteracion of [
+    {totalMenor:4849}, {abonoMenor:4849}, {abonoMenor:0.5},
+    {items:[items[0],{...items[1],cant:5.5},items[2]]},
+    {items:[items[0],items[1],{...items[2],precioMenor:-750}]},
+    {items:[items[0],items[1],{...items[2],precioMenor:750.1}]},
+    {items:[items[0],items[1],{...items[2],precioMenor:Infinity}]},
+    {items:[items[0],items[1],{...items[2],precioMenor:0}]},
+    {items:[items[0],null,items[2]],totalMenor:3783,abonoMenor:0},
+    {items:[partida(10 ** 12, 10 ** 12)],totalMenor:200},
+    {items:Array.from({length:MAX_PARTIDAS + 1}, () => partida(1,100)),totalMenor:(MAX_PARTIDAS + 1) * 100,abonoMenor:0}
+  ]) await assertFails(alta(ana,"ana",{...p,...alteracion},id));
+  assert.equal(await assertSucceeds(alta(ana,"ana",p,id)),"P-0050");
+  await assertFails(cambiar(luis,"pedidos/" + id,{totalMenor:1}));
+  await assertFails(cambiar(luis,"pedidos/" + id,{abono:1}));
+  await assertSucceeds(cambiar(luis,"pedidos/" + id,{items:[...items.slice(0,2),partida(2,750)],totalMenor:5598}));
+  const partidasMaximas = Array.from({length:MAX_PARTIDAS}, () => partida(1,100));
+  const max = pedido("ana",{items:partidasMaximas,totalMenor:MAX_PARTIDAS * 100,abonoMenor:0});
+  const fotos = Array.from({length:12}, () => ({id:randomUUID(),data:img,mini:img}));
+  await assertFails(alta(ana,"ana",{...max,items:[...partidasMaximas.slice(0,-1),partida(1,-100)],totalMenor:(MAX_PARTIDAS - 1) * 100}));
+  const idMax = randomUUID();
+  assert.equal(await assertSucceeds(alta(luis,"luis",{...max,creadoPor:"luis",lectores:["luis"],imagenes:fotos.map(f => f.id)},idMax,fotos))
+    .catch(e => { throw new Error("Alta con el máximo de partidas y fotos", {cause:e}); }),"P-0051");
+  await assertSucceeds(cambiar(luis,"pedidos/" + idMax,{
+    items:[partida(2,100), ...partidasMaximas.slice(1)],totalMenor:(MAX_PARTIDAS + 1) * 100,editadoPor:"luis"
+  }));
+  assert.equal(await assertSucceeds(alta(ana,"ana",{...max,items:[partida(10 ** 12,1)],totalMenor:10 ** 12})),"P-0052");
+});
+
+test("traslada los recibos y la cola al restablecer el PIN y separa a otras cuentas", async () => {
+  const transferir = (origen, destino, identidadCola) => {
+    const batch = writeBatch(admin);
+    batch.set(doc(admin,"usuarios",destino),perfil("ana",{bloquear:true,identidadCola}));
+    batch.delete(doc(admin,"usuarios",origen));
+    batch.set(doc(admin,"logins","ana"),{uid:destino,email:"ana-nueva@example.test"});
+    return batch.commit();
+  };
+  const previo = randomUUID();
+  assert.equal(await alta(ana,"ana",pedido("ana"),previo),"P-0050");
+  await assertFails(cambiar(admin,"usuarios/luis",{identidadCola:"ana"}));
+  await assertFails(guardar(admin,"usuarios/impostor",perfil("otro",{identidadCola:"ana"})));
+  await assertFails(transferir("ana","anaNueva","luis"));
+  await assertSucceeds(transferir("ana","anaNueva","ana"));
+  const nueva = env.authenticatedContext("anaNueva").firestore();
+  await assertFails(leer(ana,"usuarios/ana/envios/" + previo));
+  await assertFails(leer(luis,"usuarios/ana/envios/" + previo));
+  assert.equal(await alta(nueva,"anaNueva",pedido("ana"),previo,[],"ana"),"P-0050");
+  const pendiente = randomUUID();
+  const foto = {id:randomUUID(),data:img,mini:img};
+  assert.equal(await alta(nueva,"anaNueva",pedido("ana",{imagenes:[foto.id]}),pendiente,[foto],"ana"),"P-0051");
+  assert.equal((await leer(admin,"pedidos/" + pendiente)).creadorUid,"anaNueva");
+  await assertSucceeds(transferir("anaNueva","anaFinal","ana"));
+  const final = env.authenticatedContext("anaFinal").firestore();
+  await assertFails(leer(nueva,"usuarios/ana/envios/" + pendiente));
+  assert.equal(await alta(final,"anaFinal",pedido("ana"),pendiente,[],"ana"),"P-0051");
+  assert.equal((await leer(final,"fotos/" + foto.id)).pedidoId,pendiente);
 });
 
 test("mantiene arranque único, alta de equipo y reemplazo del UID al cambiar PIN", async () => {
@@ -209,7 +272,7 @@ test("mantiene arranque único, alta de equipo y reemplazo del UID al cambiar PI
   altaEquipo.set(doc(nuevo,"logins","equipo"),{uid:"empleado",email:"equipo@example.test"});
   await assertSucceeds(altaEquipo.commit());
   const reset = writeBatch(nuevo);
-  reset.set(doc(nuevo,"usuarios","nuevoUid"),perfil("equipo"));
+  reset.set(doc(nuevo,"usuarios","nuevoUid"),perfil("equipo",{identidadCola:"empleado"}));
   reset.delete(doc(nuevo,"usuarios","empleado"));
   reset.set(doc(nuevo,"logins","equipo"),{uid:"nuevoUid",email:"equipo2@example.test"});
   await assertSucceeds(reset.commit());

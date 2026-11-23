@@ -1152,7 +1152,7 @@ html,body{overflow-x:clip}
 import { firebaseConfig } from "./config.js";
 import { consecutivoDe, documentosFoto, registrarPedido } from "./pedidos-sync.mjs";
 import { guardarPendiente, leerPendientes, borrarPendiente, guardarFotoLocal, leerFotoLocal, borrarFotoLocal } from "./cola-local.mjs";
-import { centavos, centavosHistoricos, cantidad, clavePrecio, precioHistorico, validarPago } from "./pagos.mjs";
+import { MAX_PARTIDAS, centavos, centavosHistoricos, cantidad, clavePrecio, precioHistorico, validarPago, validarPagoEnCentavos, actualizarPagoPendiente } from "./pagos.mjs";
 import { initializeApp, deleteApp } from "https://www.gstatic.com/firebasejs/10.12.2/firebase-app.js";
 import { getAuth, onAuthStateChanged, signInWithEmailAndPassword, createUserWithEmailAndPassword, signOut, updatePassword, reauthenticateWithCredential, EmailAuthProvider } from "https://www.gstatic.com/firebasejs/10.12.2/firebase-auth.js";
 import { initializeFirestore, getFirestore, persistentLocalCache, persistentMultipleTabManager, doc, collection, query, where, onSnapshot, getDoc, getDocFromCache, getDocFromServer, getDocsFromServer, setDoc as fsSetDoc, updateDoc as fsUpdateDoc, deleteDoc as fsDeleteDoc, writeBatch as fsWriteBatch, runTransaction } from "https://www.gstatic.com/firebasejs/10.12.2/firebase-firestore.js";
@@ -1168,7 +1168,7 @@ const updateDoc = (...a) => sinEsperar(fsUpdateDoc(...a));
 const deleteDoc = (...a) => sinEsperar(fsDeleteDoc(...a));
 const writeBatch = db => { const b = fsWriteBatch(db), c = b.commit.bind(b); b.commit = () => sinEsperar(c()); return b; };
 
-const VERSION = "v3.67";
+const VERSION = "v3.68";
 /* ================= Utilidades ================= */
 const $ = (s, r = document) => r.querySelector(s);
 const esc = s => String(s ?? "").replace(/[&<>"']/g, c => ({"&":"&amp;","<":"&lt;",">":"&gt;",'"':"&quot;","'":"&#39;"}[c]));
@@ -1955,9 +1955,12 @@ function validarPedidoRespaldo(p){
       || (p.imagenes && (!Array.isArray(p.imagenes) || p.imagenes.some(id => typeof id !== "string" || !id || id.includes("/")))))
     throw new Error("El respaldo incluye un pedido con formato inválido");
   if (p.pagoVersion === 1) {
-    const pago = validarPago(p.items, i => precioDe(p, prKey(i, p)), p.abono, p.moneda);
+    const pago = validarPago(p.items, i => precioUnitario(p, i) / 100, p.abono, p.moneda, Infinity);
     if (pago.error || pago.total !== p.totalMenor || pago.abono !== p.abonoMenor)
-      throw new Error("El respaldo contiene un pago nuevo inconsistente");
+      throw new Error("El respaldo contiene un pago histórico inconsistente");
+  } else if (p.pagoVersion === 2) {
+    const pago = validarPagoEnCentavos(p.items, p.abonoMenor, p.moneda);
+    if (pago.error || pago.total !== p.totalMenor) throw new Error("El respaldo contiene un pago inconsistente");
   } else if (p.pagoVersion !== undefined) throw new Error("El respaldo usa una versión de pago desconocida");
 }
 async function restaurarArchivo(f){
@@ -2117,11 +2120,27 @@ function servsDe(p){ return Array.isArray(p.servicios) ? [...p.servicios] : p.se
 // Tallas 2XL en adelante ("Unisex Plus") llevan su propio precio
 const esPlusTxt = t => /^(?:(?:[2-9]|[1-9]\d+)\s*XL|X{2,}L)$/i.test(String(t || "").trim());
 const esPlus = t => { const v = String(t || "").trim(); return !!v && cfg().cat.tallasPlus.includes(v); };
-const prKey = (i, p) => clavePrecio(i, cfg().cat.tallasPlus, Array.isArray(p?.precios) ? p.precios : []);
-const precioMenor = (p, clave) => p.pr ? (centavos(p.pr[clave]) ?? 0) : precioHistorico(p, clave);
-const precioDe = (p, clave) => precioMenor(p, clave) / 100;
+const claveBase = (i, p) => clavePrecio(i, cfg().cat.tallasPlus, Array.isArray(p?.precios) ? p.precios : []);
+const prKey = (i, p) => {
+  const base = claveBase(i, p);
+  if (i.precioMenor && p?._preciosDistintos?.has(base)) return `${base} · ${fmtMonto(i.precioMenor / 100)}`;
+  return base;
+};
+function detectarPreciosDistintos(p){
+  const porClave = new Map(), distintas = new Set();
+  if (p.pagoVersion !== 2) return distintas;
+  for (const item of p.items) {
+    const clave = claveBase(item, p), anterior = porClave.get(clave);
+    if (anterior !== undefined && anterior !== item.precioMenor) distintas.add(clave);
+    porClave.set(clave, item.precioMenor);
+  }
+  return distintas;
+}
+const precioUnitario = (p, i) => p.pr ? (centavos(p.pr[prKey(i, p)]) ?? 0)
+  : p.pagoVersion === 2 ? i.precioMenor : precioHistorico(p, claveBase(i, p));
+const abonoMenor = p => p.pagoVersion === 2 && !p.pr ? p.abonoMenor : centavosHistoricos(p.abono);
 const unidadesDe = (i, p) => cantidad(i.cant) ?? (p.pr ? 0 : 1);
-const importeLinea = (p, i) => unidadesDe(i, p) * precioMenor(p, prKey(i, p)) / 100;
+const importeLinea = (p, i) => unidadesDe(i, p) * precioUnitario(p, i) / 100;
 function prendasDe(p){
   const grupos = Object.create(null);
   for (const i of (p.items || [])) {
@@ -2135,9 +2154,9 @@ function totales(p){
   for (const i of (p.items || [])) {
     const unidades = unidadesDe(i, p);
     piezas += unidades;
-    total += unidades * precioMenor(p, prKey(i, p));
+    total += unidades * precioUnitario(p, i);
   }
-  const abono = centavosHistoricos(p.abono);
+  const abono = abonoMenor(p);
   return {piezas, total:total / 100, abono:abono / 100, saldo:(total - abono) / 100};
 }
 const pagoDelFormulario = () => validarPago(F.items.filter(i => !itemVacio(i)), i => F.pr[prKey(i, F)], F.abono, F.moneda);
@@ -2146,7 +2165,8 @@ const erroresPago = {
   total:"El total supera el importe permitido",
   abono:"Escribe un abono no negativo de hasta dos decimales",
   sobrepago:"El abono no puede ser mayor que el total",
-  moneda:"Elige una moneda válida"
+  moneda:"Elige una moneda válida",
+  partidas:`El máximo es de ${MAX_PARTIDAS} partidas por pedido`
 };
 function dueShort(p){
   if (p.estado === "entregado") return {t:"Entregado", c:"ok"};
@@ -2156,7 +2176,8 @@ function dueShort(p){
   return {t: n < 0 ? `Vencido ${-n} d` : n === 0 ? "Hoy" : n === 1 ? "Mañana" : `En ${n} días`, c: n < 0 ? "err" : n <= d ? "warn" : ""};
 }
 const SDK_PEDIDOS = {doc, getDocFromServer, runTransaction};
-const ownerLocal = () => firebaseConfig.projectId + ":" + S.uid;
+const identidadCola = (perfil, uid) => perfil?.identidadCola ?? uid;
+const ownerLocal = () => firebaseConfig.projectId + ":" + identidadCola(S.me, S.uid);
 let sincronizando = false;
 const problemaEnvio = new Map();
 const avisoCola = typeof BroadcastChannel !== "undefined" ? new BroadcastChannel("pedidos-cola-local") : null;
@@ -2164,14 +2185,14 @@ if (avisoCola) avisoCola.onmessage = () => actualizarPendientes();
 
 async function actualizarPendientes(){
   if (!S.uid || !S.me?.activo) return;
-  const owner = ownerLocal();
+  const uid = S.uid, owner = ownerLocal();
   try {
     const pedidos = await leerPendientes(owner);
-    if (owner !== ownerLocal() || !S.me?.activo) return;
+    if (uid !== S.uid || owner !== ownerLocal() || !S.me?.activo) return;
     S.pendientes = pedidos.sort((a, b) => a.pedido.creadoEn.localeCompare(b.pedido.creadoEn));
     S.errorCola = false;
   } catch(e) {
-    if (owner !== ownerLocal() || !S.me?.activo) return;
+    if (uid !== S.uid || owner !== ownerLocal() || !S.me?.activo) return;
     S.errorCola = true;
     console.warn("cola local", e.name);
   }
@@ -2179,15 +2200,16 @@ async function actualizarPendientes(){
 }
 async function sincronizarPendientes(forzar = false){
   if (sincronizando || !S.online || !S.me?.activo || S.auth.currentUser?.uid !== S.uid) return;
-  const uid = S.uid, owner = ownerLocal();
+  const uid = S.uid, owner = ownerLocal(), identidad = identidadCola(S.me, uid);
   sincronizando = true;
   try {
     const pendientes = await leerPendientes(owner);
     for (const entrada of pendientes) {
       if (uid !== S.uid || !S.me?.activo || !S.online) break;
-      if (!forzar && ["permission-denied","contador-agotado"].includes(problemaEnvio.get(entrada.id))) continue;
+      if (!forzar && ["permission-denied","contador-agotado","pago-pendiente"].includes(problemaEnvio.get(entrada.id))) continue;
       try {
-        await registrarPedido(S.db, SDK_PEDIDOS, uid, entrada);
+        await registrarPedido(S.db, SDK_PEDIDOS, uid, entrada, identidad,
+          p => actualizarPagoPendiente(p, i => claveBase(i, p)));
         await borrarPendiente(owner, entrada.id);
         problemaEnvio.delete(entrada.id);
         avisoCola?.postMessage("actualizar");
@@ -2197,7 +2219,11 @@ async function sincronizarPendientes(forzar = false){
       }
     }
   } catch(e) { console.warn("cola local", e.name); }
-  finally { sincronizando = false; await actualizarPendientes(); }
+  finally {
+    sincronizando = false;
+    await actualizarPendientes();
+    if (uid !== S.uid) sincronizarPendientes();
+  }
 }
 function pendientesHTML(){
   if (S.errorCola) return '<p class="msg bad">No se puede acceder a los pedidos locales en este navegador.</p>';
@@ -2210,6 +2236,7 @@ function abrirPendientes(){
     const estado = error === "permission-denied" ? "El servidor rechazó el envío. Revisa tu acceso con el administrador."
       : error === "contador-pendiente" ? "Un administrador debe conectar la app para alinear la numeración."
       : error === "contador-agotado" ? "La numeración alcanzó su límite."
+      : error === "pago-pendiente" ? "El pago anterior requiere revisión. Los datos siguen guardados aquí."
       : error ? "Sin confirmación del servidor. Puedes reintentar." : "Guardado en este dispositivo";
     return `<details class="card"><summary><b>${esc(p.cliente.nombre)}</b> · ${esc(TIPOS[p.tipo].label)}</summary>
       <p class="note">${estado} · ${esc(id)}</p><div class="pdnote">${esc(resumenTexto({...p, codigo:"Pendiente de envío"}))}</div>
@@ -2594,14 +2621,21 @@ function nuevoUsuario(){
 }
 function resetPin(oldUid){
   const u = S.usuarios[oldUid]; if (!u) return;
-  confirmar(`¿Generar un PIN nuevo para ${u.nombre}?`, "El PIN anterior dejará de funcionar y su sesión abierta se cerrará.", "Generar PIN", async () => {
+  confirmar(`¿Generar un PIN nuevo para ${u.nombre}?`, "El PIN anterior dejará de funcionar. Los pedidos pendientes se recuperan al entrar con el nuevo PIN en el mismo navegador.", "Generar PIN", async () => {
     const pin = genPin();
     const {uid, email} = await crearCuenta(u.usuario, pin);
-    const bt = fsWriteBatch(S.db);
-    bt.set(doc(S.db, "usuarios/" + uid), Object.assign({}, u, {pinCambiadoEn:new Date().toISOString()}));
-    bt.delete(doc(S.db, "usuarios/" + oldUid));
-    bt.set(doc(S.db, "logins/" + u.usuario), {email, uid});
-    await bt.commit();
+    const perfil = doc(S.db, "usuarios", oldUid), login = doc(S.db, "logins", u.usuario);
+    await runTransaction(S.db, async tx => {
+      const [anterior, acceso] = await Promise.all([tx.get(perfil), tx.get(login)]);
+      if (!anterior.exists() || acceso.data()?.uid !== oldUid)
+        throw new Error("El usuario ya cambió. Actualiza el equipo y vuelve a intentarlo.");
+      const datos = anterior.data();
+      tx.set(doc(S.db, "usuarios", uid), {
+        ...datos, identidadCola:identidadCola(datos, oldUid), pinCambiadoEn:new Date().toISOString()
+      });
+      tx.delete(perfil);
+      tx.set(login, {email, uid});
+    });
     showCred(u.nombre, u.usuario, pin);
   });
 }
@@ -3026,13 +3060,22 @@ function openForm(id, tipo, cliente, borrador){
   F._nuevo = !orig;
   F._owner = ownerLocal();
   if (!orig) F.envioId ||= crypto.randomUUID();
-  F.abono ??= "";
+  F.abono = orig?.pagoVersion === 2 ? String(orig.abonoMenor / 100) : (F.abono ?? "");
   F.items = (F.items || []).map(i => Object.assign({etiqueta:F.etiqueta || "", cant:1}, i));
   F.imagenes = (F.imagenes || []).map(im => typeof im === "string" ? {id:im} : {...im, subiendo:true});
   F.servicios = servsDe(F);
   const prBorr = borrador && !orig && borrador.pr ? Object.assign({}, borrador.pr) : null;
-  { const pr = Object.create(null); delete F.pr; (F.items || []).forEach(i => { const k = prKey(i, F); if (k && pr[k] === undefined) { const v = precioDe(F, k); pr[k] = v ? String(v) : ""; } }); F.pr = pr; }
-  if (prBorr) Object.assign(F.pr, prBorr);
+  const precios = Object.create(null);
+  delete F.pr;
+  F._preciosDistintos = detectarPreciosDistintos(F);
+  for (const item of F.items) {
+    const clave = prKey(item, F);
+    if (clave && precios[clave] === undefined) {
+      const valor = precioUnitario(F, item);
+      precios[clave] = valor ? String(valor / 100) : "";
+    }
+  }
+  F.pr = Object.assign(precios, prBorr);
   const pasoBorr = prBorr || borrador ? Math.min(3, Number(borrador.step) || 0) : 0;
   F.step = 0; F.visto = [true, false, false, false];
   const marcas = c.cat.marcas.includes(F.etiqueta) || !F.etiqueta ? c.cat.marcas : [...c.cat.marcas, F.etiqueta];
@@ -3236,6 +3279,7 @@ function erroresPaso(i){
     const llenas = F.items.filter(x => !itemVacio(x));
     const incompl = F.items.findIndex(x => !itemVacio(x) && (reqItem().some(f => !x[f])));
     if (!llenas.length) e.push(["f-items", "Agrega una prenda"]);
+    else if (llenas.length > MAX_PARTIDAS) e.push(["f-items", erroresPago.partidas]);
     else if (incompl >= 0) e.push(["f-items", "Completa lo marcado en rojo"]);
     else if (llenas.some(x => cantidad(x.cant) === null)) e.push(["f-items", "Las unidades deben ser un entero positivo"]);
   }
@@ -3659,15 +3703,12 @@ async function saveForm(ov, orig){
     return;
   }
   const tel = F._checkTel(), isP = F.tipo === "personalizado", pago = pagoDelFormulario();
-  const precios = Object.keys(prendasDe(F)).map(k => ({n:k, v:centavos(F.pr[k]) / 100}));
-  const unitarios = new Set(precios.map(p => p.v));
   const now = new Date().toISOString(), nombre = F.cliente.nombre.trim().replace(/\s+/g, " "), pr = perm();
   const data = {
     cliente:{nombre, telefono:tel.e164}, tema:(F.tema || "").trim(), servicio:isP ? F.servicios.join(", ") : "", servicios:isP ? [...F.servicios] : [], prendaDe:isP ? F.prendaDe : "tienda",
     etiqueta:isP ? [...new Set(F.items.filter(i => !itemVacio(i)).map(i => i.etiqueta).filter(Boolean))].join(", ") : "",
-    items:F.items.filter(i => !itemVacio(i)).map(i => ({etiqueta:isP ? (i.etiqueta || "") : "", prenda:i.prenda, color:isP ? i.color : "Fullprint", horma:i.horma || "", talla:i.talla, cant:cantidad(i.cant), nombre:(i.nombre || "").trim(), numero:(i.numero || "").trim()})),
-    fechaEntrega:F.fechaEntrega, precios, precio:unitarios.size === 1 ? precios[0].v : 0,
-    moneda:F.moneda, abono:pago.abono / 100, pagoVersion:1, totalMenor:pago.total, abonoMenor:pago.abono,
+    items:F.items.filter(i => !itemVacio(i)).map(i => ({etiqueta:isP ? (i.etiqueta || "") : "", prenda:i.prenda, color:isP ? i.color : "Fullprint", horma:i.horma || "", talla:i.talla, cant:cantidad(i.cant), precioMenor:precioUnitario(F, i), nombre:(i.nombre || "").trim(), numero:(i.numero || "").trim()})),
+    fechaEntrega:F.fechaEntrega, moneda:F.moneda, pagoVersion:2, totalMenor:pago.total, abonoMenor:pago.abono,
     motivoSinAbono:pago.abono > 0 ? "" : (F.motivoSinAbono || "").trim(), urgente:!!F.urgente,
     imagenes:F.imagenes.filter(i => i.id && !i.error).map(i => i.id), nota:(F.nota || "").trim(),
     editadoEn:now, editadoPor:S.me.usuario
@@ -3689,7 +3730,7 @@ async function saveForm(ov, orig){
     const J = x => JSON.stringify(x === undefined ? null : x);
     const campos = [["Cliente", o => [o.cliente && o.cliente.nombre, o.cliente && o.cliente.telefono]], ["Diseño", o => o.tema], ["Estampado", o => o.servicio], ["Quién pone la prenda", o => o.prendaDe],
       ["Prendas", o => (o.items || []).map(i => [i.etiqueta, i.prenda, i.color, i.horma, i.talla, unidadesDe(i, o), i.nombre || "", i.numero || ""])], ["Fecha de entrega", o => o.fechaEntrega],
-      ["Precios", o => (o.items || []).map(i => precioDe(o, prKey(i, o)))], ["Pago", o => [centavosHistoricos(o.abono), o.moneda]], ["Urgente", o => !!o.urgente], ["Referencias", o => o.imagenes || []], ["Nota", o => (o.nota || "").trim()]];
+      ["Precios", o => (o.items || []).map(i => precioUnitario(o, i))], ["Pago", o => [abonoMenor(o), o.moneda]], ["Urgente", o => !!o.urgente], ["Referencias", o => o.imagenes || []], ["Nota", o => (o.nota || "").trim()]];
     const cambios = campos.filter(([, f]) => J(f(orig)) !== J(f(data))).map(([n]) => n);
     if (cambios.length) Object.assign(data, {revisar:true, revisarCambios:[...new Set([...(orig.revisar ? orig.revisarCambios || [] : []), ...cambios])], revisarPor:S.me.usuario, revisarEn:now});
   }
@@ -3750,7 +3791,7 @@ function resumenTexto(p){
     p.etiqueta && `Etiqueta: ${p.etiqueta}`, " ",
     ...(p.items || []).map(i => `• ${unidadesDe(i, p) > 1 ? unidadesDe(i, p) + "× " : ""}${itemLine(i)}${i.horma ? " (" + i.horma + ")" : ""}`), " ", p.nota && `Nota: ${p.nota}`,
     `Cliente: ${p.cliente.nombre}`, `WhatsApp: ${prettyPhone(p.cliente.telefono)}`, `Entrega: ${fmtDate(p.fechaEntrega)}`,
-    ...Object.keys(prendasDe(p)).map(k => `Precio ${k}: ${money(precioDe(p, k), p.moneda)}`), `Total: ${money(t.total, p.moneda)}`, `Abono: ${money(t.abono, p.moneda)} · Saldo: ${money(t.saldo, p.moneda)}`, p.motivoSinAbono && `Sin abono: ${p.motivoSinAbono}`].filter(Boolean).join("\n").replace(/\n \n/g, "\n\n");
+    ...new Set((p.items || []).map(i => `Precio ${claveBase(i, p)}: ${money(precioUnitario(p, i) / 100, p.moneda)}`)), `Total: ${money(t.total, p.moneda)}`, `Abono: ${money(t.abono, p.moneda)} · Saldo: ${money(t.saldo, p.moneda)}`, p.motivoSinAbono && `Sin abono: ${p.motivoSinAbono}`].filter(Boolean).join("\n").replace(/\n \n/g, "\n\n");
 }
 function tallyTable(p){
   const c = cfg().cat, order = [...c.tallasAdulto, ...c.tallasPlus, ...c.tallasNino], g = {}, ts = new Set();
@@ -3788,7 +3829,7 @@ function openDetail(id){
         ${extra.length ? `<div class="pdextra">${extra.map(x => `<span>${esc(x)}</span>`).join("")}</div>` : ""}
         <hr>
         <div class="pdrow"><span class="pdlbl">PRENDAS</span><span class="pdmut">${t.piezas} ${t.piezas === 1 ? "pieza" : "piezas"}</span></div>
-        <ul class="pdit">${(p.items || []).map(i => { const sub = [i.talla ? "Talla " + i.talla : "", i.horma, i.etiqueta, i.nombre, i.numero ? "N° " + i.numero : ""].filter(Boolean); return `<li><span class="q num">${esc(unidadesDe(i, p))}</span><span class="d"><b>${esc(i.prenda)} ${esc(i.color.toLowerCase())}</b>${sub.length ? `<small>${esc(sub.join(" · "))}</small>` : ""}</span><span class="pr num">${esc(money(importeLinea(p, i), p.moneda))}</span></li>`; }).join("")}</ul>
+        <ul class="pdit">${(p.items || []).map(i => { const sub = [i.talla ? "Talla " + i.talla : "", i.horma, i.etiqueta, i.nombre, i.numero ? "N° " + i.numero : ""].filter(Boolean); return `<li><span class="q num">${esc(unidadesDe(i, p))}</span><span class="d"><b>${esc(i.prenda)} ${esc(String(i.color || "").toLowerCase())}</b>${sub.length ? `<small>${esc(sub.join(" · "))}</small>` : ""}</span><span class="pr num">${esc(money(importeLinea(p, i), p.moneda))}</span></li>`; }).join("")}</ul>
       </div>
       <div class="pdcard">
         <div class="pdrow"><span class="pdlbl ic">${I("cash")}PAGO</span></div>
