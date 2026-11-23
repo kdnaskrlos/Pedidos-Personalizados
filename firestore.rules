@@ -21,11 +21,11 @@ service cloud.firestore {
       return (t == 'personalizado' && me().get('verPersonalizado', false) == true)
           || (t == 'sublimacion' && me().get('verSublimacion', false) == true);
     }
-    function puedeVer(p) {
-      return admin() || (activo() && verTipo(p.tipo)
-        && ((p.publico == true && me().get('soloAsignados', false) != true)
-          || me().usuario in p.lectores));
+    function puedeVerEmpleado(p) {
+      return activo() && verTipo(p.tipo)
+        && ((p.publico == true && me().get('soloAsignados', false) != true) || me().usuario in p.lectores);
     }
+    function puedeVer(p) { return admin() || puedeVerEmpleado(p); }
     function iniciaAhora() {
       return signed() && !exists(estadoPath()) && getAfter(estadoPath()).data.iniciadoPor == request.auth.uid;
     }
@@ -216,7 +216,7 @@ service cloud.firestore {
       let delta = p.diff(resource.data).affectedKeys();
       let esAdmin = admin();
       let esRestauracion = esAdmin && p.get('restaurado', false) == true;
-      return puedeVer(resource.data)
+      return (esAdmin || puedeVerEmpleado(resource.data))
         && !delta.hasAny(['tipo', 'codigo', 'creadoPor', 'creadoEn', 'creadorUid', 'consecutivo', 'demo'])
         && (!delta.hasAny(['cliente', 'imagenes', 'nota', 'tema']) || datosPedidoValidos(p) || esRestauracion)
         && (esAdmin

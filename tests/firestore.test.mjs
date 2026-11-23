@@ -221,8 +221,10 @@ test("verifica cada partida y el total de pedidos múltiples por API, incluso en
   const idMax = randomUUID();
   assert.equal(await assertSucceeds(alta(luis,"luis",{...max,creadoPor:"luis",lectores:["luis"],imagenes:fotos.map(f => f.id)},idMax,fotos))
     .catch(e => { throw new Error("Alta con el máximo de partidas y fotos", {cause:e}); }),"P-0051");
+  await assertSucceeds(cambiar(admin,"usuarios/luis",{bloquear:true}));
   await assertSucceeds(cambiar(luis,"pedidos/" + idMax,{
-    items:[partida(2,100), ...partidasMaximas.slice(1)],totalMenor:(MAX_PARTIDAS + 1) * 100,editadoPor:"luis"
+    items:[partida(2,100), ...partidasMaximas.slice(1)],totalMenor:(MAX_PARTIDAS + 1) * 100,editadoPor:"luis",
+    revisar:true,revisarPor:"luis",revisarCambios:["Prendas"],publico:false,denegados:["ana"]
   }));
   assert.equal(await assertSucceeds(alta(ana,"ana",{...max,items:[partida(10 ** 12,1)],totalMenor:10 ** 12})),"P-0052");
 });
