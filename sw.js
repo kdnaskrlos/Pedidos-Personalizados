@@ -1,6 +1,6 @@
 // Permite instalar la app y abrirla al instante, con o sin internet.
 // La cola de pedidos usa IndexedDB y las lecturas guardadas usan la caché de Firebase.
-const CACHE = "pedidos-v177";
+const CACHE = "pedidos-v178";
 const LIBS = "libs-v1"; // Firebase y la fuente: archivos con versión fija, se guardan una vez
 const SHELL = ["./", "./index.html", "./config.js", "./pagos.mjs", "./calendario.mjs", "./notas.mjs", "./pedido-export.mjs", "./heic.mjs", "./heic-worker.mjs", "./vendor/libheif-bundle.mjs", "./whatsapp.mjs", "./pedidos-sync.mjs", "./cola-local.mjs", "./manifest.webmanifest", "./icono-192.png", "./icono-512.png", "./icono-maskable-512.png", "./apple-touch-icon.png"];
 self.addEventListener("install", e => { e.waitUntil(caches.open(CACHE).then(c => c.addAll(SHELL.map(u => new Request(u, {cache:"reload"})))).then(() => self.skipWaiting())); });

@@ -158,7 +158,7 @@ async function escribirNotaConListas(page) {
   await page.keyboard.insertText("Doblar");
   await nota.press("Enter");
   await nota.press("Enter");
-  await page.getByRole("button",{name:"☐ Casilla"}).click();
+  await page.getByRole("button",{name:"• Viñeta"}).click();
   await page.keyboard.insertText("Revisar empaque");
   await nota.press("Enter");
   await nota.press("Enter");
@@ -366,7 +366,7 @@ async function crearSublimado(page, tema, opciones = {}) {
   }
   await page.locator("#in-abono").fill("0,25");
   await page.locator("#next").click();
-  const notaEsperada = "Nota " + tema + (opciones.errores ? "\n• Separar prendas\n• Doblar\n☐ Revisar empaque\nLínea normal" : "");
+  const notaEsperada = "Nota " + tema + (opciones.errores ? "\n• Separar prendas\n• Doblar\n• Revisar empaque\nLínea normal" : "");
   await page.locator("#in-nota").fill("Nota " + tema);
   if (opciones.errores) await escribirNotaConListas(page);
   assert.equal(await page.locator("#in-nota").inputValue(),notaEsperada);
@@ -634,10 +634,10 @@ test("escritorio y móvil: login, altas offline en varios clientes, recarga, sin
     ]);
     comprobarCamposPNG(resumen);
     assert.ok(fotos.every(foto => foto.subarray(0,8).equals(Buffer.from([137,80,78,71,13,10,26,10]))));
-    assert.match(resumen,/Nota Tema Escritorio\n• Separar prendas\n• Doblar\n☐ Revisar empaque\nLínea normal/i);
+    assert.match(resumen,/Nota Tema Escritorio\n• Separar prendas\n• Doblar\n• Revisar empaque\nLínea normal/i);
     assert.match(resumen,/19\.97/);
-    await visible(page.locator("#d-download-status"));
-    assert.match(await page.locator("#d-download-status").textContent(),/elige Permitir/);
+    await oculto(page.locator("#d-download-status"));
+    assert.equal(await page.locator("#d-download-status").textContent(),"");
     await comprobarChatsEscritorio(page);
 
     await cel.locator(".oc2:visible").filter({hasText:/Tema Escritorio/i}).click();
@@ -672,7 +672,7 @@ test("escritorio y móvil: login, altas offline en varios clientes, recarga, sin
     await visible(selector);
     await selector.getByRole("button",{name:"Cancelar fecha"}).click();
     await page.locator('[data-go="3"]').click();
-    assert.match(await page.locator("#in-nota").inputValue(),/• Doblar\n☐ Revisar empaque\nLínea normal/);
+    assert.match(await page.locator("#in-nota").inputValue(),/• Doblar\n• Revisar empaque\nLínea normal/);
     await page.locator("#in-nota").fill("Nota editada desde escritorio");
     await page.locator("#save").click();
     await oculto(page.locator("#save"));
@@ -914,7 +914,7 @@ test("demo independiente: agenda, HEIC, PNG, Etiqueta y WhatsApp sin servicios e
     assert.match(resumen,/\$ 38\.00/);
     assert.match(resumen,/Prenda a cargo de\nCliente/);
     assert.match(resumen,/Confirmar la ubicación del número/);
-    assert.match(resumen,/• Doblar\n☐ Revisar empaque\nLínea normal/);
+    assert.match(resumen,/• Doblar\n• Revisar empaque\nLínea normal/);
     assert.match(resumen,/Registrado por/);
     assert.deepEqual(errores,[]);
     assert.deepEqual(externas,[]);
