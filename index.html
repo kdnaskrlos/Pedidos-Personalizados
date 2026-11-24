@@ -162,7 +162,7 @@ button.pill:hover{border-color:var(--ink)}
 .md.wide{max-width:1040px}
 .mh{flex:none;display:flex;align-items:center;gap:10px;padding:14px 18px;border-radius:16px 16px 0 0;background:var(--surface);border-bottom:1px solid var(--line)}
 .mh h2{font-size:17px;font-weight:800;flex:1;min-width:0}
-.mh .ib{width:36px;height:36px;border:1px solid var(--line);border-radius:10px;background:var(--surface);display:grid;place-items:center;color:var(--muted)}
+.mh .ib,.agselector .agcancel{width:36px;height:36px;border:1px solid var(--line);border-radius:10px;background:var(--surface);display:grid;place-items:center;color:var(--muted)}
 .mh .ib:hover{color:var(--ink);border-color:var(--ink)}
 .mb{padding:16px 18px;display:flex;flex-direction:column;gap:12px;overflow:auto;flex:1;overscroll-behavior:contain}
 .mf{flex:none;display:flex;gap:8px;justify-content:flex-end;padding:12px 18px;background:var(--surface);border-top:1px solid var(--line);border-radius:0 0 16px 16px;flex-wrap:wrap}
@@ -1010,6 +1010,24 @@ html,body{overflow-x:clip}
 .lbdots b.on{background:#fff;transform:scale(1.25)}
 .lbx-x{position:absolute;top:max(14px,env(safe-area-inset-top));right:14px;z-index:2;width:40px;height:40px;border-radius:99px;border:0;background:#ffffff26;color:#fff;display:grid;place-items:center;cursor:pointer}
 .lbx-x svg.i{width:20px;height:20px}
+.lbx-nav,.lbx-x.lbx-down,#d-download{display:none}
+.lbindicador{position:absolute;width:1px;height:1px;overflow:hidden;clip-path:inset(50%)}
+.ref-btn{display:block;width:100%;height:100%;padding:0;border:0;background:none;cursor:zoom-in}
+.agselector .agtitle{align-items:center;border-top:0;padding-top:0}
+.agselector .agconfirmacion{position:sticky;bottom:-12px;margin:0 -12px -12px;padding:8px 12px 12px;background:var(--surface)}
+.agselector .agconf{width:100%;justify-content:center}
+.dpg i.dd.ag{pointer-events:none}
+@media(min-width:761px){
+  .lbx-next svg.i{transform:rotate(-90deg)}
+  .lbx.gal .lbvp{inset:clamp(54px,10dvh,68px) clamp(54px,9vw,94px) clamp(30px,7dvh,48px)}
+  .lbx.gal .lbs{padding:0;grid-template: minmax(0,1fr) / minmax(0,1fr)}
+  .lbx.gal .lbs img{width:100%;height:100%;min-width:0;min-height:0;object-fit:contain;border-radius:0}
+  .lbx-nav{display:grid;top:50%;transform:translateY(-50%)}
+  .lbx-prev{right:auto;left:14px}
+  .lbx-nav:disabled{opacity:.35;cursor:default}
+  .lbx-x.lbx-down{display:grid;right:62px}
+  .pdmd #d-download{display:inline-flex}
+}
 /* v3.60 mejoras del reporte de diseño: contraste, etiquetas en texto normal, toques de 44 px */
 .f>label,.lbl{font-size:13px;text-transform:none;letter-spacing:0;font-weight:600}
 .sec{letter-spacing:.06em}
@@ -1150,9 +1168,11 @@ html,body{overflow-x:clip}
 
 <script type="module">
 import { firebaseConfig } from "./config.js";
+import { entregasPorFecha, fechasDelMes } from "./calendario.mjs";
+import { esHeif, cargarHeif, FORMATOS_FOTO } from "./heic.mjs";
 import { consecutivoDe, documentosFoto, registrarPedido } from "./pedidos-sync.mjs";
 import { guardarPendiente, leerPendientes, borrarPendiente, guardarFotoLocal, leerFotoLocal, borrarFotoLocal } from "./cola-local.mjs";
-import { MAX_PARTIDAS, centavos, centavosHistoricos, cantidad, clavePrecio, precioHistorico, validarPago, validarPagoEnCentavos, actualizarPagoPendiente } from "./pagos.mjs";
+import { MAX_PARTIDAS, centavos, centavosHistoricos, cantidad, clavePrecio, precioHistorico, valorPrecioHistorico, validarPago, validarPagoEnCentavos, actualizarPagoPendiente } from "./pagos.mjs";
 import { initializeApp, deleteApp } from "https://www.gstatic.com/firebasejs/10.12.2/firebase-app.js";
 import { getAuth, onAuthStateChanged, signInWithEmailAndPassword, createUserWithEmailAndPassword, signOut, updatePassword, reauthenticateWithCredential, EmailAuthProvider } from "https://www.gstatic.com/firebasejs/10.12.2/firebase-auth.js";
 import { initializeFirestore, getFirestore, persistentLocalCache, persistentMultipleTabManager, doc, collection, query, where, onSnapshot, getDoc, getDocFromCache, getDocFromServer, getDocsFromServer, setDoc as fsSetDoc, updateDoc as fsUpdateDoc, deleteDoc as fsDeleteDoc, writeBatch as fsWriteBatch, runTransaction } from "https://www.gstatic.com/firebasejs/10.12.2/firebase-firestore.js";
@@ -1168,7 +1188,7 @@ const updateDoc = (...a) => sinEsperar(fsUpdateDoc(...a));
 const deleteDoc = (...a) => sinEsperar(fsDeleteDoc(...a));
 const writeBatch = db => { const b = fsWriteBatch(db), c = b.commit.bind(b); b.commit = () => sinEsperar(c()); return b; };
 
-const VERSION = "v3.68";
+const VERSION = "v3.69";
 /* ================= Utilidades ================= */
 const $ = (s, r = document) => r.querySelector(s);
 const esc = s => String(s ?? "").replace(/[&<>"']/g, c => ({"&":"&amp;","<":"&lt;",">":"&gt;",'"':"&quot;","'":"&#39;"}[c]));
@@ -2797,20 +2817,56 @@ function chooseTipo(cliente){
   };
 }
 // Visor de imágenes: con varias se desliza entre ellas (mismo movimiento que el calendario); tocar cierra
-function lightbox(src, lista, editar){
-  const fotos = (lista && lista.length ? lista : [src]).filter(Boolean); let i = Math.max(0, fotos.indexOf(src));
-  const lb = document.createElement("div"); lb.className = "lbx gal";
-  lb.innerHTML = `<button class="lbx-x" aria-label="Cerrar">${I("x")}</button>${editar ? `<button class="lbx-x lbx-ed" aria-label="Editar imagen" title="Editar imagen">${I("edit")}</button>` : ""}<div class="lbvp"><div class="lbtrack">${fotos.map(s => `<div class="lbs"><img src="${esc(s)}" alt="" draggable="false"></div>`).join("")}</div></div>${fotos.length > 1 ? `<div class="lbdots">${fotos.map((_, k) => `<b${k === i ? ' class="on"' : ""}></b>`).join("")}</div>` : ""}`;
+function lightbox(fotos, {inicio = 0, editar, descargar} = {}){
+  let i = inicio, descargando = false;
+  const origen = document.activeElement, n = fotos.length;
+  const lb = document.createElement("div");
+  lb.className = "lbx gal";
+  lb.setAttribute("role","dialog"); lb.setAttribute("aria-modal","true"); lb.setAttribute("aria-label","Referencias");
+  lb.innerHTML = `<button class="lbx-x lbx-close" type="button" aria-label="Cerrar">${I("x")}</button>
+    ${editar ? `<button class="lbx-x lbx-ed" type="button" aria-label="Editar imagen" title="Editar imagen">${I("edit")}</button>` : ""}
+    ${descargar ? `<button class="lbx-x lbx-down" type="button" aria-label="Descargar foto" title="Descargar foto">${I("download")}</button>` : ""}
+    <div class="lbvp"><div class="lbtrack">${fotos.map(({src}, k) => `<div class="lbs"><img src="${esc(src)}" alt="Referencia ${k + 1}" draggable="false"></div>`).join("")}</div></div>
+    ${n > 1 ? `<button class="lbx-x lbx-nav lbx-prev" type="button" aria-label="Foto anterior">${I("back")}</button><button class="lbx-x lbx-nav lbx-next" type="button" aria-label="Foto siguiente">${I("chev")}</button>
+      <div class="lbdots" aria-hidden="true">${fotos.map(() => "<b></b>").join("")}</div>` : ""}
+    <div class="lbindicador" role="status"></div>`;
   overlay(lb);
-  const tr = lb.querySelector(".lbtrack"), n = fotos.length;
-  lb.querySelector(".lbx-x").addEventListener("click", () => lb.close());
-  if (editar) lb.querySelector(".lbx-ed").addEventListener("click", () => { const s = fotos[i]; lb.close(); setTimeout(() => editar(s), 140); });
-  const pos = (dx, t) => { tr.style.transition = t ? `transform ${t}s cubic-bezier(.22,.9,.3,1)` : "none"; tr.style.transform = `translate3d(calc(${-i * 100}% + ${dx}px),0,0)`; };
-  const puntos = () => lb.querySelectorAll(".lbdots b").forEach((b, k) => b.classList.toggle("on", k === i));
-  const ir = (k, rapido) => { i = Math.max(0, Math.min(n - 1, k)); pos(0, rapido ? .18 : .26); puntos(); };
-  pos(0);
+  const cerrar = lb.close;
+  lb.close = (...a) => { cerrar(...a); origen?.focus(); };
+  const tr = lb.querySelector(".lbtrack"), previa = lb.querySelector(".lbx-prev"), siguiente = lb.querySelector(".lbx-next"), descarga = lb.querySelector(".lbx-down");
+  lb.querySelector(".lbx-close").onclick = () => lb.close();
+  if (editar) lb.querySelector(".lbx-ed").onclick = () => { const foto = fotos[i]; lb.close(); setTimeout(() => editar(foto), 140); };
+  if (descarga) descarga.onclick = async () => {
+    if (descargando) return;
+    descargando = true; descarga.disabled = true; descarga.setAttribute("aria-busy","true");
+    try { await descargar(fotos[i]); }
+    catch { toast("No se pudo descargar la foto. Inténtalo de nuevo.", true); }
+    finally {
+      descargando = false;
+      descarga.disabled = false;
+      descarga.removeAttribute("aria-busy");
+      if (lb.isConnected && document.activeElement === document.body) descarga.focus();
+    }
+  };
+  const pos = (dx, t) => {
+    tr.style.transition = t && !MENOS_MOV ? `transform ${t}s cubic-bezier(.22,.9,.3,1)` : "none";
+    tr.style.transform = `translate3d(calc(${-i * 100}% + ${dx}px),0,0)`;
+  };
+  const ir = (k, t = .26) => {
+    i = Math.max(0, Math.min(n - 1, k));
+    pos(0, t);
+    lb.querySelectorAll(".lbdots b").forEach((b, j) => b.classList.toggle("on", j === i));
+    tr.querySelectorAll(".lbs").forEach((s, j) => s.setAttribute("aria-hidden", String(j !== i)));
+    lb.querySelector(".lbindicador").textContent = `Foto ${i + 1} de ${n}`;
+    if (previa) previa.disabled = i === 0;
+    if (siguiente) siguiente.disabled = i === n - 1;
+    if (document.activeElement?.disabled) lb.focus();
+  };
+  if (previa) previa.onclick = () => ir(i - 1);
+  if (siguiente) siguiente.onclick = () => ir(i + 1);
+  ir(i,0);
   let x0 = null, y0 = 0, modo = "", dx = 0, xs = [], pid = null, movio = false;
-  lb.addEventListener("pointerdown", e => { if (e.target.closest(".lbx-x")) return; x0 = e.clientX; y0 = e.clientY; modo = ""; dx = 0; movio = false; pid = e.pointerId; xs = [[performance.now(), x0]]; });
+  lb.addEventListener("pointerdown", e => { if (e.target.closest("button")) return; x0 = e.clientX; y0 = e.clientY; modo = ""; dx = 0; movio = false; pid = e.pointerId; xs = [[performance.now(), x0]]; });
   lb.addEventListener("pointermove", e => {
     if (x0 === null || e.pointerId !== pid) return;
     const mx = e.clientX - x0, my = e.clientY - y0;
@@ -2827,11 +2883,20 @@ function lightbox(src, lista, editar){
     if (modo !== "x") return;
     const a = xs[0], b = xs[xs.length - 1], vel = b[0] - a[0] > 8 ? (b[1] - a[1]) / (b[0] - a[0]) : 0;
     const rapido = Math.abs(vel) > .35 && Math.sign(vel) === Math.sign(dx) && Math.abs(dx) > 20;
-    ir(rapido || Math.abs(dx) > lb.clientWidth * .2 ? i + (dx < 0 ? 1 : -1) : i, rapido);
+    ir(rapido || Math.abs(dx) > lb.querySelector(".lbvp").clientWidth * .2 ? i + (dx < 0 ? 1 : -1) : i, rapido ? .18 : .26);
   };
   lb.addEventListener("pointerup", soltar); lb.addEventListener("pointercancel", e => { if (e.pointerId === pid) { x0 = null; ir(i); } });
   lb.tabIndex = -1; lb.focus();
-  lb.addEventListener("keydown", e => { if (e.key === "ArrowRight") ir(i + 1); if (e.key === "ArrowLeft") ir(i - 1); if (e.key === "Escape") lb.close(); });
+  lb.addEventListener("keydown", e => {
+    if (e.key === "Escape") { e.preventDefault(); return lb.close(); }
+    if (e.key === "ArrowRight" || e.key === "ArrowLeft") { e.preventDefault(); return ir(i + (e.key === "ArrowRight" ? 1 : -1)); }
+    if (e.key === "Tab") {
+      const botones = [...lb.querySelectorAll("button:not(:disabled)")].filter(b => b.offsetWidth);
+      const destino = e.shiftKey && [lb,botones[0]].includes(e.target) ? botones.at(-1)
+        : !e.shiftKey && e.target === botones.at(-1) ? botones[0] : null;
+      if (destino) { e.preventDefault(); destino.focus(); }
+    }
+  });
 }
 
 /* ================= Fotos (comprimidas dentro de Firestore) ================= */
@@ -2876,7 +2941,7 @@ function dibujar(img, max, q){
   return c.toDataURL(WEBP ? "image/webp" : "image/jpeg", q);
 }
 async function toDataURL(file){
-  const img = await loadImage(file);
+  const img = esHeif(file) ? await cargarHeif(file) : await loadImage(file);
   let max = 1600, q = WEBP ? .8 : .82, data = "";
   for (let k = 0; k < 7; k++) {
     data = dibujar(img, max, q);
@@ -2896,6 +2961,7 @@ async function prepararFoto(file, im, form){
 }
 /* ================= Calendario emergente ================= */
 function openCalendar(current, onPick, opts = {}){
+  if (opts.entrega) return openAgenda({entrega:onPick, actual:current});
   let sel = current ? parseYmd(current) : null;
   const v = sel ? new Date(sel) : today0(); v.setDate(1);
   const ov = document.createElement("div"); ov.className = "dp-ov"; overlay(ov);
@@ -2925,41 +2991,55 @@ function openCalendar(current, onPick, opts = {}){
 
 /* ===== Calendario de pedidos (por fecha de entrega), como una agenda ===== */
 // Fila compacta del calendario (como en Avisos) con miniatura de la imagen
-function agRow(p){
+function agRow(p, abrible = true){
   const T = TIPOS[p.tipo], im = (p.imagenes || [])[0], d = dueShort(p);
-  return `<div class="arow agrow" style="--c:${T.c}" data-open="${esc(p._id)}" role="button" tabindex="0">
+  return `<div class="arow agrow" style="--c:${T.c}" ${abrible ? `data-open="${esc(p._id)}" role="button" tabindex="0"` : ""}>
     ${im ? `<img class="agth" data-mini="${esc(im)}" alt="" decoding="async">` : `<span class="agth noimg">${I(T.icon)}</span>`}
     <div class="atx"><b>${esc(p.cliente && p.cliente.nombre)}</b><small>${esc(p.tema || "Sin nombre de diseño")}</small></div>
     ${p.urgente ? `<span class="oc2-urgi" title="Urgente">${I("alert")}</span>` : d.t ? `<span class="oc2-due ${d.c}">${esc(d.t)}</span>` : ""}
   </div>`;
 }
-function openAgenda(){
-  const v = today0(); v.setDate(1);
-  let sel = ymd(today0()), moviendo = false;
-  const ov = document.createElement("div"); ov.className = "dp-ov agov"; overlay(ov);
-  const porDia = () => { const g = {}; pedidosList().forEach(p => { if (p.fechaEntrega) (g[p.fechaEntrega] = g[p.fechaEntrega] || []).push(p); }); return g; };
-  // Una cuadrícula de mes (siempre 6 filas para que no cambie de tamaño)
-  const grilla = (y, m, g) => {
-    const first = (new Date(y, m, 1).getDay() + 6) % 7, nd = new Date(y, m + 1, 0).getDate(), t0 = ymd(today0());
+function openAgenda({entrega, actual} = {}){
+  let sel = actual || ymd(today0()), moviendo = false;
+  const v = parseYmd(sel); v.setDate(1);
+  const origen = document.activeElement;
+  const ov = document.createElement("div");
+  ov.className = entrega ? "dp-ov agselector" : "dp-ov agov";
+  overlay(ov);
+  if (entrega) {
+    const cerrar = ov.close;
+    ov.close = (...a) => { cerrar(...a); origen?.focus(); };
+  }
+  const porDia = () => entregasPorFecha(pedidosList());
+  const grilla = (y, m, g, visible) => {
+    const t0 = ymd(today0());
     let cells = ["Lu","Ma","Mi","Ju","Vi","Sá","Do"].map(x => `<span>${x}</span>`).join("");
-    for (let i = 0; i < first; i++) cells += "<i></i>";
-    for (let dd = 1; dd <= nd; dd++) {
-      const s = `${y}-${pad(m+1)}-${pad(dd)}`, l = g[s] || [];
+    for (const celda of fechasDelMes(y, m)) {
+      if (!celda) { cells += '<i class="dd ag"></i>'; continue; }
+      const {dia, fecha} = celda, l = g.get(fecha) || [];
       const act = l.filter(p => p.estado !== "entregado");
-      const puntos = act.slice(0, 3).map(p => `<b class="pt-${p.urgente ? "err" : dueShort(p).c || "nor"}"></b>`).join("") + (act.length > 3 ? `<small>+${act.length - 3}</small>` : "") + (!act.length && l.length ? `<b class="pt-ok"></b>` : "");
-      cells += `<button class="dd ag ${s === t0 ? "hoy" : ""} ${s === sel ? "sel" : ""} ${l.length ? "con" : ""}" data-d="${s}"><span>${dd}</span><em>${puntos}</em></button>`;
+      const puntos = act.slice(0, 3).map(p => `<b class="pt-${p.urgente ? "err" : dueShort(p).c || "nor"}"></b>`).join("") + (act.length > 3 ? `<small>+${act.length - 3}</small>` : "") + (!act.length && l.length ? '<b class="pt-ok"></b>' : "");
+      const nombre = `${dia} de ${MESES[m]} de ${y}, ${l.length} ${l.length === 1 ? "entrega" : "entregas"}`;
+      cells += `<button type="button" class="dd ag ${fecha === t0 ? "hoy" : ""} ${fecha === sel ? "sel" : ""} ${l.length ? "con" : ""}" data-d="${fecha}" aria-label="${nombre}" aria-pressed="${fecha === sel}"><span>${dia}</span><em aria-hidden="true">${puntos}</em></button>`;
     }
-    for (let k = first + nd; k < 42; k++) cells += `<i class="dd ag"></i>`;
-    return `<div class="dpg">${cells}</div>`;
+    return `<div class="dpg"${visible ? "" : ' inert aria-hidden="true"'}>${cells}</div>`;
   };
   const mesDe = k => { const d = new Date(v.getFullYear(), v.getMonth() + k, 1); return [d.getFullYear(), d.getMonth()]; };
   const draw = () => {
     const g = porDia(), y = v.getFullYear(), m = v.getMonth();
-    const l = (g[sel] || []).sort((a, b) => (a.estado === "entregado") - (b.estado === "entregado") || (b.urgente ? 1 : 0) - (a.urgente ? 1 : 0));
+    const l = [...(g.get(sel) || [])].sort((a, b) => (a.estado === "entregado") - (b.estado === "entregado") || (b.urgente ? 1 : 0) - (a.urgente ? 1 : 0));
     const sc = ov.querySelector(".agpop") ? ov.querySelector(".agpop").scrollTop : 0;
-    ov.innerHTML = `<div class="dp-pop agpop"><div class="dph"><button data-nav="-1">‹</button><b>${MESES[m]} ${y}</b><button data-nav="1">›</button></div>
-      <div class="agvp"><div class="agtrack">${[-1, 0, 1].map(k => grilla(...mesDe(k), g)).join("")}</div></div>
-      ${l.length ? `<div class="alist aglist">${l.map(agRow).join("")}</div>` : ""}</div>`;
+    const foc = ov.contains(document.activeElement) ? document.activeElement.dataset.d : null;
+    const atajo = n => { const d = today0(); d.setDate(d.getDate() + n); return ymd(d); };
+    ov.innerHTML = `<div class="dp-pop agpop"${entrega ? ' role="dialog" aria-modal="true" aria-label="Fecha de entrega"' : ""}>
+      ${entrega ? `<div class="agday agtitle"><b>Fecha de entrega</b><button class="ib agcancel" type="button" data-ag-cerrar aria-label="Cancelar fecha">${I("x")}</button></div>` : ""}
+      <div class="dph"><button type="button" data-nav="-1" aria-label="Mes anterior">‹</button><b aria-live="polite">${MESES[m]} ${y}</b><button type="button" data-nav="1" aria-label="Mes siguiente">›</button></div>
+      <div class="agvp"><div class="agtrack">${[-1, 0, 1].map(k => grilla(...mesDe(k), g, k === 0)).join("")}</div></div>
+      ${entrega ? `<div class="dpq">${[[0,"Hoy"],[1,"Mañana"],[3,"+3 días"],[7,"+1 semana"],[15,"+15 días"]].map(([n,t]) => `<button type="button" class="btn sm" data-d="${atajo(n)}">${t}</button>`).join("")}</div>
+        <div class="agday" aria-live="polite"><b>${esc(fmtDate(sel))}</b><span>${l.length} ${l.length === 1 ? "entrega" : "entregas"}</span></div>` : ""}
+      ${l.length ? `<div class="alist aglist">${l.map(p => agRow(p, !entrega)).join("")}</div>` : ""}
+      ${entrega ? `<div class="agconfirmacion"><button type="button" class="btn primary agconf" data-ag-confirmar>${I("check")}Confirmar fecha</button></div>` : ""}</div>`;
+    if (foc) ov.querySelector(`.dpg:not([inert]) [data-d="${foc}"]`)?.focus();
     if (sc) ov.querySelector(".agpop").scrollTop = sc;
     loadFotos(ov);
   };
@@ -2967,7 +3047,7 @@ function openAgenda(){
   const drawMes = () => {
     const tr = ov.querySelector(".agtrack"), g = porDia();
     tr.style.transition = "none"; tr.style.transform = "";
-    tr.innerHTML = [-1, 0, 1].map(k => grilla(...mesDe(k), g)).join("");
+    tr.innerHTML = [-1, 0, 1].map(k => grilla(...mesDe(k), g, k === 0)).join("");
     ov.querySelector(".dph b").textContent = `${MESES[v.getMonth()]} ${v.getFullYear()}`;
   };
   // Pasa de mes con un deslizamiento corto; si llega otro gesto a mitad, termina al instante
@@ -2982,22 +3062,46 @@ function openAgenda(){
     const una = () => terminar();
     tr.addEventListener("transitionend", una, {once:true}); setTimeout(una, rapido ? 230 : 310);
   };
+  const seleccionar = (fecha, enfocar) => {
+    const p0 = ov.querySelector(".agpop"), h0 = p0 ? p0.getBoundingClientRect().height : 0;
+    sel = fecha;
+    if (entrega) { v.setTime(parseYmd(fecha).getTime()); v.setDate(1); }
+    draw();
+    if (enfocar) ov.querySelector(`.dpg:not([inert]) [data-d="${sel}"]`)?.focus();
+    const p1 = ov.querySelector(".agpop");
+    if (!p1 || MENOS_MOV) return;
+    const h1 = p1.getBoundingClientRect().height;
+    if (Math.abs(h1 - h0) > 2) {
+      p1.style.overflow = "hidden";
+      p1.animate([{height:h0 + "px"}, {height:h1 + "px"}], {duration:260,easing:"cubic-bezier(.22,.9,.3,1)"}).onfinish = () => p1.style.overflow = "";
+    }
+    p1.querySelector(".aglist")?.animate([{opacity:0,transform:"translateY(-6px)"},{opacity:1,transform:"none"}], {duration:220,delay:60,fill:"backwards"});
+  };
   ov.onclick = e => {
-    if (e.target === ov) return ov.close();
+    if (e.target === ov || e.target.closest("[data-ag-cerrar]")) return ov.close();
     if (arrastro) { arrastro = false; return; }
+    if (e.target.closest("[data-ag-confirmar]")) { entrega(sel); return ov.close(); }
     const n = e.target.closest("[data-nav]"); if (n) return irA(Number(n.dataset.nav));
-    const d = e.target.closest("[data-d]"); if (d) {
-      // Al cambiar de día, la ventana crece o se encoge suave según los pedidos de ese día
-      const p0 = ov.querySelector(".agpop"), h0 = p0 ? p0.getBoundingClientRect().height : 0;
-      sel = d.dataset.d; draw();
-      const p1 = ov.querySelector(".agpop"); if (!p1 || MENOS_MOV) return;
-      const h1 = p1.getBoundingClientRect().height;
-      if (Math.abs(h1 - h0) > 2) { p1.style.overflow = "hidden"; p1.animate([{height:h0 + "px"}, {height:h1 + "px"}], {duration:260, easing:"cubic-bezier(.22,.9,.3,1)"}).onfinish = () => p1.style.overflow = ""; }
-      const lst = p1.querySelector(".aglist"); if (lst) lst.animate([{opacity:0, transform:"translateY(-6px)"}, {opacity:1, transform:"none"}], {duration:220, delay:60, easing:"ease-out", fill:"backwards"});
+    const d = e.target.closest("[data-d]"); if (d) return seleccionar(d.dataset.d, !!entrega);
+    const o = e.target.closest("[data-open]"); if (o && !entrega) openDetail(o.dataset.open);
+  };
+  if (entrega) ov.addEventListener("keydown", e => {
+    if (e.key === "Escape") { e.preventDefault(); return ov.close(); }
+    if (e.key === "Tab") {
+      const botones = [...ov.querySelectorAll("button")].filter(b => !b.closest("[inert]"));
+      const destino = e.shiftKey && e.target === botones[0] ? botones.at(-1)
+        : !e.shiftKey && e.target === botones.at(-1) ? botones[0] : null;
+      if (destino) { e.preventDefault(); destino.focus(); }
       return;
     }
-    const o = e.target.closest("[data-open]"); if (o) openDetail(o.dataset.open);
-  };
+    const pasos = {ArrowLeft:-1,ArrowRight:1,ArrowUp:-7,ArrowDown:7};
+    const fecha = e.target.closest(".dpg [data-d]")?.dataset.d;
+    if (!fecha || !Object.hasOwn(pasos,e.key)) return;
+    e.preventDefault();
+    const dia = parseYmd(fecha);
+    dia.setDate(dia.getDate() + pasos[e.key]);
+    seleccionar(ymd(dia), true);
+  });
   // La cuadrícula sigue al dedo; al soltar pasa de mes si se arrastró lo suficiente o con un movimiento rápido
   let x0 = null, y0 = 0, modo = "", dx = 0, arrastro = false, t0 = 0, xs = [];
   // Eventos de puntero con captura: aunque la cuadrícula se redibuje a mitad del gesto, el dedo no se pierde
@@ -3027,7 +3131,10 @@ function openAgenda(){
   };
   ov.addEventListener("pointerup", soltar); ov.addEventListener("pointercancel", soltar);
   draw();
-  const t = setInterval(() => { if (!document.body.contains(ov)) return clearInterval(t); if (!document.querySelector(".md") && !moviendo && x0 === null) draw(); }, 3000);
+  if (entrega) ov.querySelector(`.dpg:not([inert]) [data-d="${sel}"]`)?.focus();
+  else {
+    const t = setInterval(() => { if (!document.body.contains(ov)) return clearInterval(t); if (!document.querySelector(".md") && !moviendo && x0 === null) draw(); }, 3000);
+  }
 }
 
 // Mayúscula inicial mientras se escribe: en cada palabra (nombres) o solo en la primera (tema)
@@ -3135,7 +3242,7 @@ function openForm(id, tipo, cliente, borrador){
       <section class="step" data-step="3" hidden>
         <div class="fsec"><div class="sec">${I("camera")}Imágenes de referencia</div>
           <div class="imgs" id="imgs"></div>
-          <input type="file" id="fileGal" accept="image/*" multiple hidden><input type="file" id="fileCam" accept="image/*" capture="environment" hidden>
+          <input type="file" id="fileGal" accept="${FORMATOS_FOTO}" multiple hidden><input type="file" id="fileCam" accept="${FORMATOS_FOTO}" capture="environment" hidden>
         </div>
         <div class="fsec"><div class="sec">${I("note")}Nota / información adicional</div>
           <textarea class="inp" id="in-nota" rows="3">${esc(F.nota)}</textarea>
@@ -3223,7 +3330,7 @@ function openForm(id, tipo, cliente, borrador){
     if (d.deny !== undefined) { const i = F.denegados.indexOf(d.deny); i >= 0 ? F.denegados.splice(i, 1) : F.denegados.push(d.deny); b.setAttribute("aria-pressed", i < 0); }
   });
   const drawFecha = () => { const s = $("#in-fecha .d", ov); if (F.fechaEntrega) { const n = daysUntil(F.fechaEntrega); s.innerHTML = esc(fmtDate(F.fechaEntrega)) + ` <span class="ph">(${n < 0 ? "hace " + (-n) + " días" : n === 0 ? "hoy" : n === 1 ? "mañana" : "en " + n + " días"})</span>`; } else s.innerHTML = `<span class="ph">Elegir en el calendario</span>`; };
-  $("#in-fecha", ov).onclick = () => openCalendar(F.fechaEntrega, d => { F.fechaEntrega = d; clearErr("f-fecha"); drawFecha(); const m = $("#f-fecha .msg", ov); m.className = "msg warn"; m.textContent = daysUntil(d) < 0 ? "⚠ La fecha elegida ya pasó" : ""; });
+  $("#in-fecha", ov).onclick = () => openCalendar(F.fechaEntrega, d => { F.fechaEntrega = d; clearErr("f-fecha"); drawFecha(); const m = $("#f-fecha .msg", ov); m.className = "msg warn"; m.textContent = daysUntil(d) < 0 ? "⚠ La fecha elegida ya pasó" : ""; guardarBorrador(); }, {entrega:true});
   drawFecha();
   $("#fileGal", ov).onchange = e => { addFiles(e.target.files); e.target.value = ""; };
   $("#fileCam", ov).onchange = e => { addFiles(e.target.files); e.target.value = ""; };
@@ -3596,11 +3703,17 @@ function renderImgs(){
     if (im.local && F._nuevo) borrarFotoLocal(F._owner, im.id).catch(() => {});
     guardarBorrador();
     return renderImgs();
-  } const i = e.target.closest("img"); if (i && i.src) {
-      // El lápiz para editar está dentro del visor
-      const imgs = [...box.querySelectorAll(".imgbox img")];
-      lightbox(i.src, imgs.map(x => x.src), s => { const k = imgs.findIndex(x => x.src === s); const im = F && F.imagenes[k]; if (k < 0 || !im || im.subiendo || im.error) return false; editarImagen(k, s); });
-    } };
+  }
+    const i = e.target.closest("img");
+    if (!i?.getAttribute("src")) return;
+    const fotos = [...box.querySelectorAll(".imgbox img")].filter(x => x.getAttribute("src"))
+      .map(x => ({src:x.src, elemento:x, indice:Number(x.closest(".imgbox").querySelector("[data-rmimg]").dataset.rmimg)}));
+    const form = F;
+    lightbox(fotos,{inicio:fotos.findIndex(f => f.elemento === i), editar:({src,indice}) => {
+      const im = F === form && F.imagenes[indice];
+      if (im && !im.subiendo && !im.error) editarImagen(indice,src);
+    }});
+  };
   loadFotos(box);
 }
 // Editor de imagen de referencia: rotar 90° y recortar libremente
@@ -3680,13 +3793,15 @@ async function addFiles(files){
   const form = F;
   for (const f of Array.from(files)) {
     if (F !== form) break;
-    if (!/^image\//.test(f.type)) { toast("Solo imágenes", true); continue; }
+    const heif = esHeif(f);
+    if (!heif && !/^image\//.test(f.type)) { toast("Solo imágenes", true); continue; }
     const tmp = {subiendo:true};
     form.imagenes.push(tmp); renderImgs();
     try { await prepararFoto(f, tmp, form); }
     catch(e) {
       console.warn(e.name); tmp.subiendo = false; tmp.error = true;
-      toast(e.name === "QuotaExceededError" ? "No hay espacio para guardar la imagen" : "Error al preparar la imagen", true);
+      toast(e.name === "QuotaExceededError" ? "No hay espacio para guardar la imagen"
+        : heif ? "No se pudo convertir la foto HEIC/HEIF. Prueba con otra foto." : "Error al preparar la imagen", true);
     }
     if (F === form) renderImgs();
   }
@@ -3800,13 +3915,102 @@ function tallyTable(p){
   const tl = [...ts].sort((a, b) => ix(a) - ix(b));
   return `<div class="gridwrap"><table class="tally"><thead><tr><th>Prenda</th>${tl.map(t => `<th>${esc(t)}</th>`).join("")}<th>Total</th></tr></thead><tbody>${Object.entries(g).map(([k, r]) => `<tr><td>${esc(k)}</td>${tl.map(t => `<td class="num">${r[t] || ""}</td>`).join("")}<td class="num"><b>${Object.values(r).reduce((a, b) => a + b, 0)}</b></td></tr>`).join("")}</tbody></table></div>`;
 }
+function estadoPedido(p){
+  return ({pendiente:"En producción",listo:p.avisado ? "Sin retirar" : "Listo",entregado:"Entregado"})[p.estado || "pendiente"];
+}
+function modeloExportable(p){
+  const moneda = ["COP","USD","Bs"].includes(p.moneda) ? p.moneda : "";
+  const importe = n => moneda ? money(n, moneda) : n;
+  const calculado = totales(p);
+  const fecha = s => s && Number.isFinite(Date.parse(s)) ? fmtDT(s) : "";
+  const persona = usuario => usuario ? nameOf(usuario) : "";
+  const items = Array.isArray(p.items) ? p.items : [];
+  const tienePrecio = i => {
+    const valor = p.pagoVersion === 2 ? i.precioMenor : valorPrecioHistorico(p, claveBase(i,p));
+    return typeof valor === "number" ? Number.isFinite(valor) : centavos(valor) !== null;
+  };
+  const totalDisponible = items.length > 0 && items.every(i => tienePrecio(i) && cantidad(i.cant) !== null);
+  const abonoDisponible = p.pagoVersion === 2 ? Number.isSafeInteger(p.abonoMenor)
+    : typeof p.abono === "number" ? Number.isFinite(p.abono) : centavos(p.abono) !== null;
+  return {codigo:p.codigo,tipo:TIPOS[p.tipo]?.label,nota:p.nota,datos:[
+    ["Creación",fecha(p.creadoEn)],["Entrega",p.fechaEntrega],["Cliente",p.cliente?.nombre],
+    ["Teléfono",p.cliente?.telefono],["Tema",p.tema],["Servicio",servsDe(p).join(", ")],["Etiqueta",p.etiqueta],
+    ["Prenda a cargo de",({cliente:"Cliente",tienda:"Tienda"})[p.prendaDe]],["Estado",p.estado ? estadoPedido(p) || p.estado : ""],
+    ["Urgente",typeof p.urgente === "boolean" ? (p.urgente ? "Sí" : "No") : ""]
+  ], prendas:items.map(i => [
+    i.prenda,i.horma,i.talla,i.color,cantidad(i.cant),i.nombre,i.numero,i.etiqueta,
+    tienePrecio(i) ? importe(precioUnitario(p,i) / 100) : "",
+    tienePrecio(i) && cantidad(i.cant) !== null ? importe(importeLinea(p,i)) : ""
+  ]),pago:[
+    ["Moneda",moneda],["Total",totalDisponible ? importe(calculado.total) : ""],
+    ["Abono",abonoDisponible ? importe(calculado.abono) : ""],
+    ["Saldo",totalDisponible && abonoDisponible ? importe(calculado.saldo) : ""],["Motivo sin abono",p.motivoSinAbono]
+  ],seguimiento:[
+    ["Registrado por",persona(p.creadoPor)],["Última edición",fecha(p.editadoEn)],["Editado por",persona(p.editadoPor)],
+    ["Listo desde",fecha(p.listoEn)],["Marcado listo por",persona(p.listoPor)],["Cliente avisado",fecha(p.avisadoEn)],
+    ["Avisado por",persona(p.avisadoPor)],["Entregado",fecha(p.entregadoEn)],["Entregado por",persona(p.entregadoPor)],
+    ["Último recordatorio",fecha(p.recordadoEn)],["Recordar desde",p.posponerHasta],["Cambio por revisar",fecha(p.revisarEn)],
+    ["Revisión registrada por",persona(p.revisarPor)],["Cambios",p.revisarCambios?.join(", ")],
+    ["Asignados",p.asignados?.map(persona).join(", ")],["Acceso restringido para",p.denegados?.map(persona).join(", ")]
+  ]};
+}
+
+function exigirPedidoVisible(id, uid){
+  if (!S.me?.activo || S.auth.currentUser?.uid !== uid || S.uid !== uid || !S.pedidos[id])
+    throw new Error("El pedido ya no está disponible");
+  return S.pedidos[id];
+}
+async function descargarReferenciaPedido(id, uid, {idFoto, indice}){
+  const p = exigirPedidoVisible(id, uid);
+  if (!(p.imagenes || []).includes(idFoto)) throw new Error("La referencia cambió");
+  const {archivoReferencia,codigoParaArchivo,descargarArchivo} = await import("./pedido-export.mjs");
+  const foto = await leerFoto(doc(S.db,"fotos",idFoto));
+  if (!(exigirPedidoVisible(id, uid).imagenes || []).includes(idFoto)) throw new Error("La referencia cambió");
+  const archivo = archivoReferencia(foto.data()?.data, indice);
+  descargarArchivo({...archivo,nombre:`${codigoParaArchivo(p.codigo)}-${archivo.nombre}`});
+}
+async function descargarPedido(id, uid, boton, estado){
+  boton.disabled = true;
+  const etiqueta = $("span",boton);
+  etiqueta.textContent = "Preparando…";
+  boton.setAttribute("aria-busy","true");
+  estado.textContent = "Preparando descarga…";
+  let referencia = 0;
+  try {
+    let pedido = exigirPedidoVisible(id, uid);
+    if (S.online) {
+      try { pedido = (await getDocFromServer(doc(S.db,"pedidos",id))).data(); }
+      catch(e) { if (e.code !== "unavailable") throw e; }
+    }
+    if (!pedido) throw new Error("El pedido no está disponible");
+    const {archivoReferencia,archivoPedido,descargarArchivo} = await import("./pedido-export.mjs");
+    const archivos = [];
+    for (const [indice,idFoto] of (pedido.imagenes || []).entries()) {
+      referencia = indice + 1;
+      exigirPedidoVisible(id, uid);
+      const foto = await leerFoto(doc(S.db,"fotos",idFoto));
+      archivos.push(archivoReferencia(foto.data()?.data,indice));
+    }
+    referencia = 0;
+    exigirPedidoVisible(id, uid);
+    descargarArchivo(archivoPedido(modeloExportable(pedido),archivos));
+    estado.textContent = "";
+  } catch {
+    estado.textContent = referencia ? `No se pudo leer la referencia ${referencia}. Reintenta la descarga.` : "No se pudo descargar el pedido.";
+    toast(estado.textContent,true);
+  } finally {
+    boton.disabled = false;
+    etiqueta.textContent = "Descargar";
+    boton.removeAttribute("aria-busy");
+  }
+}
 function openDetail(id){
   const p = S.pedidos[id]; if (!p) return;
   const T = TIPOS[p.tipo], t = totales(p), pr = perm(), est = p.estado || "pendiente";
   const fd = p.fechaEntrega ? parseYmd(p.fechaEntrega) : null;
   const fecha = fd ? `${DIAS[fd.getDay()][0].toUpperCase() + DIAS[fd.getDay()].slice(1)} ${fd.getDate()} de ${MESES[fd.getMonth()]}` : "Sin fecha";
   const due = dueShort(p);
-  const estTxt = est === "pendiente" ? "En producción" : est === "listo" ? (p.avisado ? "Sin retirar" : "Listo") : "Entregado";
+  const estTxt = estadoPedido(p) || est;
   const ini = (p.cliente.nombre || "?").trim().split(/\s+/).slice(0, 2).map(w => w[0]).join("").toUpperCase();
   const extra = [...servsDe(p), p.tipo === "personalizado" ? (p.prendaDe === "cliente" ? "Prenda del cliente" : p.prendaDe === "tienda" ? "Prenda de la tienda" : "") : ""].filter(Boolean);
   const ov = modal(`
@@ -3839,7 +4043,7 @@ function openDetail(id){
         ${t.saldo < 0 ? `<p class="msg warn">El abono supera el total.</p>` : ""}
         ${p.motivoSinAbono ? `<p class="pdmut"><b>Sin abono:</b> ${esc(p.motivoSinAbono)}</p>` : ""}
       </div>
-      ${(p.imagenes || []).length ? `<div class="pdcard"><div class="pdlbl">REFERENCIAS</div><div class="imgs">${p.imagenes.map(im => `<div class="imgbox"><img data-foto="${esc(im)}" alt=""></div>`).join("")}</div></div>` : ""}
+      ${(p.imagenes || []).length ? `<div class="pdcard"><div class="pdlbl">REFERENCIAS</div><div class="imgs">${p.imagenes.map((im, k) => `<div class="imgbox"><button type="button" class="ref-btn" aria-label="Abrir referencia ${k + 1}"><img data-foto="${esc(im)}" alt=""></button></div>`).join("")}</div></div>` : ""}
       ${p.nota ? `<div class="pdcard"><div class="pdlbl">NOTA</div><div class="pdnote">${esc(p.nota)}</div></div>` : ""}
       <p class="hist pdhist">Registrado: ${fmtDT(p.creadoEn)} por ${esc(nameOf(p.creadoPor))}${p.editadoEn ? `<br>Última edición: ${fmtDT(p.editadoEn)} por ${esc(nameOf(p.editadoPor))}` : ""}${p.listoEn ? `<br>Completado: ${fmtDT(p.listoEn)}` : ""}${p.avisadoEn ? `<br>Cliente avisado: ${fmtDT(p.avisadoEn)}` : ""}${p.entregadoEn ? `<br>Entregado: ${fmtDT(p.entregadoEn)}` : ""}${(p.asignados || []).length ? `<br>Visible solo para: ${esc(p.asignados.map(nameOf).join(", "))}` : ""}${(p.denegados || []).length ? `<br><span class="pdlock">${I("lock")}Acceso restringido para: ${esc(p.denegados.map(nameOf).join(", "))}</span>` : ""}</p>
     </div>
@@ -3848,15 +4052,39 @@ function openDetail(id){
         ${est !== "pendiente" ? `<button class="btn" id="d-reab">${I("undo")}Reabrir</button>` : ""}
         ${pr.eliminar ? `<button class="btn danger ico" id="d-del" title="Eliminar pedido" aria-label="Eliminar pedido">${I("trash")}</button>` : ""}
         <button class="btn" id="d-edit">${I("edit")}Editar</button>
+        <button class="btn" id="d-download" type="button">${I("download")}<span>Descargar</span></button>
       </div>
+      <span class="lbindicador" id="d-download-status" role="status"></span>
       ${est === "pendiente" ? `<button class="btn pdlisto" id="d-listo">${I("check")}Marcar pedido listo</button>` : ""}
       ${est === "listo" ? `<div class="dgrid">${p.avisado ? `<a class="btn wa big" id="d-rec" href="${esc(waLink(p, cfg().plantillaRetiro))}" target="_blank" rel="noopener">${I("msg")}Recordar</a>` : `<a class="btn wa big" id="d-wa" href="${esc(waLink(p))}" target="_blank" rel="noopener">${I("msg")}Avisar al cliente</a>`}<button class="btn listo" id="d-ent">${I("box")}Entregado</button></div>` : ""}
     </div>`, "pdmd");
   loadFotos(ov);
-  ov.querySelectorAll(".imgbox img").forEach(i => i.onclick = () => i.src && lightbox(i.src, [...ov.querySelectorAll(".imgbox img")].map(x => x.src)));
+  const uid = S.uid, referencias = [...ov.querySelectorAll(".ref-btn")];
+  let abriendoReferencias = false;
+  referencias.forEach(b => b.onclick = async () => {
+    if (abriendoReferencias) return;
+    abriendoReferencias = true;
+    try {
+      const fotos = (await Promise.all(referencias.map(async (btn, indice) => {
+        const img = $("img",btn), idFoto = img.dataset.foto;
+        const src = img.getAttribute("src") || await leerImagen(idFoto).catch(() => "");
+        return {src,idFoto,indice,btn};
+      }))).filter(f => /^data:image\//.test(f.src));
+      if (!ov.isConnected) return;
+      exigirPedidoVisible(id,uid);
+      const inicio = fotos.findIndex(f => f.btn === b);
+      if (inicio < 0) throw new Error("Referencia no disponible");
+      lightbox(fotos,{inicio,descargar:f => descargarReferenciaPedido(id,uid,f)});
+    } catch {
+      toast("No se pudo abrir la referencia.",true);
+    } finally {
+      abriendoReferencias = false;
+    }
+  });
   const upd = async (data, msg) => { if (await cambiar(id, data, msg)) ov.close(); };
   const on = (s, fn) => { const b = $(s, ov); if (b) b.onclick = fn; };
   on("#d-edit", () => { ov.close(); openForm(id); });
+  on("#d-download", e => descargarPedido(id,uid,e.currentTarget,$("#d-download-status",ov)));
   on("#d-listo", async () => {
     if (!await cambiar(id, {estado:"listo", listoEn:new Date().toISOString(), listoPor:S.me.usuario, avisado:false}, "Listo")) return;
     ov.close();

@@ -8,6 +8,7 @@ import { test } from "node:test";
 import { chromium, devices } from "playwright-core";
 import { initializeTestEnvironment } from "@firebase/rules-unit-testing";
 import { doc, writeBatch } from "firebase/firestore";
+import { unzipSync } from "../vendor/fflate.mjs";
 
 const projectId = "demo-pedidos-codex";
 const root = new URL("../", import.meta.url);
@@ -66,7 +67,7 @@ async function appDePrueba() {
           sdk.set(path,asset);
         }
         data = await sdk.get(path);
-      } else if (/^\/(?:[a-z0-9-]+\.(?:js|mjs|png|webmanifest))$/.test(path)) {
+      } else if (/^\/(?:(?:vendor\/)?[a-z0-9-]+\.(?:js|mjs|png|webmanifest))$/.test(path)) {
         res.setHeader("Content-Type",mime[path.split(".").at(-1)]);
         data = await readFile(new URL(path.slice(1),root));
       } else {
@@ -120,7 +121,17 @@ async function crearSublimado(page, tema, opciones = {}) {
   }
   await page.locator("#next").click();
   await page.locator("#in-fecha").click();
-  await page.getByRole("button",{name:"Mañana",exact:true}).click();
+  const selector = page.getByRole("dialog",{name:"Fecha de entrega"});
+  await visible(selector);
+  if (opciones.errores) {
+    const elegido = selector.locator('.dpg:not([inert]) button[aria-pressed="true"]');
+    const antes = await elegido.getAttribute("data-d");
+    await page.keyboard.press("ArrowRight");
+    assert.notEqual(await elegido.getAttribute("data-d"),antes);
+  }
+  await selector.getByRole("button",{name:"Mañana",exact:true}).click();
+  await visible(selector);
+  await selector.getByRole("button",{name:"Confirmar fecha"}).click();
   await page.locator("#in-mon").selectOption("USD");
   const precios = page.locator("#prl input");
   await precios.first().fill("10,11");
@@ -135,8 +146,23 @@ async function crearSublimado(page, tema, opciones = {}) {
   await page.locator("#next").click();
   await page.locator("#in-nota").fill("Nota " + tema);
   if (opciones.foto) {
-    await page.locator("#fileGal").setInputFiles(new URL("icono-192.png",root).pathname);
-    await visible(page.locator('#imgs img[src^="data:image/"]'));
+    const entrada = page.locator("#fileGal");
+    if (opciones.errores) {
+      await entrada.setInputFiles({name:"invalida.heic",mimeType:"image/heic",buffer:Buffer.from("invalida")});
+      await visible(page.getByText(/No se pudo (abrir|convertir) la foto HEIC/).first());
+      assert.equal(await page.locator("#in-nota").inputValue(), "Nota " + tema);
+      await page.locator("[data-rmimg]").click();
+      await entrada.setInputFiles({
+        name:"referencia.HEIF",mimeType:"application/octet-stream",
+        buffer:await readFile(new URL("tests/fixtures/referencia-orientacion-6.heic",root))
+      });
+      await page.waitForFunction(() => {
+        const foto = document.querySelector("#imgs img");
+        return foto?.naturalWidth === 48 && foto.naturalHeight === 96;
+      });
+    }
+    await entrada.setInputFiles(new URL("icono-192.png",root).pathname);
+    await visible(page.locator('#imgs img[src^="data:image/"]').last());
   }
   await page.locator("#save").click();
   await oculto(page.locator("#save"));
@@ -212,7 +238,7 @@ test("escritorio y móvil: login, altas offline en varios clientes, recarga, sin
     assert.match(await page.locator('[data-act="cola"]').innerText(), /2 pedidos/);
     await page.locator(".mb details summary").first().click();
     await visible(page.getByText(/Nota Tema Escritorio/i));
-    await visible(page.locator(".mb details img"));
+    await visible(page.locator(".mb details img").first());
     await page.getByRole("button",{name:"Cerrar",exact:true}).filter({visible:true}).last().click();
 
     const otraPestana = await desktop.newPage();
@@ -236,8 +262,64 @@ test("escritorio y móvil: login, altas offline en varios clientes, recarga, sin
     await page.locator(".oc2:visible").filter({hasText:/Tema Escritorio/i}).click();
     await visible(page.getByText("Nota Tema Escritorio",{exact:false}));
     assert.match(await page.locator(".pdpay").innerText(),/19\.97/);
-    await page.waitForFunction(() => document.querySelector(".pdmd img[data-foto]")?.naturalWidth > 0);
+    await page.waitForFunction(() => [...document.querySelectorAll(".pdmd img[data-foto]")].filter(img => img.naturalWidth).length === 2);
+    const detalle = page.locator(".pdmd"), visor = page.getByRole("dialog",{name:"Referencias"});
+    const bytesDe = async (tab, n) => Buffer.from((await tab.locator(".pdmd img[data-foto]").nth(n).getAttribute("src")).split(",")[1],"base64");
+    const guardadas = await Promise.all([bytesDe(page,0),bytesDe(page,1)]);
+    await detalle.getByRole("button",{name:"Abrir referencia 1"}).click();
+    await visible(visor);
+    assert.equal(await visor.locator(".lbx-prev").isDisabled(),true);
+    await visor.locator(".lbx-next").click();
+    assert.equal(await visor.locator(".lbx-next").isDisabled(),true);
+    await page.keyboard.press("ArrowLeft");
+    const original = page.waitForEvent("download");
+    await visor.getByRole("button",{name:"Descargar foto"}).click();
+    const imagen = await original;
+    assert.match(imagen.suggestedFilename(),/^S-\d+-referencia-01\.(webp|jpg)$/);
+    assert.deepEqual(await readFile(await imagen.path()),guardadas[0]);
+    await page.setViewportSize({width:900,height:460});
+    assert.equal(await visor.locator(".lbs img").first().evaluate(img => {
+      const {top,bottom,left,right} = img.getBoundingClientRect();
+      return getComputedStyle(img).objectFit === "contain" && top >= 0 && left >= 0 && bottom <= innerHeight && right <= innerWidth;
+    }),true);
+    await page.setViewportSize({width:1440,height:900});
+    await page.keyboard.press("Escape");
+    await oculto(visor);
+    const archivoPedido = page.waitForEvent("download");
+    await detalle.getByRole("button",{name:"Descargar",exact:true}).click();
+    const zip = await archivoPedido;
+    assert.match(zip.suggestedFilename(),/^pedido-S-\d+\.zip$/);
+    const entradas = unzipSync(await readFile(await zip.path()));
+    const resumen = Buffer.from(entradas[Object.keys(entradas).find(n => n.endsWith(".html"))]).toString();
+    assert.match(resumen,/Nota Tema Escritorio/i);
+    assert.match(resumen,/19\.97/);
+    assert.doesNotMatch(resumen,/<img|data:image/);
+    assert.deepEqual(Object.keys(entradas).filter(n => n.startsWith("imagenes/")).map(n => Buffer.from(entradas[n])),guardadas);
+
+    await cel.locator(".oc2:visible").filter({hasText:/Tema Escritorio/i}).click();
+    await oculto(cel.locator("#d-download"));
+    await cel.getByRole("button",{name:"Abrir referencia 1"}).click();
+    const visorMovil = cel.getByRole("dialog",{name:"Referencias"});
+    await visible(visorMovil);
+    for (const control of [".lbx-prev",".lbx-next",".lbx-down"]) await oculto(visorMovil.locator(control));
+    await visorMovil.locator(".lbvp").evaluate(el => {
+      for (const [tipo,x] of [["pointerdown",290],["pointermove",105],["pointerup",105]])
+        el.dispatchEvent(new PointerEvent(tipo,{bubbles:true,cancelable:true,pointerId:1,pointerType:"touch",clientX:x,clientY:300}));
+    });
+    assert.equal(await visorMovil.locator(".lbx-next").isDisabled(),true);
+    await visorMovil.getByRole("button",{name:"Cerrar"}).click();
+    await cel.locator(".pdback").click();
+
     await page.locator("#d-edit").click();
+    await page.locator('[data-go="2"]').click();
+    await page.locator("#in-fecha").click();
+    const selector = page.getByRole("dialog",{name:"Fecha de entrega"});
+    await visible(selector.locator('.dpg:not([inert]) button[aria-pressed="true"][aria-label$="3 entregas"]'));
+    assert.equal(await selector.locator(".agrow").count(),3);
+    assert.equal(await selector.locator(".agrow[data-open]").count(),0);
+    await selector.locator(".agrow").first().click();
+    await visible(selector);
+    await selector.getByRole("button",{name:"Cancelar fecha"}).click();
     await page.locator('[data-go="3"]').click();
     await page.locator("#in-nota").fill("Nota editada desde escritorio");
     await page.locator("#save").click();
@@ -304,10 +386,15 @@ test("escritorio y móvil: login, altas offline en varios clientes, recarga, sin
     await env.withSecurityRulesDisabled(async context => {
       const db = context.firestore(), lote = writeBatch(db);
       lote.set(doc(db,"pedidos","pedido-historico"),{
-        tipo:"sublimacion",codigo:"S-0011",creadoPor:"equipoprueba",creadoEn:"2024-01-01",estado:"pendiente",
+        tipo:"sublimacion",codigo:"S-0011",creadoPor:"equipoprueba",creadoEn:"2024-01-01",fechaEntrega:"2026-12-04",estado:"pendiente",
         tema:"Pedido histórico",nota:"Nota histórica",cliente:{nombre:"Cuenta histórica",telefono:"584120000000"},
         items:[{prenda:"Franela",horma:"Unisex",color:"Fullprint",talla:"M",cant:2}],
         moneda:"USD",precio:5.20,abono:1.00,imagenes:[foto],publico:true,lectores:["equipoprueba"]
+      });
+      lote.set(doc(db,"pedidos","pedido-restringido"),{
+        tipo:"sublimacion",codigo:"S-0012",tema:"Pedido restringido",fechaEntrega:"2026-12-04",
+        creadoPor:"adminprueba",creadoEn:"2024-01-01",estado:"pendiente",items:[],
+        cliente:{nombre:"Cuenta restringida",telefono:"584120000000"},publico:false,lectores:["adminprueba"]
       });
       lote.set(doc(db,"fotos",foto),{data:"data:image/png;base64," + bytes.toString("base64"),por:"equipoprueba"});
       await lote.commit();
@@ -325,6 +412,14 @@ test("escritorio y móvil: login, altas offline en varios clientes, recarga, sin
     assert.match(await cel.locator(".pdpay").innerText(),/9\.40/);
     await visible(cel.getByText("Nota histórica"));
     await cel.waitForFunction(() => document.querySelector(".pdmd img[data-foto]")?.naturalWidth > 0);
+    assert.deepEqual(await bytesDe(cel,0),bytes);
+    await cel.locator("#d-edit").click();
+    await cel.locator('[data-go="2"]').click();
+    await cel.locator("#in-fecha").click();
+    const agendaRestringida = cel.getByRole("dialog",{name:"Fecha de entrega"});
+    await visible(agendaRestringida.locator('.dpg:not([inert]) button[data-d="2026-12-04"][aria-label$="1 entrega"]'));
+    assert.equal(await agendaRestringida.locator(".agrow").count(),1);
+    assert.doesNotMatch(await agendaRestringida.innerText(),/Cuenta restringida|Pedido restringido/);
     assert.deepEqual(errores,[]);
     assert.deepEqual(inesperadas,[]);
   } catch(e) {
@@ -334,5 +429,52 @@ test("escritorio y móvil: login, altas offline en varios clientes, recarga, sin
     await env?.cleanup();
     await navegador?.close();
     await new Promise(resolve => server.close(resolve));
+  }
+});
+
+test("demo HTML desde disco: agenda, HEIC y ZIP sin servicios externos", {timeout:30000}, async () => {
+  const executablePath = process.env.CHROMIUM_PATH || (existsSync("/usr/bin/chromium") ? "/usr/bin/chromium" : chromium.executablePath());
+  const navegador = await chromium.launch({executablePath,args:["--no-sandbox"]});
+  try {
+    const context = await navegador.newContext({viewport:{width:1280,height:800},reducedMotion:"reduce"});
+    const externas = [], errores = [];
+    await context.route(/^https?:/,route => { externas.push(route.request().url()); return route.abort(); });
+    context.on("page",tab => tab.on("pageerror",e => errores.push(e.message)));
+    let page = await context.newPage();
+    const archivo = new URL("demo/mejoras-pedidos-v369.html",root);
+    try { await page.goto(archivo.href); }
+    catch (error) {
+      if (!error.message.includes("ERR_BLOCKED_BY_ADMINISTRATOR")) throw error;
+      // Chromium administrado bloquea file://. El documento se carga en una
+      // pestaña vacía con origen opaco y las solicitudes externas bloqueadas.
+      await page.close();
+      page = await context.newPage();
+      await page.setContent(await readFile(archivo,"utf8"));
+    }
+    await page.getByRole("button",{name:/S-0042/}).click();
+    const visor = page.getByRole("dialog",{name:"Referencias"});
+    await page.getByRole("button",{name:"Abrir referencia 1"}).click();
+    await visor.getByRole("button",{name:"Foto siguiente"}).click();
+    assert.equal(await visor.locator('[role="status"]').textContent(),"Foto 2 de 2");
+    await visor.getByRole("button",{name:"Cerrar"}).click();
+    await page.getByRole("button",{name:"Editar",exact:true}).click();
+    await page.locator("#in-fecha").click();
+    const calendario = page.getByRole("dialog",{name:"Fecha de entrega"});
+    await visible(calendario.getByText("2 entregas",{exact:true}));
+    await calendario.getByRole("button",{name:"+3 días",exact:true}).click();
+    await calendario.getByRole("button",{name:"Confirmar fecha"}).click();
+    await page.getByRole("button",{name:"Probar HEIC"}).click();
+    await visible(page.getByText("Referencia lista para guardar."));
+    await page.waitForFunction(() => [...document.querySelectorAll("#imgs img")].at(-1)?.naturalHeight === 96);
+    await page.getByRole("button",{name:"Guardar",exact:true}).click();
+    const descarga = page.waitForEvent("download");
+    await page.getByRole("button",{name:"Descargar",exact:true}).click();
+    const zip = unzipSync(await readFile(await (await descarga).path()));
+    assert.equal(Object.keys(zip).length,4);
+    assert.match(Buffer.from(zip["resumen-pedido-S-0042.html"]).toString(),/Camisetas del club/);
+    assert.deepEqual(errores,[]);
+    assert.deepEqual(externas,[]);
+  } finally {
+    await navegador.close();
   }
 });
