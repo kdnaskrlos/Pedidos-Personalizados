@@ -1198,7 +1198,7 @@ const updateDoc = (...a) => sinEsperar(fsUpdateDoc(...a));
 const deleteDoc = (...a) => sinEsperar(fsDeleteDoc(...a));
 const writeBatch = db => { const b = fsWriteBatch(db), c = b.commit.bind(b); b.commit = () => sinEsperar(c()); return b; };
 
-const VERSION = "v3.69.1";
+const VERSION = "v3.69.2";
 /* ================= Utilidades ================= */
 const $ = (s, r = document) => r.querySelector(s);
 const esc = s => String(s ?? "").replace(/[&<>"']/g, c => ({"&":"&amp;","<":"&lt;",">":"&gt;",'"':"&quot;","'":"&#39;"}[c]));
@@ -4103,7 +4103,7 @@ function openDetail(id){
       </div>
       <div class="pdcard pdcli">
         <div class="pdwho"><span class="pdav">${esc(ini)}</span><b>${esc(p.cliente.nombre)}</b></div>
-        ${chat ? `<a class="pdwa" href="${esc(chat)}" target="_blank" rel="noopener noreferrer">${I("msg")}${esc(prettyPhone(telefono))}</a>`
+        ${chat ? `<a class="pdwa" href="${esc(chat)}" target="pedidos_whatsapp_chat">${I("msg")}${esc(prettyPhone(telefono))}</a>`
           : `<span>${esc(telefono || "Sin teléfono")}</span>`}
       </div>
       <div class="pdcard">
@@ -4162,7 +4162,20 @@ function openDetail(id){
   const upd = async (data, msg) => { if (await cambiar(id, data, msg)) ov.close(); };
   const on = (s, fn) => { const b = $(s, ov); if (b) b.onclick = fn; };
   // Un enlace HTTPS normal permite que Chrome capture la navegación si la app instalada lo admite.
-  on(".pdwa", e => { e.currentTarget.href = urlChat(); });
+  on(".pdwa", e => {
+    const url = urlChat();
+    if (!url) { e.preventDefault(); return; }
+    e.currentTarget.href = url;
+    if (!matchMedia("(min-width: 761px) and (any-pointer: fine)").matches) return;
+    // Destino fijo: Chrome puede reutilizar la pestaña de WhatsApp en cada clic.
+    // No usar noopener en window.open, porque impediría reutilizarla.
+    e.preventDefault();
+    const pestana = window.open(url, "pedidos_whatsapp_chat");
+    if (pestana) {
+      try { pestana.opener = null; } catch {}
+      try { pestana.focus(); } catch {}
+    }
+  });
   on("#d-edit", () => { ov.close(); openForm(id); });
   on("#d-download", e => descargarPedido(id,uid,e.currentTarget,$("#d-download-status",ov)));
   on("#d-listo", async () => {
