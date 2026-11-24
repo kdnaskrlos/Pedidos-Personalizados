@@ -4087,8 +4087,8 @@ function openDetail(id){
   const estTxt = estadoPedido(p) || est;
   const ini = (p.cliente.nombre || "?").trim().split(/\s+/).slice(0, 2).map(w => w[0]).join("").toUpperCase();
   const telefono = p.cliente.telefono;
-  const urlChat = () => enlaceChatCliente(telefono,matchMedia("(min-width: 761px) and (any-pointer: fine)").matches);
-  const chat = urlChat();
+  const modoChat = matchMedia("(min-width: 761px) and (any-pointer: fine)");
+  const chat = enlaceChatCliente(telefono,modoChat.matches);
   const extra = [...servsDe(p), p.tipo === "personalizado" ? (p.prendaDe === "cliente" ? "Prenda del cliente" : p.prendaDe === "tienda" ? "Prenda de la tienda" : "") : ""].filter(Boolean);
   const ov = modal(`
     <div class="mh pdh" style="--c:${T.c}">
@@ -4161,17 +4161,19 @@ function openDetail(id){
   });
   const upd = async (data, msg) => { if (await cambiar(id, data, msg)) ov.close(); };
   const on = (s, fn) => { const b = $(s, ov); if (b) b.onclick = fn; };
-  // Un enlace HTTPS normal permite que Chrome capture la navegación si la app instalada lo admite.
   on(".pdwa", e => {
-    const url = urlChat();
+    const escritorio = modoChat.matches, url = enlaceChatCliente(telefono,escritorio);
     if (!url) { e.preventDefault(); return; }
     e.currentTarget.href = url;
-    if (!matchMedia("(min-width: 761px) and (any-pointer: fine)").matches) return;
-    // Destino fijo: Chrome puede reutilizar la pestaña de WhatsApp en cada clic.
-    // No usar noopener en window.open, porque impediría reutilizarla.
+    if (!escritorio) return; // El enlace móvil conserva noopener y noreferrer.
     e.preventDefault();
-    const pestana = window.open(url, "pedidos_whatsapp_chat");
-    try { pestana?.focus(); } catch {}
+    // Chrome necesita el opener para volver a navegar a un destino con nombre entre orígenes.
+    const pestana = window.open(url,"pedidos_whatsapp_chat");
+    if (!pestana) {
+      toast("Si el chat no se abrió, permite las ventanas emergentes de Pedidos y vuelve a intentarlo.",true);
+      return;
+    }
+    try { pestana.focus(); } catch { /* El navegador decide si le da foco. */ }
   });
   on("#d-edit", () => { ov.close(); openForm(id); });
   on("#d-download", e => descargarPedido(id,uid,e.currentTarget,$("#d-download-status",ov)));

@@ -139,23 +139,63 @@ async function comprobarIconoSobreFoto(icono) {
   }));
 }
 
-async function comprobarChat(page, destino) {
-  const enlace = page.locator(".pdwa"), contexto = page.context();
-  await contexto.route(destino, ruta => ruta.fulfill({contentType:"text/plain",body:"WhatsApp simulado"}));
+async function simularWhatsApp(contexto, destino) {
+  await contexto.route(destino, ruta => ruta.fulfill({contentType:"text/plain",body:destino}));
+}
+
+async function abrirChat(page, destino) {
+  const enlace = page.locator(".pdwa");
   assert.equal(await enlace.getAttribute("href"),destino);
-  const popup = contexto.waitForEvent("page");
+  const [chat] = await Promise.all([
+    page.context().waitForEvent("page",{timeout:10000}),
+    enlace.click()
+  ]);
+  await chat.waitForURL(destino,{timeout:10000});
+  assert.equal(await chat.locator("body").innerText(),destino);
+  return chat;
+}
+
+async function comprobarChatsEscritorio(page) {
+  const contexto = page.context(), pedidos = page.url(), enlace = page.locator(".pdwa");
+  const primero = "https://web.whatsapp.com/send?phone=584120000000";
+  const segundo = "https://web.whatsapp.com/send?phone=584140000000";
+  const tarjeta = tema => page.locator(".oc2:visible").filter({hasText:tema});
+  await simularWhatsApp(contexto,primero);
+  await simularWhatsApp(contexto,segundo);
+  assert.equal(contexto.pages().length,1);
+
+  const chat = await abrirChat(page,primero);
+  assert.equal(contexto.pages().length,2);
+  await page.bringToFront();
+  await page.locator(".pdback").click();
+  await tarjeta(/Tema Adicional/i).click();
+  assert.equal(await enlace.getAttribute("href"),segundo);
   await enlace.click();
-  const chat = await popup;
-  await chat.waitForURL(destino);
-  assert.equal(await chat.locator("body").innerText(),"WhatsApp simulado");
-  if (destino.startsWith("https://web.whatsapp.com/")) {
-    const pestañas = contexto.pages().length;
-    await enlace.click();
-    await chat.waitForURL(destino);
-    assert.equal(contexto.pages().length,pestañas,"El segundo clic debe reutilizar la misma pestaña");
-  }
+  await chat.waitForURL(segundo,{timeout:10000});
+  assert.equal(await chat.locator("body").innerText(),segundo);
+  assert.equal(contexto.pages().length,2,"Ambos clientes deben abrirse en la misma pestaña de WhatsApp");
+  assert.equal(page.url(),pedidos);
+  await visible(page.locator(".pdmd").getByText(/Nota Tema Adicional/i));
+
   await chat.close();
-  await visible(page.locator(".pdmd"));
+  assert.equal(contexto.pages().length,1);
+  const nuevoChat = await abrirChat(page,segundo);
+  assert.equal(contexto.pages().length,2);
+  await nuevoChat.close();
+  await visible(enlace);
+  assert.equal(page.url(),pedidos);
+
+  // Simula un navegador que bloquea la siguiente apertura.
+  await page.evaluate(() => {
+    const abrir = window.open;
+    window.open = () => { window.open = abrir; return null; };
+  });
+  await enlace.click();
+  await visible(page.getByText(/permite las ventanas emergentes de Pedidos/));
+  assert.equal(contexto.pages().length,1);
+  assert.equal(page.url(),pedidos);
+  await page.locator(".pdback").click();
+  await tarjeta(/Tema Escritorio/i).click();
 }
 
 async function iniciar(page, url, usuario, pin) {
@@ -173,7 +213,7 @@ async function crearSublimado(page, tema, opciones = {}) {
   const tipo = page.locator('[data-t="sublimacion"]');
   if (await tipo.count()) await tipo.click();
   await page.locator("#in-nombre").fill("Persona de prueba");
-  await page.locator("#in-tel").fill("04120000000");
+  await page.locator("#in-tel").fill(opciones.telefono || "04120000000");
   await page.locator("#in-tema").fill(tema);
   await page.locator("#next").click();
   await page.locator("#addItem").click();
@@ -394,7 +434,7 @@ test("escritorio y móvil: login, altas offline en varios clientes, recarga, sin
     await Promise.all([
       (async () => {
         await crearSublimado(page,"Tema escritorio",{foto:true,errores:true});
-        await crearSublimado(page,"Tema adicional");
+        await crearSublimado(page,"Tema adicional",{telefono:"04140000000"});
       })(),
       crearSublimado(cel,"Tema móvil")
     ]);
@@ -476,11 +516,16 @@ test("escritorio y móvil: login, altas offline en varios clientes, recarga, sin
     assert.match(resumen,/19\.97/);
     await visible(page.locator("#d-download-status"));
     assert.match(await page.locator("#d-download-status").textContent(),/elige Permitir/);
-    await comprobarChat(page,"https://web.whatsapp.com/send?phone=584120000000");
+    await comprobarChatsEscritorio(page);
 
     await cel.locator(".oc2:visible").filter({hasText:/Tema Escritorio/i}).click();
     await oculto(cel.locator("#d-download"));
-    await comprobarChat(cel,"https://wa.me/584120000000");
+    const destinoMovil = "https://wa.me/584120000000";
+    await simularWhatsApp(mobile,destinoMovil);
+    const chatMovil = await abrirChat(cel,destinoMovil);
+    assert.ok(await chatMovil.evaluate(() => window.opener === null));
+    await chatMovil.close();
+    await visible(cel.locator(".pdmd"));
     await cel.getByRole("button",{name:"Abrir referencia 1"}).click();
     const visorMovil = cel.getByRole("dialog",{name:"Referencias"});
     await visible(visorMovil);
@@ -690,7 +735,7 @@ test("demo independiente: agenda, HEIC, PNG, Etiqueta y WhatsApp sin servicios e
     }
     await page.getByRole("button",{name:/P-0042/}).click();
     await page.locator(".pdwa").click();
-    await visible(page.getByText("https://web.whatsapp.com/send/?phone=12025550142",{exact:true}));
+    await visible(page.getByText("https://web.whatsapp.com/send?phone=12025550142",{exact:true}));
     await page.getByRole("button",{name:"Cerrar",exact:true}).click();
     assert.equal(await page.locator(".pdmd .imgbox button").count(),2);
     assert.equal(await page.getByRole("button",{name:/Descargar referencia/}).count(),0);

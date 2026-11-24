@@ -2253,7 +2253,7 @@ function entregasPorFecha(pedidos) {
 function enlaceChatCliente(telefono, escritorio) {
   const numero = /^\+?([1-9]\d{7,14})$/.exec(String(telefono ?? "").trim())?.[1];
   if (!numero) return "";
-  return escritorio ? `https://web.whatsapp.com/send/?phone=${numero}` : `https://wa.me/${numero}`;
+  return escritorio ? `https://web.whatsapp.com/send?phone=${numero}` : `https://wa.me/${numero}`;
 }
 
 const FORMATOS_FOTO = "image/*,.heic,.heif,image/heic,image/heif,image/heic-sequence,image/heif-sequence";
@@ -3287,7 +3287,7 @@ document.addEventListener("click",e => {
     e.preventDefault();
     const ov = modal(`<div class="mh"><h2>WhatsApp del cliente</h2><button class="ib" data-close aria-label="Cerrar">${I("x")}</button></div>
       <div class="mb"><p>Enlace de destino con un número ficticio</p><p id="demo-destino">${esc(a.href)}</p>
-      <p class="note">En escritorio, Chrome puede abrir el enlace en la app instalada de WhatsApp Web. Si Chrome abre una pestaña, el pedido sigue abierto.</p></div>`,"sm pop");
+      <p class="note">En escritorio, Pedidos usa una pestaña de Chrome para los chats de WhatsApp Web. El detalle del pedido sigue abierto.</p></div>`,"sm pop");
     $("[data-close]",ov).focus();
   }
   if (e.target.closest('a[href="#contacto"]')) e.preventDefault();
