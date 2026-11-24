@@ -112,7 +112,7 @@ function dibujarResumen(ctx, resumen) {
     for (const [indice, prenda] of resumen.prendas.entries()) {
       const [nombre,horma,talla,color,cantidad,personalizado,numero,etiqueta,unitario,subtotal] = prenda;
       const montos = activos([["Precio unitario",unitario],["Subtotal",subtotal]]);
-      const anchoImporte = 140, separacion = 8, pad = 16;
+      const anchoImporte = 152, separacion = 8, pad = 16;
       const anchoDatos = interior - 2 * pad - montos.length * (anchoImporte + separacion);
       const unir = pares => activos(pares).map(([clave,valor]) => `${clave}: ${valor}`).join(" · ");
       const titulo = nombre ? `${indice + 1}. ${nombre}` : `Partida ${indice + 1}`;

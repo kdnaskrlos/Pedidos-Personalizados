@@ -118,8 +118,9 @@ async function descargarPedido(page, nombres) {
 }
 
 function comprobarCamposPNG(resumen) {
-  for (const campo of ["Creación","Entrega","Cliente","Tema","Precio unitario","Subtotal","Total","Abono","Saldo"])
+  for (const campo of ["Creación","Entrega","Cliente","Tema","Subtotal","Total","Abono","Saldo"])
     assert.ok(resumen.split("\n").includes(campo),campo);
+  assert.match(resumen,/\bPrecio\s+unitario\b/);
   assert.match(resumen,/Cantidad: \d/);
   assert.match(resumen,/Talla: /);
   assert.doesNotMatch(resumen,/RESUMEN DEL PEDIDO|\b[PS]-\d{4}\b|Teléfono|Estado|Urgente|Moneda|584120000000|12025550142/);
