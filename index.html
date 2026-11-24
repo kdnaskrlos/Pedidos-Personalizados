@@ -4078,6 +4078,7 @@ async function descargarPedido(id, uid, boton, estado){
     if (boton.isConnected && document.activeElement === document.body) boton.focus();
   }
 }
+let pestanaWhatsApp = null;
 function openDetail(id){
   const p = S.pedidos[id]; if (!p) return;
   const T = TIPOS[p.tipo], t = totales(p), pr = perm(), est = p.estado || "pendiente";
@@ -4170,8 +4171,16 @@ function openDetail(id){
     // Destino fijo: Chrome puede reutilizar la pestaña de WhatsApp en cada clic.
     // No usar noopener en window.open, porque impediría reutilizarla.
     e.preventDefault();
+    try {
+      if (pestanaWhatsApp && !pestanaWhatsApp.closed) {
+        pestanaWhatsApp.location.href = url;
+        pestanaWhatsApp.focus();
+        return;
+      }
+    } catch { pestanaWhatsApp = null; }
     const pestana = window.open(url, "pedidos_whatsapp_chat");
     if (pestana) {
+      pestanaWhatsApp = pestana;
       try { pestana.opener = null; } catch {}
       try { pestana.focus(); } catch {}
     }
