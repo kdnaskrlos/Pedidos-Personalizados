@@ -4064,7 +4064,7 @@ async function descargarPedido(id, uid, boton, estado){
     if (!resumenSolicitado) mensajes.push("No se pudo preparar o solicitar el resumen PNG.");
     if (faltan.length) mensajes.push(`No se pudieron descargar las referencias ${faltan.join(", ")}.`);
     if (Number(resumenSolicitado) + referencias.length - faltan.length > 1) {
-      mensajes.push("Si Chrome pregunta por las descargas múltiples, elige Permitir. Si faltan archivos, habilita Descargas automáticas en la configuración del sitio y vuelve a pulsar Descargar, o usa el icono de cada foto.");
+      mensajes.push("Si Chrome pregunta por las descargas múltiples, elige Permitir. Si faltan archivos, habilita Descargas automáticas en la configuración del sitio y vuelve a pulsar Descargar, o abre la foto y usa el icono de descarga en el visor.");
     }
     estado.classList.toggle("bad",!resumenSolicitado || faltan.length > 0);
     estado.textContent = mensajes.join("\n");
@@ -4121,7 +4121,7 @@ function openDetail(id){
         ${t.saldo < 0 ? `<p class="msg warn">El abono supera el total.</p>` : ""}
         ${p.motivoSinAbono ? `<p class="pdmut"><b>Sin abono:</b> ${esc(p.motivoSinAbono)}</p>` : ""}
       </div>
-      ${(p.imagenes || []).length ? `<div class="pdcard"><div class="pdlbl">REFERENCIAS</div><div class="imgs">${p.imagenes.map((im, k) => `<div class="imgbox"><button type="button" class="ref-btn" aria-label="Abrir referencia ${k + 1}"><img data-foto="${esc(im)}" alt=""></button><button type="button" class="descarga-foto" data-descargar-ref="${k}" aria-label="Descargar referencia ${k + 1}" title="Descargar referencia ${k + 1}">${I("download")}</button></div>`).join("")}</div></div>` : ""}
+      ${(p.imagenes || []).length ? `<div class="pdcard"><div class="pdlbl">REFERENCIAS</div><div class="imgs">${p.imagenes.map((im, k) => `<div class="imgbox"><button type="button" class="ref-btn" aria-label="Abrir referencia ${k + 1}"><img data-foto="${esc(im)}" alt=""></button></div>`).join("")}</div></div>` : ""}
       ${p.nota ? `<div class="pdcard"><div class="pdlbl">NOTA</div><div class="pdnote">${esc(p.nota)}</div></div>` : ""}
       <p class="hist pdhist">Registrado: ${fmtDT(p.creadoEn)} por ${esc(nameOf(p.creadoPor))}${p.editadoEn ? `<br>Última edición: ${fmtDT(p.editadoEn)} por ${esc(nameOf(p.editadoPor))}` : ""}${p.listoEn ? `<br>Completado: ${fmtDT(p.listoEn)}` : ""}${p.avisadoEn ? `<br>Cliente avisado: ${fmtDT(p.avisadoEn)}` : ""}${p.entregadoEn ? `<br>Entregado: ${fmtDT(p.entregadoEn)}` : ""}${(p.asignados || []).length ? `<br>Visible solo para: ${esc(p.asignados.map(nameOf).join(", "))}` : ""}${(p.denegados || []).length ? `<br><span class="pdlock">${I("lock")}Acceso restringido para: ${esc(p.denegados.map(nameOf).join(", "))}</span>` : ""}</p>
     </div>
@@ -4138,10 +4138,6 @@ function openDetail(id){
     </div>`, "pdmd");
   loadFotos(ov);
   const uid = S.uid, referencias = [...ov.querySelectorAll(".ref-btn")];
-  for (const boton of ov.querySelectorAll("[data-descargar-ref]")) {
-    const indice = Number(boton.dataset.descargarRef), idFoto = p.imagenes[indice];
-    boton.onclick = () => descargarFotoConEstado(boton,() => descargarReferenciaPedido(id,uid,{idFoto,indice}));
-  }
   let abriendoReferencias = false;
   referencias.forEach(b => b.onclick = async () => {
     if (abriendoReferencias) return;

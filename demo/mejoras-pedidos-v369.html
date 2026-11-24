@@ -1159,7 +1159,7 @@ html,body{overflow-x:clip}
 <div class="shell">
 <header class="topbar"><span class="pill st bad"><i></i>Datos ficticios</span><span class="sp"></span>
 <button class="pill tdate" id="demo-agenda" title="Calendario de pedidos"></button></header>
-<main class="main"><h1>Pedidos</h1><p class="note demo-nota">Abre P-0042 y pulsa Descargar para obtener el resumen PNG y las referencias por separado. También puedes bajar cada foto desde su icono, revisar el enlace de WhatsApp y probar Etiqueta, la agenda y HEIC al editar el pedido.</p>
+<main class="main"><h1>Pedidos</h1><p class="note demo-nota">Abre P-0042 y pulsa Descargar para obtener el resumen PNG y las referencias por separado. Abre una foto para descargarla desde el visor. También puedes revisar el enlace de WhatsApp y probar Etiqueta, la agenda y HEIC al editar el pedido.</p>
 <div id="demo-pedidos"></div></main>
 </div></div>
 <!--
@@ -2391,18 +2391,16 @@ function dibujarResumen(ctx, resumen) {
     return y;
   };
   const activos = pares => pares.filter(([,v]) => disponible(v));
-  const encabezado = (nombre,y) => {
-    caja(margen,y + 5,6,25,"#d2561c",3);
-    escribir(nombre,margen + 18,y,interior - 18,{px:25,peso:800});
-    return y + 44;
-  };
 
   let y = 40;
   const datos = activos(resumen.datos);
-  if (datos.length) y = campos(datos,margen,encabezado("Datos del pedido",y),interior,2,{fondo:"#fff"}) + 24;
+  if (datos.length) {
+    caja(margen,y + 5,6,25,"#d2561c",3);
+    escribir("Datos del pedido",margen + 18,y,interior - 18,{px:25,peso:800});
+    y = campos(datos,margen,y + 44,interior,2,{fondo:"#fff"}) + 24;
+  }
 
   if (resumen.prendas.length) {
-    y = encabezado("Prendas",y);
     for (const [indice, prenda] of resumen.prendas.entries()) {
       const [nombre,horma,talla,color,cantidad,personalizado,numero,etiqueta,unitario,subtotal] = prenda;
       const montos = activos([["Precio unitario",unitario],["Subtotal",subtotal]]);
@@ -2446,14 +2444,12 @@ function dibujarResumen(ctx, resumen) {
 
   const pago = activos(resumen.pago);
   if (pago.length) {
-    y = encabezado("Pago",y);
     const montos = pago.filter(([clave]) => ["Total","Abono","Saldo"].includes(clave));
     y = campos(montos,margen,y,interior,3,{fondo:"#e7eff8",destacado:true});
     y = campos(pago.filter(par => !montos.includes(par)),margen,y,interior,2,{fondo:"#fff"}) + 18;
   }
 
   if (disponible(resumen.nota)) {
-    y = encabezado("Notas",y);
     ctx.font = `500 22px ${fuente}`;
     const altoNota = partirTexto(ctx,resumen.nota,interior - 36).length * 32;
     caja(margen,y,interior,altoNota + 36,"#fff1e5");
@@ -2463,7 +2459,7 @@ function dibujarResumen(ctx, resumen) {
 
   const seguimiento = activos(resumen.seguimiento);
   if (seguimiento.length)
-    y = campos(seguimiento,margen,encabezado("Seguimiento",y),interior,2,{fondo:"#fff"});
+    y = campos(seguimiento,margen,y,interior,2,{fondo:"#fff"});
   return y + 28;
 }
 
@@ -2978,7 +2974,7 @@ async function descargarPedido(id, uid, boton, estado){
     if (!resumenSolicitado) mensajes.push("No se pudo preparar o solicitar el resumen PNG.");
     if (faltan.length) mensajes.push(`No se pudieron descargar las referencias ${faltan.join(", ")}.`);
     if (Number(resumenSolicitado) + referencias.length - faltan.length > 1) {
-      mensajes.push("Si Chrome pregunta por las descargas múltiples, elige Permitir. Si faltan archivos, habilita Descargas automáticas en la configuración del sitio y vuelve a pulsar Descargar, o usa el icono de cada foto.");
+      mensajes.push("Si Chrome pregunta por las descargas múltiples, elige Permitir. Si faltan archivos, habilita Descargas automáticas en la configuración del sitio y vuelve a pulsar Descargar, o abre la foto y usa el icono de descarga en el visor.");
     }
     estado.classList.toggle("bad",!resumenSolicitado || faltan.length > 0);
     estado.textContent = mensajes.join("\n");
@@ -3035,7 +3031,7 @@ function openDetail(id){
         ${t.saldo < 0 ? `<p class="msg warn">El abono supera el total.</p>` : ""}
         ${p.motivoSinAbono ? `<p class="pdmut"><b>Sin abono:</b> ${esc(p.motivoSinAbono)}</p>` : ""}
       </div>
-      ${(p.imagenes || []).length ? `<div class="pdcard"><div class="pdlbl">REFERENCIAS</div><div class="imgs">${p.imagenes.map((im, k) => `<div class="imgbox"><button type="button" class="ref-btn" aria-label="Abrir referencia ${k + 1}"><img data-foto="${esc(im)}" alt=""></button><button type="button" class="descarga-foto" data-descargar-ref="${k}" aria-label="Descargar referencia ${k + 1}" title="Descargar referencia ${k + 1}">${I("download")}</button></div>`).join("")}</div></div>` : ""}
+      ${(p.imagenes || []).length ? `<div class="pdcard"><div class="pdlbl">REFERENCIAS</div><div class="imgs">${p.imagenes.map((im, k) => `<div class="imgbox"><button type="button" class="ref-btn" aria-label="Abrir referencia ${k + 1}"><img data-foto="${esc(im)}" alt=""></button></div>`).join("")}</div></div>` : ""}
       ${p.nota ? `<div class="pdcard"><div class="pdlbl">NOTA</div><div class="pdnote">${esc(p.nota)}</div></div>` : ""}
       <p class="hist pdhist">Registrado: ${fmtDT(p.creadoEn)} por ${esc(nameOf(p.creadoPor))}${p.editadoEn ? `<br>Última edición: ${fmtDT(p.editadoEn)} por ${esc(nameOf(p.editadoPor))}` : ""}${p.listoEn ? `<br>Completado: ${fmtDT(p.listoEn)}` : ""}${p.avisadoEn ? `<br>Cliente avisado: ${fmtDT(p.avisadoEn)}` : ""}${p.entregadoEn ? `<br>Entregado: ${fmtDT(p.entregadoEn)}` : ""}${(p.asignados || []).length ? `<br>Visible solo para: ${esc(p.asignados.map(nameOf).join(", "))}` : ""}${(p.denegados || []).length ? `<br><span class="pdlock">${I("lock")}Acceso restringido para: ${esc(p.denegados.map(nameOf).join(", "))}</span>` : ""}</p>
     </div>
@@ -3052,10 +3048,6 @@ function openDetail(id){
     </div>`, "pdmd");
   loadFotos(ov);
   const uid = S.uid, referencias = [...ov.querySelectorAll(".ref-btn")];
-  for (const boton of ov.querySelectorAll("[data-descargar-ref]")) {
-    const indice = Number(boton.dataset.descargarRef), idFoto = p.imagenes[indice];
-    boton.onclick = () => descargarFotoConEstado(boton,() => descargarReferenciaPedido(id,uid,{idFoto,indice}));
-  }
   let abriendoReferencias = false;
   referencias.forEach(b => b.onclick = async () => {
     if (abriendoReferencias) return;

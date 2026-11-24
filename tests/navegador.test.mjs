@@ -118,8 +118,11 @@ async function descargarPedido(page, nombres) {
 }
 
 function comprobarCamposPNG(resumen) {
-  for (const campo of ["Creación","Entrega","Cliente","Tema","Subtotal","Total","Abono","Saldo"])
-    assert.ok(resumen.split("\n").includes(campo),campo);
+  const lineas = resumen.split("\n");
+  for (const campo of ["Datos del pedido","Creación","Entrega","Cliente","Tema","Subtotal","Total","Abono","Saldo"])
+    assert.ok(lineas.includes(campo),campo);
+  for (const titulo of ["Prendas","Pago","Notas","Seguimiento"])
+    assert.ok(!lineas.includes(titulo),titulo);
   assert.match(resumen,/\bPrecio\s+unitario\b/);
   assert.match(resumen,/Cantidad: \d/);
   assert.match(resumen,/Talla: /);
@@ -428,15 +431,9 @@ test("escritorio y móvil: login, altas offline en varios clientes, recarga, sin
     const detalle = page.locator(".pdmd"), visor = page.getByRole("dialog",{name:"Referencias"});
     const bytesDe = async (tab, n) => Buffer.from((await tab.locator(".pdmd img[data-foto]").nth(n).getAttribute("src")).split(",")[1],"base64");
     const guardadas = await Promise.all([bytesDe(page,0),bytesDe(page,1)]);
-    const miniatura = detalle.getByRole("button",{name:"Descargar referencia 2"});
-    await comprobarIconoSobreFoto(miniatura);
-    const individual = page.waitForEvent("download");
-    await miniatura.click();
-    const fotoMiniatura = await individual;
-    assert.match(fotoMiniatura.suggestedFilename(),/^S-\d+-referencia-02\.(webp|jpg)$/);
-    assert.deepEqual(await readFile(await fotoMiniatura.path()),guardadas[1]);
+    assert.equal(await detalle.locator(".imgbox button").count(),2);
+    assert.equal(await detalle.getByRole("button",{name:/Descargar referencia/}).count(),0);
     await oculto(visor);
-    await visible(detalle);
 
     await detalle.getByRole("button",{name:"Abrir referencia 1"}).click();
     await visible(visor);
@@ -477,7 +474,6 @@ test("escritorio y móvil: login, altas offline en varios clientes, recarga, sin
 
     await cel.locator(".oc2:visible").filter({hasText:/Tema Escritorio/i}).click();
     await oculto(cel.locator("#d-download"));
-    await oculto(cel.getByRole("button",{name:"Descargar referencia 2"}));
     await comprobarChat(cel,"https://wa.me/584120000000");
     await cel.getByRole("button",{name:"Abrir referencia 1"}).click();
     const visorMovil = cel.getByRole("dialog",{name:"Referencias"});
@@ -690,6 +686,8 @@ test("demo independiente: agenda, HEIC, PNG, Etiqueta y WhatsApp sin servicios e
     await page.locator(".pdwa").click();
     await visible(page.getByText("https://web.whatsapp.com/send/?phone=12025550142",{exact:true}));
     await page.getByRole("button",{name:"Cerrar",exact:true}).click();
+    assert.equal(await page.locator(".pdmd .imgbox button").count(),2);
+    assert.equal(await page.getByRole("button",{name:/Descargar referencia/}).count(),0);
     const visor = page.getByRole("dialog",{name:"Referencias"});
     await page.getByRole("button",{name:"Abrir referencia 1"}).click();
     await visor.getByRole("button",{name:"Foto siguiente"}).click();
@@ -731,6 +729,8 @@ test("demo independiente: agenda, HEIC, PNG, Etiqueta y WhatsApp sin servicios e
     assert.match(resumen,/2\. Franela/);
     assert.match(resumen,/\$ 38\.00/);
     assert.match(resumen,/Prenda a cargo de\nCliente/);
+    assert.match(resumen,/Confirmar la ubicación del número/);
+    assert.match(resumen,/Registrado por/);
     assert.deepEqual(errores,[]);
     assert.deepEqual(externas,[]);
   } finally {

@@ -97,18 +97,16 @@ function dibujarResumen(ctx, resumen) {
     return y;
   };
   const activos = pares => pares.filter(([,v]) => disponible(v));
-  const encabezado = (nombre,y) => {
-    caja(margen,y + 5,6,25,"#d2561c",3);
-    escribir(nombre,margen + 18,y,interior - 18,{px:25,peso:800});
-    return y + 44;
-  };
 
   let y = 40;
   const datos = activos(resumen.datos);
-  if (datos.length) y = campos(datos,margen,encabezado("Datos del pedido",y),interior,2,{fondo:"#fff"}) + 24;
+  if (datos.length) {
+    caja(margen,y + 5,6,25,"#d2561c",3);
+    escribir("Datos del pedido",margen + 18,y,interior - 18,{px:25,peso:800});
+    y = campos(datos,margen,y + 44,interior,2,{fondo:"#fff"}) + 24;
+  }
 
   if (resumen.prendas.length) {
-    y = encabezado("Prendas",y);
     for (const [indice, prenda] of resumen.prendas.entries()) {
       const [nombre,horma,talla,color,cantidad,personalizado,numero,etiqueta,unitario,subtotal] = prenda;
       const montos = activos([["Precio unitario",unitario],["Subtotal",subtotal]]);
@@ -152,14 +150,12 @@ function dibujarResumen(ctx, resumen) {
 
   const pago = activos(resumen.pago);
   if (pago.length) {
-    y = encabezado("Pago",y);
     const montos = pago.filter(([clave]) => ["Total","Abono","Saldo"].includes(clave));
     y = campos(montos,margen,y,interior,3,{fondo:"#e7eff8",destacado:true});
     y = campos(pago.filter(par => !montos.includes(par)),margen,y,interior,2,{fondo:"#fff"}) + 18;
   }
 
   if (disponible(resumen.nota)) {
-    y = encabezado("Notas",y);
     ctx.font = `500 22px ${fuente}`;
     const altoNota = partirTexto(ctx,resumen.nota,interior - 36).length * 32;
     caja(margen,y,interior,altoNota + 36,"#fff1e5");
@@ -169,7 +165,7 @@ function dibujarResumen(ctx, resumen) {
 
   const seguimiento = activos(resumen.seguimiento);
   if (seguimiento.length)
-    y = campos(seguimiento,margen,encabezado("Seguimiento",y),interior,2,{fondo:"#fff"});
+    y = campos(seguimiento,margen,y,interior,2,{fondo:"#fff"});
   return y + 28;
 }
 
