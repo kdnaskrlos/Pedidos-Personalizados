@@ -124,8 +124,8 @@ function comprobarCamposPNG(resumen) {
   for (const titulo of ["Prendas","Pago","Notas","Seguimiento"])
     assert.ok(!lineas.includes(titulo),titulo);
   assert.match(resumen,/\bPrecio\s+unitario\b/);
-  assert.match(resumen,/Cantidad: \d/);
-  assert.match(resumen,/Talla: /);
+  assert.match(resumen,/^\d+$/m);
+  assert.match(resumen,/Talla /);
   assert.doesNotMatch(resumen,/RESUMEN DEL PEDIDO|\b[PS]-\d{4}\b|Teléfono|Estado|Urgente|Moneda|584120000000|12025550142/);
 }
 
@@ -137,6 +137,113 @@ async function comprobarIconoSobreFoto(icono) {
     return a.width >= 44 && a.height >= 44 && Math.abs(f.right - a.right - 4) <= 2 &&
       Math.abs(a.top - f.top - 4) <= 2 && a.right <= innerWidth;
   }));
+}
+
+async function comprobarAncla(page,id) {
+  await page.waitForFunction(id => {
+    const t = document.getElementById(id), barra = document.querySelector(".topbar");
+    if (!t || !barra || t !== document.activeElement) return false;
+    const {top,bottom} = t.getBoundingClientRect();
+    return top >= barra.getBoundingClientRect().bottom && bottom < innerHeight;
+  },id);
+}
+
+async function escribirNotaConListas(page) {
+  const nota = page.locator("#in-nota");
+  await nota.press("End");
+  await nota.press("Enter");
+  await page.getByRole("button",{name:"• Viñeta"}).click();
+  await page.keyboard.insertText("Separar prendas");
+  await nota.press("Enter");
+  await page.keyboard.insertText("Doblar");
+  await nota.press("Enter");
+  await nota.press("Enter");
+  await page.getByRole("button",{name:"☐ Casilla"}).click();
+  await page.keyboard.insertText("Revisar empaque");
+  await nota.press("Enter");
+  await nota.press("Enter");
+  await page.keyboard.insertText("Línea normal");
+}
+
+async function comprobarZoomMovil(page,visor) {
+  const mano = await page.context().newCDPSession(page);
+  const r = await visor.locator(".lbvp").boundingBox();
+  const cx = Math.round(r.x + r.width / 2), cy = Math.round(r.y + r.height / 2);
+  const tocar = (type,...dx) => mano.send("Input.dispatchTouchEvent",{
+    type,touchPoints:dx.map((x,id) => ({x:cx+x,y:cy,id}))
+  });
+  const foto = visor.locator('.lbs[aria-hidden="false"] img');
+  const estado = () => foto.evaluate(img => {
+    const m = new DOMMatrix(getComputedStyle(img).transform);
+    return {escala:m.a,x:m.e,visible:img.getBoundingClientRect().right > 0 && img.getBoundingClientRect().left < innerWidth};
+  });
+  try {
+    await tocar("touchStart",-20,20);
+    await tocar("touchMove",-125,125);
+    await tocar("touchEnd");
+    assert.equal((await estado()).escala,4);
+    await tocar("touchStart",0);
+    await tocar("touchMove",-155);
+    await tocar("touchEnd");
+    const ampliada = await estado();
+    assert.ok(ampliada.x < 0 && ampliada.visible);
+    assert.equal(await visor.locator('[role="status"]').textContent(),"Foto 2 de 2");
+
+    await tocar("touchStart",-125,125);
+    await tocar("touchMove",-17,17);
+    await tocar("touchEnd");
+    assert.equal((await estado()).escala,1);
+    await tocar("touchStart",-95);
+    await tocar("touchMove",95);
+    await tocar("touchEnd");
+    assert.equal(await visor.locator('[role="status"]').textContent(),"Foto 1 de 2");
+    assert.equal((await estado()).escala,1);
+
+    await visor.press("ArrowRight");
+    await tocar("touchStart",-20,20);
+    await tocar("touchMove",-125,125);
+    await tocar("touchEnd");
+    assert.equal((await estado()).escala,4);
+    await visor.press("ArrowLeft");
+    await visor.press("ArrowRight");
+    assert.equal((await estado()).escala,1);
+  } finally {
+    await mano.detach();
+  }
+}
+
+async function comprobarCalendariosPorTipo(page) {
+  let fecha;
+  const navPedidos = page.locator('[data-view="pedidos"]:visible').first();
+  for (const [tema,cantidad,excluido] of [
+    [/Etiqueta de Prueba/i,"1 entrega",/Tema Adicional/i],
+    [/Tema Adicional/i,"4 entregas",/Etiqueta de Prueba/i]
+  ]) {
+    await navPedidos.click();
+    await page.locator('[data-filtro="pendientes"]:visible').click();
+    await page.locator(".oc2:visible").filter({hasText:tema}).click();
+    await page.locator("#d-edit").click();
+    await page.locator('[data-go="2"]').click();
+    await page.locator("#in-fecha").click();
+    const calendario = page.getByRole("dialog",{name:"Fecha de entrega"});
+    const dia = calendario.locator('.dpg:not([inert]) button[aria-pressed="true"]');
+    await visible(dia);
+    assert.ok((await dia.getAttribute("aria-label")).endsWith(cantidad));
+    assert.doesNotMatch(await calendario.locator(".aglist").innerText(),excluido);
+    fecha = await dia.getAttribute("data-d");
+    await page.reload();
+    await visible(page.locator(".shell"));
+  }
+
+  await page.locator('[data-act="agenda"]').click();
+  const agenda = page.locator(".agov");
+  const dia = agenda.locator(`.dpg:not([inert]) button[data-d="${fecha}"]`);
+  if (!(await dia.count())) await agenda.getByRole("button",{name:"Mes siguiente"}).click();
+  await visible(dia);
+  assert.match(await dia.getAttribute("aria-label"),/5 entregas$/);
+  await dia.click();
+  for (const tema of [/Etiqueta de Prueba/i,/Tema Adicional/i])
+    await visible(agenda.locator(".aglist").getByText(tema));
 }
 
 async function simularWhatsApp(contexto, destino) {
@@ -259,13 +366,16 @@ async function crearSublimado(page, tema, opciones = {}) {
   }
   await page.locator("#in-abono").fill("0,25");
   await page.locator("#next").click();
+  const notaEsperada = "Nota " + tema + (opciones.errores ? "\n• Separar prendas\n• Doblar\n☐ Revisar empaque\nLínea normal" : "");
   await page.locator("#in-nota").fill("Nota " + tema);
+  if (opciones.errores) await escribirNotaConListas(page);
+  assert.equal(await page.locator("#in-nota").inputValue(),notaEsperada);
   if (opciones.foto) {
     const entrada = page.locator("#fileGal");
     if (opciones.errores) {
       await entrada.setInputFiles({name:"invalida.heic",mimeType:"image/heic",buffer:Buffer.from("invalida")});
       await visible(page.getByText(/No se pudo (abrir|convertir) la foto HEIC/).first());
-      assert.equal(await page.locator("#in-nota").inputValue(), "Nota " + tema);
+      assert.equal(await page.locator("#in-nota").inputValue(),notaEsperada);
       await page.locator("[data-rmimg]").click();
       await entrada.setInputFiles({
         name:"referencia.HEIF",mimeType:"application/octet-stream",
@@ -349,6 +459,7 @@ async function comprobarEtiquetas(page, env) {
   assert.equal(await etiquetas.count(),0);
   await page.locator("#next").click();
   await page.locator("#in-fecha").click();
+  await page.getByRole("button",{name:"Mañana",exact:true}).click();
   await page.getByRole("button",{name:"Confirmar fecha"}).click();
   await page.locator("#in-mon").selectOption("USD");
   await page.locator("#prl input").fill("10");
@@ -470,6 +581,17 @@ test("escritorio y móvil: login, altas offline en varios clientes, recarga, sin
     }));
     assert.equal(await cel.locator('[data-tab="personalizado"]').count(),0);
 
+    await page.setViewportSize({width:1100,height:430});
+    for (const [tab, ids] of [[page,["aviso-vencidos","aviso-proximos"]],[cel,["aviso-proximos","aviso-vencidos"]]]) {
+      for (const id of ids) {
+        await tab.locator('[data-view="resumen"]:visible').first().click();
+        await tab.locator(`[data-aviso="${id}"]`).click();
+        await comprobarAncla(tab,id);
+      }
+      await pedidosNav(tab).click();
+    }
+    await page.setViewportSize({width:1440,height:900});
+
     await page.locator(".oc2:visible").filter({hasText:/Tema Escritorio/i}).click();
     await visible(page.getByText("Nota Tema Escritorio",{exact:false}));
     assert.match(await page.locator(".pdpay").innerText(),/19\.97/);
@@ -512,7 +634,7 @@ test("escritorio y móvil: login, altas offline en varios clientes, recarga, sin
     ]);
     comprobarCamposPNG(resumen);
     assert.ok(fotos.every(foto => foto.subarray(0,8).equals(Buffer.from([137,80,78,71,13,10,26,10]))));
-    assert.match(resumen,/Nota Tema Escritorio/i);
+    assert.match(resumen,/Nota Tema Escritorio\n• Separar prendas\n• Doblar\n☐ Revisar empaque\nLínea normal/i);
     assert.match(resumen,/19\.97/);
     await visible(page.locator("#d-download-status"));
     assert.match(await page.locator("#d-download-status").textContent(),/elige Permitir/);
@@ -535,6 +657,7 @@ test("escritorio y móvil: login, altas offline en varios clientes, recarga, sin
         el.dispatchEvent(new PointerEvent(tipo,{bubbles:true,cancelable:true,pointerId:1,pointerType:"touch",clientX:x,clientY:300}));
     });
     assert.equal(await visorMovil.locator(".lbx-next").isDisabled(),true);
+    await comprobarZoomMovil(cel,visorMovil);
     await visorMovil.getByRole("button",{name:"Cerrar"}).click();
     await cel.locator(".pdback").click();
 
@@ -549,6 +672,7 @@ test("escritorio y móvil: login, altas offline en varios clientes, recarga, sin
     await visible(selector);
     await selector.getByRole("button",{name:"Cancelar fecha"}).click();
     await page.locator('[data-go="3"]').click();
+    assert.match(await page.locator("#in-nota").inputValue(),/• Doblar\n☐ Revisar empaque\nLínea normal/);
     await page.locator("#in-nota").fill("Nota editada desde escritorio");
     await page.locator("#save").click();
     await oculto(page.locator("#save"));
@@ -672,7 +796,7 @@ test("escritorio y móvil: login, altas offline en varios clientes, recarga, sin
           const escala = this.getTransform().a, medida = this.measureText(texto);
           const derecha = this.textAlign === "right";
           cajas.push({
-            texto,y,
+            texto,x,y,
             dentro:(x - (derecha ? medida.width : 0)) * escala >= 0 &&
               (x + (derecha ? 0 : medida.width)) * escala <= this.canvas.width &&
               (y + medida.actualBoundingBoxDescent) * escala < this.canvas.height
@@ -688,9 +812,10 @@ test("escritorio y móvil: login, altas offline en varios clientes, recarga, sin
         ]);
         const {datos} = await archivoResumenPng({codigo:"S-0011",datos:[["Cliente","Cliente ficticio"]],prendas,
           pago:[["Saldo","$ 19.97"]], nota:"Una nota extensa con un salto de línea. ".repeat(90) + "\nFin de la nota",seguimiento:[]});
-        const ultimas = cajas.filter(c => /^(?:\d+\. Franela|Fin de la nota)/.test(c.texto));
+        const ultimas = cajas.filter(c => /^(?:Franela|Fin de la nota)/.test(c.texto));
         return {formato:datos.type,dentro:cajas.every(c => c.dentro),filas:ultimas.map(c => c.texto),
-          orden:ultimas.every((c,i) => !i || c.y > ultimas[i-1].y)};
+          orden:ultimas.every((c,i) => !i || c.y > ultimas[i-1].y),
+          precios:cajas.filter(c => ["$ 10.11","$ 20.22"].includes(c.texto)).slice(0,2).map(c => c.x)};
       } finally {
         CanvasRenderingContext2D.prototype.fillText = trazar;
       }
@@ -698,10 +823,12 @@ test("escritorio y móvil: login, altas offline en varios clientes, recarga, sin
     assert.equal(historicoLargo.formato,"image/png");
     assert.ok(historicoLargo.dentro && historicoLargo.orden);
     assert.equal(historicoLargo.filas.length,13);
-    assert.equal(historicoLargo.filas.at(-2),"12. Franela 12");
+    assert.equal(historicoLargo.filas.at(-2),"Franela 12 azul");
+    assert.deepEqual(historicoLargo.precios,[724,884]);
     assert.equal(historicoLargo.filas.at(-1),"Fin de la nota");
 
     await comprobarEtiquetas(page,env);
+    await comprobarCalendariosPorTipo(page);
     assert.deepEqual(errores,[]);
     assert.deepEqual(inesperadas,[]);
   } catch(e) {
@@ -733,6 +860,9 @@ test("demo independiente: agenda, HEIC, PNG, Etiqueta y WhatsApp sin servicios e
       page = await context.newPage();
       await page.setContent(await readFile(archivo,"utf8"));
     }
+    await page.getByRole("button",{name:"Vencidos"}).click();
+    await comprobarAncla(page,"aviso-vencidos");
+    await page.getByRole("button",{name:"Volver a Pedidos"}).click();
     await page.getByRole("button",{name:/P-0042/}).click();
     await page.locator(".pdwa").click();
     await visible(page.getByText("https://web.whatsapp.com/send?phone=12025550142",{exact:true}));
@@ -762,25 +892,29 @@ test("demo independiente: agenda, HEIC, PNG, Etiqueta y WhatsApp sin servicios e
     await page.locator("#in-fecha").click();
     const calendario = page.getByRole("dialog",{name:"Fecha de entrega"});
     await visible(calendario.getByText("2 entregas",{exact:true}));
+    await oculto(calendario.getByText("Equipo Aurora",{exact:true}));
     await calendario.getByRole("button",{name:"+3 días",exact:true}).click();
     await calendario.getByRole("button",{name:"Confirmar fecha"}).click();
+    await escribirNotaConListas(page);
     await page.getByRole("button",{name:"Probar HEIC"}).click();
     await visible(page.getByText("Referencia lista para guardar."));
     await page.waitForFunction(() => [...document.querySelectorAll("#imgs img")].at(-1)?.naturalHeight === 96);
     await page.getByRole("button",{name:"Guardar",exact:true}).click();
     const {resumen,fotos,alto} = await descargarPedido(page,[
-      /^resumen-pedido-P-0042\.png$/, /^P-0042-referencia-01\.jpg$/,
-      /^P-0042-referencia-02\.jpg$/, /^P-0042-referencia-03\.(jpg|webp)$/
+      /^resumen-pedido-P-0042\.png$/, /^P-0042-referencia-01\.png$/,
+      /^P-0042-referencia-02\.png$/, /^P-0042-referencia-03\.png$/
     ]);
     comprobarCamposPNG(resumen);
     assert.equal(fotos.length,3);
     assert.ok(alto < 2400, "Dos partidas deben caber en un resumen compacto");
     assert.match(resumen,/Camisetas del club/);
-    assert.match(resumen,/1\. Franela/);
-    assert.match(resumen,/2\. Franela/);
+    assert.match(resumen,/^Chemis verde esmeralda$/m);
+    assert.match(resumen,/^Franela Violeta$/m);
+    assert.match(resumen,/Talla S · Dama/);
     assert.match(resumen,/\$ 38\.00/);
     assert.match(resumen,/Prenda a cargo de\nCliente/);
     assert.match(resumen,/Confirmar la ubicación del número/);
+    assert.match(resumen,/• Doblar\n☐ Revisar empaque\nLínea normal/);
     assert.match(resumen,/Registrado por/);
     assert.deepEqual(errores,[]);
     assert.deepEqual(externas,[]);

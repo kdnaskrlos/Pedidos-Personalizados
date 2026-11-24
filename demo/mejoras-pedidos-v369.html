@@ -359,6 +359,8 @@ table.mx{border-collapse:collapse;width:100%;font-size:13px}
 
 /* avisos compactos */
 .asec{display:flex;flex-direction:column;gap:8px}
+.asec h2.sec{margin:0}
+.nota-listas{display:flex;flex-wrap:wrap;gap:8px;margin:0 0 8px}
 .asec .sec svg.i{color:var(--c)}
 .alist{border:1px solid var(--line);border-radius:var(--r);background:var(--surface);overflow:hidden}
 .arow{display:flex;align-items:center;gap:10px;padding:9px 12px;border-bottom:1px solid var(--line);border-left:3px solid var(--c);cursor:pointer;min-width:0}
@@ -1159,8 +1161,15 @@ html,body{overflow-x:clip}
 <div class="shell">
 <header class="topbar"><span class="pill st bad"><i></i>Datos ficticios</span><span class="sp"></span>
 <button class="pill tdate" id="demo-agenda" title="Calendario de pedidos"></button></header>
-<main class="main"><h1>Pedidos</h1><p class="note demo-nota">Abre P-0042 y pulsa Descargar para obtener el resumen PNG y las referencias por separado. Abre una foto para descargarla desde el visor. También puedes revisar el enlace de WhatsApp y probar Etiqueta, la agenda y HEIC al editar el pedido.</p>
-<div id="demo-pedidos"></div></main>
+<main class="main">
+<div id="demo-resumen"><h1>Pedidos</h1>
+<p class="note demo-nota">Abre P-0042 para descargar el PNG o ampliar sus fotos con dos dedos. Edita el pedido para probar las listas en la nota y el calendario por tipo.</p>
+<div class="opts demo-nota">
+<button class="btn" data-aviso="aviso-proximos">Entregas pronto</button>
+<button class="btn" data-aviso="aviso-vencidos">Vencidos</button>
+</div>
+<div id="demo-pedidos"></div></div>
+<div id="demo-avisos" hidden></div></main>
 </div></div>
 <!--
 libheif-js 1.23.5
@@ -2238,15 +2247,63 @@ function fechasDelMes(anio, mes) {
   });
 }
 
-function entregasPorFecha(pedidos) {
+function entregasPorFecha(pedidos, tipo) {
   const entregas = new Map();
   for (const pedido of pedidos) {
-    if (!pedido.fechaEntrega) continue;
+    if (!pedido.fechaEntrega || (tipo && pedido.tipo !== tipo)) continue;
     const dia = entregas.get(pedido.fechaEntrega) || [];
     dia.push(pedido);
     entregas.set(pedido.fechaEntrega, dia);
   }
   return entregas;
+}
+
+const marcador = /^([ \t]*)([•☐☑])[ \t]*/;
+const inicioDeLinea = (texto, cursor) => texto.slice(0, cursor).lastIndexOf("\n") + 1;
+
+function continuarLista(texto, cursor) {
+  if (cursor !== texto.length && texto[cursor] !== "\n") return null;
+  const inicio = inicioDeLinea(texto,cursor);
+  const linea = texto.slice(inicio,cursor), prefijo = linea.match(marcador);
+  if (!prefijo) return null;
+  if (!linea.slice(prefijo[0].length).trim()) return {inicio,fin:cursor,texto:""};
+  return {inicio:cursor,fin:cursor,texto:`\n${prefijo[1]}${prefijo[2]} `};
+}
+
+function iniciarLista(texto, cursor, simbolo) {
+  const inicio = inicioDeLinea(texto,cursor), resto = texto.slice(inicio);
+  const prefijo = resto.match(marcador);
+  const sangria = prefijo?.[1] ?? resto.match(/^[ \t]*/)[0];
+  const fin = inicio + (prefijo?.[0].length ?? sangria.length);
+  const nuevo = sangria + simbolo + " ";
+  return {inicio,fin,texto:nuevo,cursor:inicio + nuevo.length + Math.max(0,cursor - fin)};
+}
+
+function conectarListasNota(area, barra) {
+  const aplicar = ({inicio,fin,texto,cursor = inicio + texto.length}) => {
+    area.setRangeText(texto,inicio,fin,"end");
+    area.focus();
+    area.setSelectionRange(cursor,cursor);
+    area.dispatchEvent(new Event("input",{bubbles:true}));
+  };
+  const alEnter = e => {
+    if (e.isComposing || !e.cancelable || area.selectionStart !== area.selectionEnd) return;
+    const cambio = continuarLista(area.value,area.selectionStart);
+    if (cambio) { e.preventDefault(); aplicar(cambio); }
+  };
+  area.addEventListener("keydown",e => {
+    if (e.key !== "Enter") return;
+    // Las notas admiten saltos de línea aunque el formulario trate Enter como salida de otros campos.
+    e.stopPropagation();
+    if (!e.shiftKey && !e.altKey && !e.ctrlKey && !e.metaKey) alEnter(e);
+  });
+  area.addEventListener("beforeinput",e => {
+    if (["insertLineBreak","insertParagraph"].includes(e.inputType)) alEnter(e);
+  });
+  barra.addEventListener("click",e => {
+    const boton = e.target.closest("[data-lista-nota]");
+    if (boton) aplicar(iniciarLista(area.value,area.selectionStart,boton.dataset.listaNota));
+  });
 }
 
 // El formulario guarda el teléfono internacional sin separadores.
@@ -2309,6 +2366,31 @@ function archivoReferencia(src, indice) {
   };
 }
 
+// Convierte las fotos almacenadas a un PNG real. Cambiar solo el nombre
+// o la extensión no convertiría los bytes JPEG/WebP de Firestore.
+async function archivoReferenciaPng(src, indice) {
+  const original = archivoReferencia(src, indice);
+  const nombre = `referencia-${String(indice + 1).padStart(2, "0")}.png`;
+  if (original.tipo === "image/png") return {...original, nombre};
+  const fuente = new Blob([original.datos], {type:original.tipo});
+  let imagen;
+  try {
+    imagen = await createImageBitmap(fuente);
+    const lienzo = document.createElement("canvas");
+    lienzo.width = imagen.width;
+    lienzo.height = imagen.height;
+    const contexto = lienzo.getContext("2d");
+    if (!contexto) throw new Error("No se puede convertir la referencia a PNG");
+    contexto.drawImage(imagen, 0, 0);
+    const png = await new Promise((resolve, reject) => lienzo.toBlob(
+      archivo => archivo ? resolve(archivo) : reject(new Error("No se pudo crear el PNG")), "image/png"
+    ));
+    return {nombre, tipo:"image/png", datos:png};
+  } finally {
+    imagen?.close?.();
+  }
+}
+
 function descargarArchivo({nombre, tipo, datos}) {
   const url = URL.createObjectURL(new Blob([datos], {type:tipo}));
   const enlace = document.createElement("a");
@@ -2327,6 +2409,15 @@ const fuente = "system-ui, sans-serif";
 const tinta = "#192a40";
 const suave = "#4c6078";
 const disponible = valor => valor !== undefined && valor !== null && String(valor).trim() !== "";
+
+const palabras = texto => String(texto).normalize("NFD").replace(/\p{M}/gu,"")
+  .toLocaleLowerCase("es").replace(/[^\p{L}\p{N}]+/gu," ").trim();
+
+function nombrePrenda(nombre, color) {
+  const base = nombre || "Prenda";
+  if (!disponible(color) || ` ${palabras(base)} `.includes(` ${palabras(color)} `)) return base;
+  return `${base} ${String(color).toLocaleLowerCase("es")}`;
+}
 
 function partirTexto(ctx, valor, limite) {
   const lineas = [];
@@ -2401,34 +2492,39 @@ function dibujarResumen(ctx, resumen) {
   }
 
   if (resumen.prendas.length) {
-    for (const [indice, prenda] of resumen.prendas.entries()) {
+    for (const prenda of resumen.prendas) {
       const [nombre,horma,talla,color,cantidad,personalizado,numero,etiqueta,unitario,subtotal] = prenda;
       const montos = activos([["Precio unitario",unitario],["Subtotal",subtotal]]);
       const anchoImporte = 152, separacion = 8, pad = 16;
-      const anchoDatos = interior - 2 * pad - montos.length * (anchoImporte + separacion);
-      const unir = pares => activos(pares).map(([clave,valor]) => `${clave}: ${valor}`).join(" · ");
-      const titulo = nombre ? `${indice + 1}. ${nombre}` : `Partida ${indice + 1}`;
-      const principal = unir([["Cantidad",cantidad],["Talla",talla],["Horma",horma],["Color",color]]);
-      const secundario = unir([["Nombre",personalizado],["Número",numero],["Etiqueta",etiqueta]]);
-      const filas = [
-        medir(titulo,anchoDatos,{px:23,peso:800}),
-        ...(principal ? [medir(principal,anchoDatos,{px:18,peso:700})] : []),
-        ...(secundario ? [medir(secundario,anchoDatos,{px:16,peso:500})] : [])
-      ];
+      const ladoCantidad = 52, gap = 12;
+      const tieneCantidad = disponible(cantidad);
+      const desplazamiento = tieneCantidad ? ladoCantidad + gap : 0;
+      const anchoDatos = interior - 2 * pad - montos.length * (anchoImporte + separacion) - desplazamiento;
+      const titulo = medir(nombrePrenda(nombre,color),anchoDatos,{px:23,peso:800});
+      const atributos = [disponible(talla) && `Talla ${talla}`,horma,etiqueta,personalizado,disponible(numero) && `N° ${numero}`]
+        .filter(v => v !== false && disponible(v)).join(" · ");
+      const detalle = atributos ? medir(atributos,anchoDatos,{px:16,peso:500}) : null;
+      const altoTexto = titulo.alto + (detalle?.alto || 0);
       const importes = montos.map(([clave,valor]) => {
         const destacado = clave === "Subtotal";
         return {destacado, rotulo:medir(clave,anchoImporte - 24,{px:14,peso:700}),
           valor:medir(valor,anchoImporte - 24,{px:destacado ? 21 : 19,peso:700})};
       });
-      const alto = Math.max(filas.reduce((total,f) => total + f.alto,0) + 24,
+      const alto = Math.max(altoTexto + 24,tieneCantidad ? ladoCantidad + 24 : 0,
         ...importes.map(({rotulo,valor}) => rotulo.alto + valor.alto + 32));
       caja(margen,y,interior,alto,"#fff",12);
 
-      let filaY = y + 12;
-      filas.forEach((f,i) => {
-        trazar(f,margen + pad,filaY,{color:i === 0 ? tinta : suave});
-        filaY += f.alto;
-      });
+      if (tieneCantidad) {
+        const x = margen + pad, top = y + (alto - ladoCantidad) / 2;
+        caja(x,top,ladoCantidad,ladoCantidad,"#f0f2f5",8);
+        ctx.font = `800 28px ${fuente}`;
+        const px = Math.min(28, 28 * (ladoCantidad - 8) / ctx.measureText(String(cantidad)).width);
+        escribir(cantidad,x + ladoCantidad / 2,top + (ladoCantidad - px) / 2,ladoCantidad - 4,
+          {px,peso:800,alineado:"center"});
+      }
+      const textoX = margen + pad + desplazamiento, textoY = y + (alto - altoTexto) / 2;
+      trazar(titulo,textoX,textoY);
+      if (detalle) trazar(detalle,textoX,textoY + titulo.alto,{color:suave});
       importes.forEach(({destacado,rotulo,valor},i) => {
         const x = margen + interior - pad - (importes.length - i) * (anchoImporte + separacion) + separacion;
         const altoImporte = rotulo.alto + valor.alto + 16;
@@ -2566,6 +2662,59 @@ function cardHTML(p){
 }
 
 
+function alertas(){
+  const d = cfg().dias, l = pedidosList();
+  const pend = l.filter(p => (p.estado || "pendiente") === "pendiente" && p.fechaEntrega);
+  return {
+    pend: l.filter(p => (p.estado || "pendiente") === "pendiente"),
+    vencidos: pend.filter(p => daysUntil(p.fechaEntrega) < 0).sort((a,b) => a.fechaEntrega.localeCompare(b.fechaEntrega)),
+    proximos: pend.filter(p => { const n = daysUntil(p.fechaEntrega); return n >= 0 && n <= d; }).sort((a,b) => a.fechaEntrega.localeCompare(b.fechaEntrega)),
+    avisar: l.filter(p => p.estado === "listo" && !p.avisado),
+    retiro: l.filter(p => p.estado === "listo" && p.avisado && p.avisadoEn && (Date.now() - Date.parse(p.avisadoEn)) / 86400000 >= cfg().diasRetiro && !(p.posponerHasta && daysUntil(p.posponerHasta) > 0)).sort((a, b) => String(a.avisadoEn).localeCompare(b.avisadoEn))
+  };
+}
+
+function avisoRow(p, modo){
+  const T = TIPOS[p.tipo], t = totales(p);
+  const n = p.fechaEntrega ? daysUntil(p.fechaEntrega) : null;
+  const cuando = n === null ? "" : n < 0 ? `vencido hace ${-n} d` : n === 0 ? "hoy" : n === 1 ? "mañana" : `en ${n} días`;
+  const hace = p.avisadoEn ? Math.floor((Date.now() - Date.parse(p.avisadoEn)) / 86400000) : 0;
+  const right = modo === "avisar"
+    ? `<a class="aw" href="${esc(waLink(p))}" target="_blank" rel="noopener" data-avisar="${esc(p._id)}" title="Avisar por WhatsApp">${I("msg")}</a><button class="ac2" data-ya="${esc(p._id)}" title="Ya le avisé">${I("check")}</button>`
+    : modo === "retiro"
+    ? `<span class="aday vio">avisado hace ${hace} d</span>`
+    : `<span class="aday ${n < 0 ? "err" : "warn"}">${cuando}</span>`;
+  if (modo === "retiro") return `<div class="arow rt" style="--c:${T.c}">
+    <div class="rt-top" data-open="${esc(p._id)}" role="button" tabindex="0"><div class="atx"><b>${esc(p.cliente.nombre)}</b><small>${esc(p.tema || "Sin nombre de diseño")}</small></div>${right}</div>
+    <div class="rt-acts">
+      <a class="rbtn wa" href="${esc(waLink(p, cfg().plantillaRetiro))}" target="_blank" rel="noopener" data-recordar="${esc(p._id)}">${I("msg")}Recordar</a>
+      <button class="rbtn" data-posponer="${esc(p._id)}">${I("cal")}Posponer</button>
+      <button class="rbtn ok" data-entregar="${esc(p._id)}">${I("box")}Entregado</button>
+    </div>
+  </div>`;
+  return `<div class="arow" style="--c:${T.c}" data-open="${esc(p._id)}" role="button" tabindex="0">
+    <div class="atx"><b>${esc(p.cliente.nombre)}</b><small>${esc(p.tema || "Sin nombre de diseño")}</small></div>
+    ${right}
+  </div>`;
+}
+function enfocarAviso(id){
+  const titulo = document.getElementById(id);
+  if (!titulo) return;
+  const altoBarra = $(".topbar")?.offsetHeight || 0;
+  titulo.style.scrollMarginTop = (altoBarra + 12) + "px";
+  titulo.focus({preventScroll:true});
+  titulo.scrollIntoView({block:"start"});
+}
+function viewAvisos(a){
+  const sec = (c, ic, t, l, modo, id) => `<div class="asec" style="--c:${c}"><h2 class="sec"${id ? ` id="${id}" tabindex="-1"` : ""}>${I(ic)}${t} <small>${l.length}</small></h2>${l.length ? `<div class="alist">${l.map(p => avisoRow(p, modo)).join("")}</div>` : `<div class="aempty">Nada por aquí</div>`}</div>`;
+  const rv = respaldoPendiente();
+  return `${rv ? `<button class="revbar resp" data-act="respaldo">${I("shield")}<span>${rv}</span><em>Respaldar</em></button>` : ""}<div class="hello"><h1>Avisos</h1><span class="date">${I("bell")}Entregas con ${cfg().dias} día${cfg().dias == 1 ? "" : "s"} de anticipación</span></div>
+    ${sec("var(--t-info)","msg","Por avisar al cliente", a.avisar, "avisar")}
+    ${sec("var(--t-violet)","box","Avisados sin retirar", a.retiro, "retiro")}
+    ${sec("var(--err)","alert","Entregas vencidas", a.vencidos, "fecha", "aviso-vencidos")}
+    ${sec("var(--soon)","clock","Se entregan pronto", a.proximos, "fecha", "aviso-proximos")}`;
+}
+
 function modal(html, size, keep){
   const ov = document.createElement("div");
   ov.className = "ov" + (/\bpop\b/.test(size || "") ? " popup" : "") + (/\bpick\b/.test(size || "") ? " pick" : "");
@@ -2589,11 +2738,12 @@ function lightbox(fotos, {inicio = 0, editar, descargar} = {}){
     <div class="lbindicador" role="status"></div>`;
   overlay(lb);
   const cerrar = lb.close;
-  lb.close = (...a) => { cerrar(...a); origen?.focus(); };
-  const tr = $(".lbtrack",lb), previa = $(".lbx-prev",lb), siguiente = $(".lbx-next",lb);
+  lb.close = (...a) => { ajuste?.disconnect(); reiniciarGestos(); cerrar(...a); origen?.focus(); };
+  const visor = $(".lbvp",lb), tr = $(".lbtrack",visor), previa = $(".lbx-prev",lb), siguiente = $(".lbx-next",lb);
   const slides = [...tr.querySelectorAll(".lbs")], marcos = slides.map(s => $(".lb-foto",s));
-  for (const marco of marcos) {
-    const foto = $("img",marco);
+  const imagenes = marcos.map(m => $("img",m));
+  for (const [j, marco] of marcos.entries()) {
+    const foto = imagenes[j];
     const ajustar = () => {
       if (!foto.naturalWidth || !foto.naturalHeight) return;
       marco.style.setProperty("--proporcion",foto.naturalWidth / foto.naturalHeight);
@@ -2617,8 +2767,31 @@ function lightbox(fotos, {inicio = 0, editar, descargar} = {}){
     tr.style.transition = t && !MENOS_MOV ? `transform ${t}s cubic-bezier(.22,.9,.3,1)` : "none";
     tr.style.transform = `translate3d(calc(${-i * 100}% + ${dx}px),0,0)`;
   };
+  const puntos = new Map();
+  let escala = 1, x = 0, y = 0, gesto = null, pinza = null;
+  const aplicarZoom = (nivel,nx,ny) => {
+    const foto = imagenes[i];
+    const maxX = Math.max(0,(foto.offsetWidth * nivel - visor.clientWidth) / 2);
+    const maxY = Math.max(0,(foto.offsetHeight * nivel - visor.clientHeight) / 2);
+    escala = nivel;
+    x = nivel > 1 ? Math.max(-maxX,Math.min(maxX,nx)) : 0;
+    y = nivel > 1 ? Math.max(-maxY,Math.min(maxY,ny)) : 0;
+    foto.style.transform = nivel > 1 ? `translate3d(${x}px,${y}px,0) scale(${nivel})` : "";
+  };
+  const reiniciarGestos = () => {
+    aplicarZoom(1,0,0);
+    puntos.clear();
+    gesto = pinza = null;
+  };
+  const ajuste = window.ResizeObserver ? new ResizeObserver(() => {
+    if (escala > 1) aplicarZoom(escala,x,y);
+  }) : null;
+  ajuste?.observe(visor);
+
   const ir = (k, t = .26) => {
-    i = Math.max(0, Math.min(n - 1, k));
+    const destino = Math.max(0, Math.min(n - 1, k));
+    if (i !== destino) reiniciarGestos();
+    i = destino;
     pos(0, t);
     lb.querySelectorAll(".lbdots b").forEach((b, j) => b.classList.toggle("on", j === i));
     slides.forEach((s, j) => s.setAttribute("aria-hidden", String(j !== i)));
@@ -2635,27 +2808,76 @@ function lightbox(fotos, {inicio = 0, editar, descargar} = {}){
   if (previa) previa.onclick = () => ir(i - 1);
   if (siguiente) siguiente.onclick = () => ir(i + 1);
   ir(i,0);
-  let x0 = null, y0 = 0, modo = "", dx = 0, xs = [], pid = null, movio = false;
-  lb.addEventListener("pointerdown", e => { if (e.target.closest("button")) return; x0 = e.clientX; y0 = e.clientY; modo = ""; dx = 0; movio = false; pid = e.pointerId; xs = [[performance.now(), x0]]; });
-  lb.addEventListener("pointermove", e => {
-    if (x0 === null || e.pointerId !== pid) return;
-    const mx = e.clientX - x0, my = e.clientY - y0;
-    if (!modo) { if (Math.abs(mx) < 6 && Math.abs(my) < 6) return; modo = Math.abs(mx) > Math.abs(my) && n > 1 ? "x" : "y"; movio = true; if (modo === "x") try { lb.setPointerCapture(pid); } catch {} }
-    if (modo !== "x") return;
+  const punto = e => ({x:e.clientX,y:e.clientY,tactil:e.pointerType === "touch"});
+  const distanciaYCentro = () => {
+    const [a,b] = puntos.values(), r = visor.getBoundingClientRect();
+    return {dist:Math.hypot(a.x - b.x,a.y - b.y),
+      cx:(a.x + b.x - r.left - r.right) / 2, cy:(a.y + b.y - r.top - r.bottom) / 2};
+  };
+  const iniciarPinza = () => {
+    pinza = {...distanciaYCentro(),escala,x,y};
+    gesto = null;
+    pos(0,0);
+  };
+  const iniciarGesto = (p, deslizar) => {
+    gesto = {origen:p,x,y,deslizar,modo:"",dx:0,muestras:[[performance.now(),p.x]]};
+  };
+  lb.addEventListener("pointerdown",e => {
+    if (e.target.closest("button") || (e.pointerType === "mouse" && e.button !== 0)) return;
+    const p = punto(e);
+    if (puntos.size && (!p.tactil || !puntos.values().next().value.tactil)) return;
+    puntos.set(e.pointerId,p);
+    try { lb.setPointerCapture(e.pointerId); } catch {}
+    if (puntos.size === 1) iniciarGesto(p,true);
+    else iniciarPinza();
+  });
+  lb.addEventListener("pointermove",e => {
+    if (!puntos.has(e.pointerId)) return;
+    const p = punto(e);
+    puntos.set(e.pointerId,p);
+    if (pinza) {
+      const medio = distanciaYCentro();
+      if (!pinza.dist) { iniciarPinza(); return; }
+      const nivel = Math.max(1,Math.min(4,pinza.escala * medio.dist / pinza.dist));
+      const factor = nivel / pinza.escala;
+      aplicarZoom(nivel,medio.cx - (pinza.cx - pinza.x) * factor,medio.cy - (pinza.cy - pinza.y) * factor);
+      e.preventDefault();
+      return;
+    }
+    const mx = p.x - gesto.origen.x, my = p.y - gesto.origen.y;
+    if (escala > 1) {
+      aplicarZoom(escala,gesto.x + mx,gesto.y + my);
+      e.preventDefault();
+      return;
+    }
+    if (!gesto.deslizar) return;
+    if (!gesto.modo && Math.max(Math.abs(mx),Math.abs(my)) >= 6)
+      gesto.modo = Math.abs(mx) > Math.abs(my) && n > 1 ? "x" : "y";
+    if (gesto.modo !== "x") return;
     e.preventDefault();
-    dx = (i === 0 && mx > 0) || (i === n - 1 && mx < 0) ? mx / 3 : mx; // resistencia en los extremos
-    xs.push([performance.now(), e.clientX]); if (xs.length > 5) xs.shift();
-    pos(dx);
+    gesto.dx = (i === 0 && mx > 0) || (i === n - 1 && mx < 0) ? mx / 3 : mx;
+    gesto.muestras.push([performance.now(),p.x]);
+    if (gesto.muestras.length > 5) gesto.muestras.shift();
+    pos(gesto.dx,0);
   });
   const soltar = e => {
-    if (x0 === null || e.pointerId !== pid) return; x0 = null;
-    if (!movio) return; // un toque no cierra: se cierra con la X o con Atrás
-    if (modo !== "x") return;
-    const a = xs[0], b = xs[xs.length - 1], vel = b[0] - a[0] > 8 ? (b[1] - a[1]) / (b[0] - a[0]) : 0;
+    if (!puntos.delete(e.pointerId)) return;
+    if (puntos.size >= 2) { iniciarPinza(); return; }
+    pinza = null;
+    if (puntos.size === 1) { iniciarGesto(puntos.values().next().value,false); return; }
+    const terminado = gesto;
+    gesto = null;
+    if (terminado?.modo !== "x") return;
+    if (e.type !== "pointerup") { pos(0,.26); return; }
+    const {dx,muestras} = terminado, a = muestras[0], b = muestras.at(-1);
+    const vel = b[0] - a[0] > 8 ? (b[1] - a[1]) / (b[0] - a[0]) : 0;
     const rapido = Math.abs(vel) > .35 && Math.sign(vel) === Math.sign(dx) && Math.abs(dx) > 20;
-    ir(rapido || Math.abs(dx) > lb.querySelector(".lbvp").clientWidth * .2 ? i + (dx < 0 ? 1 : -1) : i, rapido ? .18 : .26);
+    const cambia = rapido || Math.abs(dx) > visor.clientWidth * .2;
+    ir(cambia ? i + (dx < 0 ? 1 : -1) : i,rapido ? .18 : .26);
   };
-  lb.addEventListener("pointerup", soltar); lb.addEventListener("pointercancel", e => { if (e.pointerId === pid) { x0 = null; ir(i); } });
+  lb.addEventListener("pointerup",soltar);
+  lb.addEventListener("pointercancel",soltar);
+  lb.addEventListener("lostpointercapture",soltar);
   lb.tabIndex = -1; lb.focus();
   lb.addEventListener("keydown", e => {
     if (e.key === "Escape") { e.preventDefault(); return lb.close(); }
@@ -2694,7 +2916,7 @@ async function toDataURL(file){
 }
 
 function openCalendar(current, onPick, opts = {}){
-  if (opts.entrega) return openAgenda({entrega:onPick, actual:current});
+  if (opts.entrega) return openAgenda({entrega:onPick, actual:current, tipo:opts.tipo});
   let sel = current ? parseYmd(current) : null;
   const v = sel ? new Date(sel) : today0(); v.setDate(1);
   const ov = document.createElement("div"); ov.className = "dp-ov"; overlay(ov);
@@ -2732,7 +2954,7 @@ function agRow(p, abrible = true){
     ${p.urgente ? `<span class="oc2-urgi" title="Urgente">${I("alert")}</span>` : d.t ? `<span class="oc2-due ${d.c}">${esc(d.t)}</span>` : ""}
   </div>`;
 }
-function openAgenda({entrega, actual} = {}){
+function openAgenda({entrega, actual, tipo} = {}){
   let sel = actual || ymd(today0()), moviendo = false;
   const v = parseYmd(sel); v.setDate(1);
   const origen = document.activeElement;
@@ -2743,7 +2965,7 @@ function openAgenda({entrega, actual} = {}){
     const cerrar = ov.close;
     ov.close = (...a) => { cerrar(...a); origen?.focus(); };
   }
-  const porDia = () => entregasPorFecha(pedidosList());
+  const porDia = () => entregasPorFecha(pedidosList(),tipo);
   const grilla = (y, m, g, visible) => {
     const t0 = ymd(today0());
     let cells = ["Lu","Ma","Mi","Ju","Vi","Sá","Do"].map(x => `<span>${x}</span>`).join("");
@@ -2915,9 +3137,9 @@ function exigirPedidoVisible(id, uid){
     throw new Error("El pedido ya no está disponible");
   return S.pedidos[id];
 }
-async function prepararArchivoReferencia(codigo, idFoto, indice, {archivoReferencia,codigoParaArchivo}) {
+async function prepararArchivoReferencia(codigo, idFoto, indice, {archivoReferenciaPng,codigoParaArchivo}) {
   const foto = await leerFoto(doc(S.db,"fotos",idFoto));
-  const archivo = archivoReferencia(foto.data()?.data,indice);
+  const archivo = await archivoReferenciaPng(foto.data()?.data,indice);
   return {...archivo,nombre:`${codigoParaArchivo(codigo)}-${archivo.nombre}`};
 }
 async function descargarReferenciaPedido(id, uid, {idFoto, indice}){
@@ -2997,8 +3219,8 @@ function openDetail(id){
   const estTxt = estadoPedido(p) || est;
   const ini = (p.cliente.nombre || "?").trim().split(/\s+/).slice(0, 2).map(w => w[0]).join("").toUpperCase();
   const telefono = p.cliente.telefono;
-  const urlChat = () => enlaceChatCliente(telefono,matchMedia("(min-width: 761px) and (any-pointer: fine)").matches);
-  const chat = urlChat();
+  const modoChat = matchMedia("(min-width: 761px) and (any-pointer: fine)");
+  const chat = enlaceChatCliente(telefono,modoChat.matches);
   const extra = [...servsDe(p), p.tipo === "personalizado" ? (p.prendaDe === "cliente" ? "Prenda del cliente" : p.prendaDe === "tienda" ? "Prenda de la tienda" : "") : ""].filter(Boolean);
   const ov = modal(`
     <div class="mh pdh" style="--c:${T.c}">
@@ -3071,8 +3293,6 @@ function openDetail(id){
   });
   const upd = async (data, msg) => { if (await cambiar(id, data, msg)) ov.close(); };
   const on = (s, fn) => { const b = $(s, ov); if (b) b.onclick = fn; };
-  // Un enlace HTTPS normal permite que Chrome capture la navegación si la app instalada lo admite.
-  on(".pdwa", e => { e.currentTarget.href = urlChat(); });
   on("#d-edit", () => { ov.close(); openForm(id); });
   on("#d-download", e => descargarPedido(id,uid,e.currentTarget,$("#d-download-status",ov)));
   on("#d-listo", async () => {
@@ -3088,7 +3308,7 @@ function openDetail(id){
 }
 
 
-const exportadorDeDemo = () => ({archivoReferencia, codigoParaArchivo, descargarArchivo, archivoResumenPng});
+const exportadorDeDemo = () => ({archivoReferenciaPng, codigoParaArchivo, descargarArchivo, archivoResumenPng});
 const MENOS_MOV = matchMedia("(prefers-reduced-motion: reduce)").matches;
 const cfg = () => ({dias:2,cat:{tallasPlus:["2XL","3XL","4XL"]}});
 const perm = () => ({eliminar:false});
@@ -3099,6 +3319,7 @@ const doc = (_db,_coleccion,id) => id;
 const leerFoto = async id => ({data:() => ({data:fotos.get(id)})});
 const leerImagen = async id => fotos.get(id) || "";
 const waLink = () => "#contacto";
+const respaldoPendiente = () => "";
 function loadFotos(elemento) {
   for (const img of elemento.querySelectorAll("[data-mini],[data-foto]")) {
     const src = fotos.get(img.dataset.mini || img.dataset.foto);
@@ -3120,15 +3341,17 @@ const pedidos = {};
 for (const [numero,nombre,tema,dia,imagenes] of [
   [42,"Andrea de muestra","Camisetas del club",1,["horizontal","vertical"]],
   [43,"Marcos de muestra","Equipo Aurora",1,[]],
-  [44,"Julia de muestra","Entrenamiento Río",3,[]]
+  [44,"Julia de muestra","Entrenamiento Río",-2,[]],
+  [45,"Samuel de muestra","Equipo del club",1,[]]
 ]) {
   const id = String(numero);
+  const esPersonalizado = [42,45].includes(numero);
   pedidos[id] = {
-    _id:id,codigo:(numero === 42 ? "P" : "S")+"-00"+id,tipo:numero === 42 ? "personalizado" : "sublimacion",tema,fechaEntrega:fechaRelativa(dia),
+    _id:id,codigo:(esPersonalizado ? "P" : "S")+"-00"+id,tipo:esPersonalizado ? "personalizado" : "sublimacion",tema,fechaEntrega:fechaRelativa(dia),
     cliente:{nombre,telefono:"120255501"+id},servicio:"Estampado",estado:"pendiente",prendaDe:"tienda",
     items:[
-      {prenda:"Franela",horma:"Unisex",talla:"M",color:"Azul",cant:3,precioMenor:1200,etiqueta:"Comic Shop"},
-      {prenda:"Franela",horma:"Unisex",talla:"XL",color:"Violeta",cant:2,precioMenor:1350,etiqueta:"Comic Shop"}
+      {prenda:"Chemis",horma:"Dama",talla:"S",color:"Verde esmeralda",cant:2,precioMenor:1800,etiqueta:"Comic Shop"},
+      {prenda:"Franela Violeta",horma:"Unisex",talla:"XL",color:"Violeta",cant:2,precioMenor:1350,etiqueta:"Comic Shop"}
     ],pagoVersion:2,abonoMenor:2500,moneda:"USD",urgente:numero===43,
     imagenes,nota:"Confirmar la ubicación del número en ambas versiones.",
     creadoEn:new Date().toISOString(),creadoPor:"taller"
@@ -3170,7 +3393,12 @@ function openForm(id) {
       <section data-demo-panel="2" hidden>
       <div class="f"><label for="in-fecha">Fecha de entrega</label>
       <button type="button" class="datebtn" id="in-fecha">${I("cal")}<span class="d">${esc(fmtDate(fecha))}</span></button></div>
-      <div class="f"><label for="in-nota">Nota</label><textarea class="inp" id="in-nota">${esc(p.nota)}</textarea></div>
+      <div class="f"><label for="in-nota">Nota</label>
+        <div class="nota-listas" id="nota-listas">
+          <button type="button" class="btn sm" data-lista-nota="•">• Viñeta</button>
+          <button type="button" class="btn sm" data-lista-nota="☐">☐ Casilla</button>
+        </div>
+        <textarea class="inp" id="in-nota">${esc(p.nota)}</textarea></div>
       <div class="f"><label>Referencias</label><div class="imgs" id="imgs"></div>
         <div class="drow2">
           <label class="btn" for="fileGal">${I("img")}Galería</label>
@@ -3247,7 +3475,8 @@ function openForm(id) {
   };
   $("#in-fecha",ov).onclick = () => openCalendar(fecha, elegida => {
     fecha=elegida; $("#in-fecha .d",ov).textContent=fmtDate(fecha);
-  },{entrega:true});
+  },{entrega:true,tipo:form.tipo});
+  conectarListasNota($("#in-nota",ov),$("#nota-listas",ov));
   for (const entrada of ov.querySelectorAll('input[type="file"]')) entrada.onchange = () => {
     agregar([...entrada.files]); entrada.value="";
   };
@@ -3265,6 +3494,19 @@ function renderPedidos() {
   loadFotos($("#demo-pedidos"));
 }
 $("#demo-agenda").onclick = () => openAgenda();
+const resumenDemo = $("#demo-resumen"), avisosDemo = $("#demo-avisos");
+const abrirAvisosDemo = id => {
+  resumenDemo.hidden = true;
+  avisosDemo.hidden = false;
+  avisosDemo.innerHTML = `<button class="btn sm" id="demo-volver">Volver a Pedidos</button>${viewAvisos(alertas())}`;
+  $("#demo-volver").onclick = () => { avisosDemo.hidden = true; resumenDemo.hidden = false; scrollTo(0,0); };
+  enfocarAviso(id);
+};
+for (const b of resumenDemo.querySelectorAll("[data-aviso]")) b.onclick = () => abrirAvisosDemo(b.dataset.aviso);
+avisosDemo.onclick = e => {
+  const pedido = e.target.closest("[data-open]");
+  if (pedido) openDetail(pedido.dataset.open);
+};
 $("#demo-agenda").innerHTML = I("cal") + fmtDate(ymd(today0()));
 $("#demo-logo").innerHTML = I("shirt");
 $("#demo-theme").innerHTML = I("sun","sun") + I("moon","moon");

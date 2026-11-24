@@ -2,6 +2,7 @@ import assert from "node:assert/strict";
 import { readFile } from "node:fs/promises";
 import { test } from "node:test";
 import { fechasDelMes, entregasPorFecha } from "../calendario.mjs";
+import { continuarLista, iniciarLista } from "../notas.mjs";
 import { esHeif } from "../heic.mjs";
 import { archivoReferencia, codigoParaArchivo } from "../pedido-export.mjs";
 import { enlaceChatCliente } from "../whatsapp.mjs";
@@ -51,4 +52,24 @@ test("WhatsApp usa E.164, enlace web directo en escritorio y wa.me en móvil", (
   assert.ok(enlaceChatCliente("123456789012345",true));
   for (const invalido of [null,"","04120000000","12","1234567890123456","1 202 555 0142","12025550142?x=1","javascript:1"])
     assert.equal(enlaceChatCliente(invalido,true),"");
+});
+
+
+test("calendario contextual separa los dos tipos y el global los conserva", () => {
+  const fechaEntrega = "2028-02-29";
+  const personal = {tipo:"personalizado",fechaEntrega};
+  const sublimado = {tipo:"sublimacion",fechaEntrega};
+  const pedidos = [personal,sublimado,personal,{}];
+  assert.deepEqual(entregasPorFecha(pedidos).get(fechaEntrega),[personal,sublimado,personal]);
+  assert.deepEqual(entregasPorFecha(pedidos,"personalizado").get(fechaEntrega),[personal,personal]);
+  assert.deepEqual(entregasPorFecha(pedidos,"sublimacion").get(fechaEntrega),[sublimado]);
+});
+
+test("listas de notas continúan el marcador y respetan texto y saltos", () => {
+  assert.deepEqual(continuarLista("• A",3),{inicio:3,fin:3,texto:"\n• "});
+  assert.deepEqual(continuarLista("☐ A\n☐ ",6),{inicio:4,fin:6,texto:""});
+  assert.deepEqual(continuarLista("☑ A",3),{inicio:3,fin:3,texto:"\n☑ "});
+  assert.equal(continuarLista("Nota normal",11),null);
+  assert.equal(continuarLista("• ABC",3),null);
+  assert.deepEqual(iniciarLista("☐ AB",4,"•"),{inicio:0,fin:2,texto:"• ",cursor:4});
 });

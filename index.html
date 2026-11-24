@@ -381,6 +381,8 @@ table.mx{border-collapse:collapse;width:100%;font-size:13px}
 
 /* avisos compactos */
 .asec{display:flex;flex-direction:column;gap:8px}
+.asec h2.sec{margin:0}
+.nota-listas{display:flex;flex-wrap:wrap;gap:8px;margin:0 0 8px}
 .asec .sec svg.i{color:var(--c)}
 .alist{border:1px solid var(--line);border-radius:var(--r);background:var(--surface);overflow:hidden}
 .arow{display:flex;align-items:center;gap:10px;padding:9px 12px;border-bottom:1px solid var(--line);border-left:3px solid var(--c);cursor:pointer;min-width:0}
@@ -1180,6 +1182,7 @@ import { firebaseConfig } from "./config.js";
 import { entregasPorFecha, fechasDelMes } from "./calendario.mjs";
 import { esHeif, cargarHeif, FORMATOS_FOTO } from "./heic.mjs";
 import { enlaceChatCliente } from "./whatsapp.mjs";
+import { conectarListasNota } from "./notas.mjs";
 import { consecutivoDe, documentosFoto, registrarPedido } from "./pedidos-sync.mjs";
 import { guardarPendiente, leerPendientes, borrarPendiente, guardarFotoLocal, leerFotoLocal, borrarFotoLocal } from "./cola-local.mjs";
 import { MAX_PARTIDAS, centavos, centavosHistoricos, cantidad, clavePrecio, precioHistorico, valorPrecioHistorico, validarPago, validarPagoEnCentavos, actualizarPagoPendiente } from "./pagos.mjs";
@@ -2094,15 +2097,15 @@ function openRevisar(){
 function viewResumen(a, pr){
   const d = new Date(), h = d.getHours();
   const tipos = ["personalizado","sublimacion"].filter(t => pr.ver[t]);
-  const tile = (c, ic, lb, v, sub, act) => `<button class="tile tint" style="--c:${c}" data-tile="${act}"><span class="bg">${I(ic)}</span><span class="lb"><span class="chip sm">${I(ic)}</span>${lb}</span><span class="v num">${v}</span><span class="sub">${sub}</span></button>`;
+  const tile = (c, ic, lb, v, sub, act, seccion) => `<button class="tile tint" style="--c:${c}" data-tile="${act}"${seccion ? ` data-aviso="${seccion}"` : ""}><span class="bg">${I(ic)}</span><span class="lb"><span class="chip sm">${I(ic)}</span>${lb}</span><span class="v num">${v}</span><span class="sub">${sub}</span></button>`;
   const pendTipo = t => pedidosList().filter(p => p.tipo === t && (p.estado || "pendiente") === "pendiente").length;
   return `
     <div class="hello greet"><h1>${h < 12 ? "Buenos días" : h < 19 ? "Buenas tardes" : "Buenas noches"}, <span>${esc((S.me.nombre || S.me.usuario).split(" ")[0])}</span></h1><span class="date">${I("cal")}${DIAS[d.getDay()]} ${d.getDate()} de ${MESES[d.getMonth()]} ${d.getFullYear()}</span></div>
     ${anunciosHTML()}
     <div class="tiles ${pr.admin ? "t6" : "t5"}">
       ${tile("var(--accent)","box","Pendientes", a.pend.length, "por producir", "pendientes")}
-      ${tile("var(--soon)","clock","Entregas pronto", a.proximos.length, `próximos ${cfg().dias} días`, "avisos")}
-      ${tile("var(--err)","alert","Vencidos", a.vencidos.length, a.vencidos.length ? "revisar hoy" : "todo al día", "avisos")}
+      ${tile("var(--soon)","clock","Entregas pronto", a.proximos.length, `próximos ${cfg().dias} días`, "avisos", "aviso-proximos")}
+      ${tile("var(--err)","alert","Vencidos", a.vencidos.length, a.vencidos.length ? "revisar hoy" : "todo al día", "avisos", "aviso-vencidos")}
       ${tile("var(--t-info)","msg","Por avisar", a.avisar.length, "clientes con pedido listo", "avisar")}
       ${(() => { const n = pedidosList().filter(p => p.estado === "listo" && p.avisado).length; return tile("var(--t-violet)","bag","Sin retirar", n, n === 1 ? "cliente avisado que no ha retirado" : "clientes avisados que no han retirado", "retirar"); })()}
       ${pr.admin ? (() => { const n = revisarList().length; return tile("var(--t-pink, #db2777)","edit","Cambios", n, n ? (n === 1 ? "pedido editado por el equipo" : "pedidos editados por el equipo") : "sin cambios por revisar", "revisar"); })() : ""}
@@ -2424,14 +2427,22 @@ function avisoRow(p, modo){
     ${right}
   </div>`;
 }
+function enfocarAviso(id){
+  const titulo = document.getElementById(id);
+  if (!titulo) return;
+  const altoBarra = $(".topbar")?.offsetHeight || 0;
+  titulo.style.scrollMarginTop = (altoBarra + 12) + "px";
+  titulo.focus({preventScroll:true});
+  titulo.scrollIntoView({block:"start"});
+}
 function viewAvisos(a){
-  const sec = (c, ic, t, l, modo) => `<div class="asec" style="--c:${c}"><div class="sec">${I(ic)}${t} <small>${l.length}</small></div>${l.length ? `<div class="alist">${l.map(p => avisoRow(p, modo)).join("")}</div>` : `<div class="aempty">Nada por aquí</div>`}</div>`;
+  const sec = (c, ic, t, l, modo, id) => `<div class="asec" style="--c:${c}"><h2 class="sec"${id ? ` id="${id}" tabindex="-1"` : ""}>${I(ic)}${t} <small>${l.length}</small></h2>${l.length ? `<div class="alist">${l.map(p => avisoRow(p, modo)).join("")}</div>` : `<div class="aempty">Nada por aquí</div>`}</div>`;
   const rv = respaldoPendiente();
   return `${rv ? `<button class="revbar resp" data-act="respaldo">${I("shield")}<span>${rv}</span><em>Respaldar</em></button>` : ""}<div class="hello"><h1>Avisos</h1><span class="date">${I("bell")}Entregas con ${cfg().dias} día${cfg().dias == 1 ? "" : "s"} de anticipación</span></div>
     ${sec("var(--t-info)","msg","Por avisar al cliente", a.avisar, "avisar")}
     ${sec("var(--t-violet)","box","Avisados sin retirar", a.retiro, "retiro")}
-    ${sec("var(--err)","alert","Entregas vencidas", a.vencidos, "fecha")}
-    ${sec("var(--soon)","clock","Se entregan pronto", a.proximos, "fecha")}`;
+    ${sec("var(--err)","alert","Entregas vencidas", a.vencidos, "fecha", "aviso-vencidos")}
+    ${sec("var(--soon)","clock","Se entregan pronto", a.proximos, "fecha", "aviso-proximos")}`;
 }
 /* ---------- Equipo (admin) ---------- */
 function viewEquipo(){
@@ -2514,6 +2525,13 @@ function bindMain(){
     if (!b) return;
     const d = b.dataset;
     if (d.view) { setView(d.view); return; }
+    if (d.aviso) {
+      setView("avisos");
+      requestAnimationFrame(() => {
+        if (S.view === "avisos") enfocarAviso(d.aviso);
+      });
+      return;
+    }
     if (d.tile) { if (d.tile === "avisos" || d.tile === "revisar") setView("avisos"); else if (d.tile.startsWith("tipo-")) { S.tab = d.tile.slice(5); S.filtro = "pendientes"; setView("pedidos"); } else { S.filtro = d.tile; autoTab(); setView("pedidos"); } return; }
     if (d.tab) { S.tab = d.tab; render(); return; }
     if (d.filtro) { S.filtro = d.filtro; autoTab(); render(); return; }
@@ -2845,11 +2863,12 @@ function lightbox(fotos, {inicio = 0, editar, descargar} = {}){
     <div class="lbindicador" role="status"></div>`;
   overlay(lb);
   const cerrar = lb.close;
-  lb.close = (...a) => { cerrar(...a); origen?.focus(); };
-  const tr = $(".lbtrack",lb), previa = $(".lbx-prev",lb), siguiente = $(".lbx-next",lb);
+  lb.close = (...a) => { ajuste?.disconnect(); reiniciarGestos(); cerrar(...a); origen?.focus(); };
+  const visor = $(".lbvp",lb), tr = $(".lbtrack",visor), previa = $(".lbx-prev",lb), siguiente = $(".lbx-next",lb);
   const slides = [...tr.querySelectorAll(".lbs")], marcos = slides.map(s => $(".lb-foto",s));
-  for (const marco of marcos) {
-    const foto = $("img",marco);
+  const imagenes = marcos.map(m => $("img",m));
+  for (const [j, marco] of marcos.entries()) {
+    const foto = imagenes[j];
     const ajustar = () => {
       if (!foto.naturalWidth || !foto.naturalHeight) return;
       marco.style.setProperty("--proporcion",foto.naturalWidth / foto.naturalHeight);
@@ -2873,8 +2892,31 @@ function lightbox(fotos, {inicio = 0, editar, descargar} = {}){
     tr.style.transition = t && !MENOS_MOV ? `transform ${t}s cubic-bezier(.22,.9,.3,1)` : "none";
     tr.style.transform = `translate3d(calc(${-i * 100}% + ${dx}px),0,0)`;
   };
+  const puntos = new Map();
+  let escala = 1, x = 0, y = 0, gesto = null, pinza = null;
+  const aplicarZoom = (nivel,nx,ny) => {
+    const foto = imagenes[i];
+    const maxX = Math.max(0,(foto.offsetWidth * nivel - visor.clientWidth) / 2);
+    const maxY = Math.max(0,(foto.offsetHeight * nivel - visor.clientHeight) / 2);
+    escala = nivel;
+    x = nivel > 1 ? Math.max(-maxX,Math.min(maxX,nx)) : 0;
+    y = nivel > 1 ? Math.max(-maxY,Math.min(maxY,ny)) : 0;
+    foto.style.transform = nivel > 1 ? `translate3d(${x}px,${y}px,0) scale(${nivel})` : "";
+  };
+  const reiniciarGestos = () => {
+    aplicarZoom(1,0,0);
+    puntos.clear();
+    gesto = pinza = null;
+  };
+  const ajuste = window.ResizeObserver ? new ResizeObserver(() => {
+    if (escala > 1) aplicarZoom(escala,x,y);
+  }) : null;
+  ajuste?.observe(visor);
+
   const ir = (k, t = .26) => {
-    i = Math.max(0, Math.min(n - 1, k));
+    const destino = Math.max(0, Math.min(n - 1, k));
+    if (i !== destino) reiniciarGestos();
+    i = destino;
     pos(0, t);
     lb.querySelectorAll(".lbdots b").forEach((b, j) => b.classList.toggle("on", j === i));
     slides.forEach((s, j) => s.setAttribute("aria-hidden", String(j !== i)));
@@ -2891,27 +2933,76 @@ function lightbox(fotos, {inicio = 0, editar, descargar} = {}){
   if (previa) previa.onclick = () => ir(i - 1);
   if (siguiente) siguiente.onclick = () => ir(i + 1);
   ir(i,0);
-  let x0 = null, y0 = 0, modo = "", dx = 0, xs = [], pid = null, movio = false;
-  lb.addEventListener("pointerdown", e => { if (e.target.closest("button")) return; x0 = e.clientX; y0 = e.clientY; modo = ""; dx = 0; movio = false; pid = e.pointerId; xs = [[performance.now(), x0]]; });
-  lb.addEventListener("pointermove", e => {
-    if (x0 === null || e.pointerId !== pid) return;
-    const mx = e.clientX - x0, my = e.clientY - y0;
-    if (!modo) { if (Math.abs(mx) < 6 && Math.abs(my) < 6) return; modo = Math.abs(mx) > Math.abs(my) && n > 1 ? "x" : "y"; movio = true; if (modo === "x") try { lb.setPointerCapture(pid); } catch {} }
-    if (modo !== "x") return;
+  const punto = e => ({x:e.clientX,y:e.clientY,tactil:e.pointerType === "touch"});
+  const distanciaYCentro = () => {
+    const [a,b] = puntos.values(), r = visor.getBoundingClientRect();
+    return {dist:Math.hypot(a.x - b.x,a.y - b.y),
+      cx:(a.x + b.x - r.left - r.right) / 2, cy:(a.y + b.y - r.top - r.bottom) / 2};
+  };
+  const iniciarPinza = () => {
+    pinza = {...distanciaYCentro(),escala,x,y};
+    gesto = null;
+    pos(0,0);
+  };
+  const iniciarGesto = (p, deslizar) => {
+    gesto = {origen:p,x,y,deslizar,modo:"",dx:0,muestras:[[performance.now(),p.x]]};
+  };
+  lb.addEventListener("pointerdown",e => {
+    if (e.target.closest("button") || (e.pointerType === "mouse" && e.button !== 0)) return;
+    const p = punto(e);
+    if (puntos.size && (!p.tactil || !puntos.values().next().value.tactil)) return;
+    puntos.set(e.pointerId,p);
+    try { lb.setPointerCapture(e.pointerId); } catch {}
+    if (puntos.size === 1) iniciarGesto(p,true);
+    else iniciarPinza();
+  });
+  lb.addEventListener("pointermove",e => {
+    if (!puntos.has(e.pointerId)) return;
+    const p = punto(e);
+    puntos.set(e.pointerId,p);
+    if (pinza) {
+      const medio = distanciaYCentro();
+      if (!pinza.dist) { iniciarPinza(); return; }
+      const nivel = Math.max(1,Math.min(4,pinza.escala * medio.dist / pinza.dist));
+      const factor = nivel / pinza.escala;
+      aplicarZoom(nivel,medio.cx - (pinza.cx - pinza.x) * factor,medio.cy - (pinza.cy - pinza.y) * factor);
+      e.preventDefault();
+      return;
+    }
+    const mx = p.x - gesto.origen.x, my = p.y - gesto.origen.y;
+    if (escala > 1) {
+      aplicarZoom(escala,gesto.x + mx,gesto.y + my);
+      e.preventDefault();
+      return;
+    }
+    if (!gesto.deslizar) return;
+    if (!gesto.modo && Math.max(Math.abs(mx),Math.abs(my)) >= 6)
+      gesto.modo = Math.abs(mx) > Math.abs(my) && n > 1 ? "x" : "y";
+    if (gesto.modo !== "x") return;
     e.preventDefault();
-    dx = (i === 0 && mx > 0) || (i === n - 1 && mx < 0) ? mx / 3 : mx; // resistencia en los extremos
-    xs.push([performance.now(), e.clientX]); if (xs.length > 5) xs.shift();
-    pos(dx);
+    gesto.dx = (i === 0 && mx > 0) || (i === n - 1 && mx < 0) ? mx / 3 : mx;
+    gesto.muestras.push([performance.now(),p.x]);
+    if (gesto.muestras.length > 5) gesto.muestras.shift();
+    pos(gesto.dx,0);
   });
   const soltar = e => {
-    if (x0 === null || e.pointerId !== pid) return; x0 = null;
-    if (!movio) return; // un toque no cierra: se cierra con la X o con Atrás
-    if (modo !== "x") return;
-    const a = xs[0], b = xs[xs.length - 1], vel = b[0] - a[0] > 8 ? (b[1] - a[1]) / (b[0] - a[0]) : 0;
+    if (!puntos.delete(e.pointerId)) return;
+    if (puntos.size >= 2) { iniciarPinza(); return; }
+    pinza = null;
+    if (puntos.size === 1) { iniciarGesto(puntos.values().next().value,false); return; }
+    const terminado = gesto;
+    gesto = null;
+    if (terminado?.modo !== "x") return;
+    if (e.type !== "pointerup") { pos(0,.26); return; }
+    const {dx,muestras} = terminado, a = muestras[0], b = muestras.at(-1);
+    const vel = b[0] - a[0] > 8 ? (b[1] - a[1]) / (b[0] - a[0]) : 0;
     const rapido = Math.abs(vel) > .35 && Math.sign(vel) === Math.sign(dx) && Math.abs(dx) > 20;
-    ir(rapido || Math.abs(dx) > lb.querySelector(".lbvp").clientWidth * .2 ? i + (dx < 0 ? 1 : -1) : i, rapido ? .18 : .26);
+    const cambia = rapido || Math.abs(dx) > visor.clientWidth * .2;
+    ir(cambia ? i + (dx < 0 ? 1 : -1) : i,rapido ? .18 : .26);
   };
-  lb.addEventListener("pointerup", soltar); lb.addEventListener("pointercancel", e => { if (e.pointerId === pid) { x0 = null; ir(i); } });
+  lb.addEventListener("pointerup",soltar);
+  lb.addEventListener("pointercancel",soltar);
+  lb.addEventListener("lostpointercapture",soltar);
   lb.tabIndex = -1; lb.focus();
   lb.addEventListener("keydown", e => {
     if (e.key === "Escape") { e.preventDefault(); return lb.close(); }
@@ -2987,7 +3078,7 @@ async function prepararFoto(file, im, form){
 }
 /* ================= Calendario emergente ================= */
 function openCalendar(current, onPick, opts = {}){
-  if (opts.entrega) return openAgenda({entrega:onPick, actual:current});
+  if (opts.entrega) return openAgenda({entrega:onPick, actual:current, tipo:opts.tipo});
   let sel = current ? parseYmd(current) : null;
   const v = sel ? new Date(sel) : today0(); v.setDate(1);
   const ov = document.createElement("div"); ov.className = "dp-ov"; overlay(ov);
@@ -3025,7 +3116,7 @@ function agRow(p, abrible = true){
     ${p.urgente ? `<span class="oc2-urgi" title="Urgente">${I("alert")}</span>` : d.t ? `<span class="oc2-due ${d.c}">${esc(d.t)}</span>` : ""}
   </div>`;
 }
-function openAgenda({entrega, actual} = {}){
+function openAgenda({entrega, actual, tipo} = {}){
   let sel = actual || ymd(today0()), moviendo = false;
   const v = parseYmd(sel); v.setDate(1);
   const origen = document.activeElement;
@@ -3036,7 +3127,7 @@ function openAgenda({entrega, actual} = {}){
     const cerrar = ov.close;
     ov.close = (...a) => { cerrar(...a); origen?.focus(); };
   }
-  const porDia = () => entregasPorFecha(pedidosList());
+  const porDia = () => entregasPorFecha(pedidosList(),tipo);
   const grilla = (y, m, g, visible) => {
     const t0 = ymd(today0());
     let cells = ["Lu","Ma","Mi","Ju","Vi","Sá","Do"].map(x => `<span>${x}</span>`).join("");
@@ -3271,7 +3362,11 @@ function openForm(id, tipo, cliente, borrador){
           <div class="imgs" id="imgs"></div>
           <input type="file" id="fileGal" accept="${FORMATOS_FOTO}" multiple hidden><input type="file" id="fileCam" accept="${FORMATOS_FOTO}" capture="environment" hidden>
         </div>
-        <div class="fsec"><div class="sec">${I("note")}Nota / información adicional</div>
+        <div class="fsec"><label class="sec" for="in-nota">${I("note")}Nota / información adicional</label>
+          <div class="nota-listas" id="nota-listas">
+            <button class="btn sm" type="button" data-lista-nota="•">• Viñeta</button>
+            <button class="btn sm" type="button" data-lista-nota="☐">☐ Casilla</button>
+          </div>
           <textarea class="inp" id="in-nota" rows="3">${esc(F.nota)}</textarea>
         </div>
         ${puedeBloquear ? `<div class="fsec"><div class="sec">${I("lock")}Acceso denegado para</div>
@@ -3343,7 +3438,9 @@ function openForm(id, tipo, cliente, borrador){
   F._checkTel = () => parsePhone(inTel.value, inPais.value);
 
   $("#in-tema", ov).oninput = e => { mayus(e.target, true); F.tema = e.target.value; clearErr("f-tema"); };
-  $("#in-nota", ov).oninput = e => F.nota = e.target.value;
+  const nota = $("#in-nota",ov);
+  nota.oninput = e => F.nota = e.target.value;
+  conectarListasNota(nota,$("#nota-listas",ov));
   $("#in-mon", ov).onchange = e => { F.moneda = e.target.value; clearErr("f-moneda"); renderTotals(); };
   $("#prl", ov).oninput = e => { const x = e.target.closest("[data-pr]"); if (!x) return; F.pr[x.dataset.pr] = x.value; x.classList.remove("bad"); if (!erroresPaso(2).some(z => z[0] === "f-precio")) clearErr("f-precio"); renderTotals(); };
   $("#in-abono", ov).oninput = e => { F.abono = e.target.value; clearErr("f-abono"); renderTotals(); };
@@ -3364,7 +3461,7 @@ function openForm(id, tipo, cliente, borrador){
     if (d.deny !== undefined) { const i = F.denegados.indexOf(d.deny); i >= 0 ? F.denegados.splice(i, 1) : F.denegados.push(d.deny); b.setAttribute("aria-pressed", i < 0); }
   });
   const drawFecha = () => { const s = $("#in-fecha .d", ov); if (F.fechaEntrega) { const n = daysUntil(F.fechaEntrega); s.innerHTML = esc(fmtDate(F.fechaEntrega)) + ` <span class="ph">(${n < 0 ? "hace " + (-n) + " días" : n === 0 ? "hoy" : n === 1 ? "mañana" : "en " + n + " días"})</span>`; } else s.innerHTML = `<span class="ph">Elegir en el calendario</span>`; };
-  $("#in-fecha", ov).onclick = () => openCalendar(F.fechaEntrega, d => { F.fechaEntrega = d; clearErr("f-fecha"); drawFecha(); const m = $("#f-fecha .msg", ov); m.className = "msg warn"; m.textContent = daysUntil(d) < 0 ? "⚠ La fecha elegida ya pasó" : ""; guardarBorrador(); }, {entrega:true});
+  $("#in-fecha", ov).onclick = () => openCalendar(F.fechaEntrega, d => { F.fechaEntrega = d; clearErr("f-fecha"); drawFecha(); const m = $("#f-fecha .msg", ov); m.className = "msg warn"; m.textContent = daysUntil(d) < 0 ? "⚠ La fecha elegida ya pasó" : ""; guardarBorrador(); }, {entrega:true,tipo:F.tipo});
   drawFecha();
   $("#fileGal", ov).onchange = e => { addFiles(e.target.files); e.target.value = ""; };
   $("#fileCam", ov).onchange = e => { addFiles(e.target.files); e.target.value = ""; };
@@ -3871,7 +3968,7 @@ async function saveForm(ov, orig){
     items:F.items.filter(i => !itemVacio(i)).map(i => ({etiqueta:conEtiqueta ? (i.etiqueta || "") : "", prenda:i.prenda, color:isP ? i.color : "Fullprint", horma:i.horma || "", talla:i.talla, cant:cantidad(i.cant), precioMenor:precioUnitario(F, i), nombre:(i.nombre || "").trim(), numero:(i.numero || "").trim()})),
     fechaEntrega:F.fechaEntrega, moneda:F.moneda, pagoVersion:2, totalMenor:pago.total, abonoMenor:pago.abono,
     motivoSinAbono:pago.abono > 0 ? "" : (F.motivoSinAbono || "").trim(), urgente:!!F.urgente,
-    imagenes:F.imagenes.filter(i => i.id && !i.error).map(i => i.id), nota:(F.nota || "").trim(),
+    imagenes:F.imagenes.filter(i => i.id && !i.error).map(i => i.id), nota:F.nota || "",
     editadoEn:now, editadoPor:S.me.usuario
   };
   const creador = orig ? orig.creadoPor : S.me.usuario;
@@ -3891,7 +3988,7 @@ async function saveForm(ov, orig){
     const J = x => JSON.stringify(x === undefined ? null : x);
     const campos = [["Cliente", o => [o.cliente && o.cliente.nombre, o.cliente && o.cliente.telefono]], ["Diseño", o => o.tema], ["Estampado", o => o.servicio], ["Quién pone la prenda", o => o.prendaDe],
       ["Prendas", o => (o.items || []).map(i => [i.etiqueta, i.prenda, i.color, i.horma, i.talla, unidadesDe(i, o), i.nombre || "", i.numero || ""])], ["Fecha de entrega", o => o.fechaEntrega],
-      ["Precios", o => (o.items || []).map(i => precioUnitario(o, i))], ["Pago", o => [abonoMenor(o), o.moneda]], ["Urgente", o => !!o.urgente], ["Referencias", o => o.imagenes || []], ["Nota", o => (o.nota || "").trim()]];
+      ["Precios", o => (o.items || []).map(i => precioUnitario(o, i))], ["Pago", o => [abonoMenor(o), o.moneda]], ["Urgente", o => !!o.urgente], ["Referencias", o => o.imagenes || []], ["Nota", o => o.nota || ""]];
     const cambios = campos.filter(([, f]) => J(f(orig)) !== J(f(data))).map(([n]) => n);
     if (cambios.length) Object.assign(data, {revisar:true, revisarCambios:[...new Set([...(orig.revisar ? orig.revisarCambios || [] : []), ...cambios])], revisarPor:S.me.usuario, revisarEn:now});
   }
