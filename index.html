@@ -1198,7 +1198,7 @@ const updateDoc = (...a) => sinEsperar(fsUpdateDoc(...a));
 const deleteDoc = (...a) => sinEsperar(fsDeleteDoc(...a));
 const writeBatch = db => { const b = fsWriteBatch(db), c = b.commit.bind(b); b.commit = () => sinEsperar(c()); return b; };
 
-const VERSION = "v3.69";
+const VERSION = "v3.69.1";
 /* ================= Utilidades ================= */
 const $ = (s, r = document) => r.querySelector(s);
 const esc = s => String(s ?? "").replace(/[&<>"']/g, c => ({"&":"&amp;","<":"&lt;",">":"&gt;",'"':"&quot;","'":"&#39;"}[c]));
@@ -4005,9 +4005,9 @@ function exigirPedidoVisible(id, uid){
     throw new Error("El pedido ya no está disponible");
   return S.pedidos[id];
 }
-async function prepararArchivoReferencia(codigo, idFoto, indice, {archivoReferencia,codigoParaArchivo}) {
+async function prepararArchivoReferencia(codigo, idFoto, indice, {archivoReferenciaPng,codigoParaArchivo}) {
   const foto = await leerFoto(doc(S.db,"fotos",idFoto));
-  const archivo = archivoReferencia(foto.data()?.data,indice);
+  const archivo = await archivoReferenciaPng(foto.data()?.data,indice);
   return {...archivo,nombre:`${codigoParaArchivo(codigo)}-${archivo.nombre}`};
 }
 async function descargarReferenciaPedido(id, uid, {idFoto, indice}){
