@@ -148,6 +148,12 @@ async function comprobarChat(page, destino) {
   const chat = await popup;
   await chat.waitForURL(destino);
   assert.equal(await chat.locator("body").innerText(),"WhatsApp simulado");
+  if (destino.startsWith("https://web.whatsapp.com/")) {
+    const pestañas = contexto.pages().length;
+    await enlace.click();
+    await chat.waitForURL(destino);
+    assert.equal(contexto.pages().length,pestañas,"El segundo clic debe reutilizar la misma pestaña");
+  }
   await chat.close();
   await visible(page.locator(".pdmd"));
 }
@@ -470,7 +476,7 @@ test("escritorio y móvil: login, altas offline en varios clientes, recarga, sin
     assert.match(resumen,/19\.97/);
     await visible(page.locator("#d-download-status"));
     assert.match(await page.locator("#d-download-status").textContent(),/elige Permitir/);
-    await comprobarChat(page,"https://web.whatsapp.com/send/?phone=584120000000");
+    await comprobarChat(page,"https://web.whatsapp.com/send?phone=584120000000");
 
     await cel.locator(".oc2:visible").filter({hasText:/Tema Escritorio/i}).click();
     await oculto(cel.locator("#d-download"));
