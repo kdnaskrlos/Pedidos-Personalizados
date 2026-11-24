@@ -15,6 +15,31 @@ export function archivoReferencia(src, indice) {
   };
 }
 
+// Convierte las fotos almacenadas a un PNG real. Cambiar solo el nombre
+// o la extensión no convertiría los bytes JPEG/WebP de Firestore.
+export async function archivoReferenciaPng(src, indice) {
+  const original = archivoReferencia(src, indice);
+  const nombre = `referencia-${String(indice + 1).padStart(2, "0")}.png`;
+  if (original.tipo === "image/png") return {...original, nombre};
+  const fuente = new Blob([original.datos], {type:original.tipo});
+  let imagen;
+  try {
+    imagen = await createImageBitmap(fuente);
+    const lienzo = document.createElement("canvas");
+    lienzo.width = imagen.width;
+    lienzo.height = imagen.height;
+    const contexto = lienzo.getContext("2d");
+    if (!contexto) throw new Error("No se puede convertir la referencia a PNG");
+    contexto.drawImage(imagen, 0, 0);
+    const png = await new Promise((resolve, reject) => lienzo.toBlob(
+      archivo => archivo ? resolve(archivo) : reject(new Error("No se pudo crear el PNG")), "image/png"
+    ));
+    return {nombre, tipo:"image/png", datos:png};
+  } finally {
+    imagen?.close?.();
+  }
+}
+
 export function descargarArchivo({nombre, tipo, datos}) {
   const url = URL.createObjectURL(new Blob([datos], {type:tipo}));
   const enlace = document.createElement("a");
