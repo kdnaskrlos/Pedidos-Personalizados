@@ -1,99 +1,275 @@
 rules_version = '2';
-// Reglas de seguridad de Comic Shop · Pedidos
-// Copia TODO este archivo en Firebase → Firestore Database → Reglas → Publicar.
 service cloud.firestore {
   match /databases/{database}/documents {
-
     function signed() { return request.auth != null; }
-    function uPath() { return /databases/$(database)/documents/usuarios/$(request.auth.uid); }
-    function me() { return get(uPath()).data; }
-    function activo() { return signed() && exists(uPath()) && me().activo == true; }
+    function usuarioPath(uid) { return /databases/$(database)/documents/usuarios/$(uid); }
+    function me() { return get(usuarioPath(request.auth.uid)).data; }
+    function activo() {
+      return signed() && exists(usuarioPath(request.auth.uid)) && me().activo == true;
+    }
     function admin() { return activo() && me().rol == 'admin'; }
-    function sinIniciar() { return !exists(/databases/$(database)/documents/sistema/estado); }
-    function seIniciaAhora() { return sinIniciar() && existsAfter(/databases/$(database)/documents/sistema/estado); }
+    function identidadCola(p, uid) { return p.get('identidadCola', uid); }
+    function propietarioEnvio() { return identidadCola(me(), request.auth.uid); }
+    function estadoPath() { return /databases/$(database)/documents/sistema/estado; }
+    function loginPath(usuario) { return /databases/$(database)/documents/logins/$(usuario); }
+    function pedidoPath(id) { return /databases/$(database)/documents/pedidos/$(id); }
+    function contadorPath(tipo) { return /databases/$(database)/documents/contadores/$(tipo); }
+    function envioPath(uid, id) { return /databases/$(database)/documents/usuarios/$(uid)/envios/$(id); }
+    function usuarioValido(u) { return u is string && u.matches('^[a-z0-9._-]{3,20}$'); }
+    function tipoValido(t) { return t in ['personalizado', 'sublimacion']; }
     function verTipo(t) {
-      return (t == 'personalizado' && me().verPersonalizado == true)
-          || (t == 'sublimacion' && me().verSublimacion == true);
+      return (t == 'personalizado' && me().get('verPersonalizado', false) == true)
+          || (t == 'sublimacion' && me().get('verSublimacion', false) == true);
     }
-    // ¿Puede este usuario ver el pedido "p"?
-    function puedeVer(p) {
-      return admin()
-        || (activo() && me().usuario in p.lectores)
-        || (activo() && p.publico == true && me().soloAsignados != true && verTipo(p.tipo));
+    function puedeVerEmpleado(p) {
+      return activo() && verTipo(p.tipo)
+        && ((p.publico == true && me().get('soloAsignados', false) != true) || me().usuario in p.lectores);
+    }
+    function puedeVer(p) { return admin() || puedeVerEmpleado(p); }
+    function iniciaAhora() {
+      return signed() && !exists(estadoPath()) && getAfter(estadoPath()).data.iniciadoPor == request.auth.uid;
+    }
+    function perfilValido(p) {
+      return usuarioValido(p.usuario) && p.rol in ['admin', 'empleado'] && p.activo is bool;
+    }
+    function loginValido(u, d) {
+      return usuarioValido(u) && d.keys().hasOnly(['uid', 'email'])
+        && d.uid is string && d.email is string && d.email.size() <= 256
+        && getAfter(usuarioPath(d.uid)).data.usuario == u;
     }
 
-    // Estado del sistema: público (la pantalla de inicio necesita saber si ya hay administrador)
+    function trasladoCola(anterior, destino) {
+      let origen = usuarioPath(anterior);
+      return anterior != destino
+        && !existsAfter(origen)
+        && getAfter(usuarioPath(destino)).data.identidadCola == identidadCola(get(origen).data, anterior);
+    }
+    function perfilTrasladado(p, uid) {
+      let login = loginPath(p.usuario);
+      let anterior = get(login).data.uid;
+      return getAfter(login).data.uid == uid && trasladoCola(anterior, uid);
+    }
+
+    // Lecturas puntuales de arranque y acceso. Las listas de identificadores quedan cerradas.
     match /sistema/estado {
-      allow read: if true;
-      allow create: if signed() && sinIniciar()
-        && getAfter(uPath()).data.rol == 'admin';
-      allow update, delete: if admin();
+      allow get: if true;
+      allow create: if iniciaAhora()
+        && request.resource.data.keys().hasOnly(['iniciado', 'iniciadoPor', 'creadoEn'])
+        && request.resource.data.iniciado == true && request.resource.data.creadoEn is string
+        && getAfter(usuarioPath(request.auth.uid)).data.rol == 'admin'
+        && getAfter(usuarioPath(request.auth.uid)).data.activo == true
+        && getAfter(loginPath(getAfter(usuarioPath(request.auth.uid)).data.usuario)).data.uid == request.auth.uid;
     }
-
-    // Usuario → correo interno de inicio de sesión (público, no contiene datos de pedidos)
     match /logins/{usuario} {
-      allow read: if true;
-      allow create: if admin() || (seIniciaAhora() && request.resource.data.uid == request.auth.uid);
-      allow update, delete: if admin();
+      allow get: if usuarioValido(usuario);
+      allow create: if loginValido(usuario, request.resource.data)
+        && (admin() || (iniciaAhora() && request.resource.data.uid == request.auth.uid
+          && request.resource.data.email == request.auth.token.email));
+      allow update: if admin() && loginValido(usuario, request.resource.data)
+        && (request.resource.data.uid == resource.data.uid || trasladoCola(resource.data.uid, request.resource.data.uid));
+      allow delete: if admin();
     }
-
-    // Perfiles y permisos del equipo: solo el administrador los cambia
     match /usuarios/{uid} {
-      allow read: if signed() && (request.auth.uid == uid || activo());
-      allow create: if admin()
-        || (request.auth.uid == uid && seIniciaAhora() && request.resource.data.rol == 'admin');
-      allow update, delete: if admin();
+      allow get: if (signed() && request.auth.uid == uid) || admin() || (activo() && resource.data.activo == true);
+      allow list: if admin() || (activo() && resource.data.activo == true);
+      allow create: if perfilValido(request.resource.data)
+        && ((admin() && (!request.resource.data.keys().hasAny(['identidadCola'])
+              || perfilTrasladado(request.resource.data, uid)))
+          || (iniciaAhora() && request.auth.uid == uid && !request.resource.data.keys().hasAny(['identidadCola'])
+            && request.resource.data.rol == 'admin' && request.resource.data.activo == true));
+      allow update: if admin() && perfilValido(request.resource.data)
+        && request.resource.data.usuario == resource.data.usuario
+        && !request.resource.data.diff(resource.data).affectedKeys().hasAny(['identidadCola']);
+      allow delete: if admin();
+
+      // El recibo sobrevive a la eliminación del pedido para que un reintento nunca lo recree.
+      match /envios/{id} {
+        allow get: if activo() && propietarioEnvio() == uid;
+        allow create: if activo() && propietarioEnvio() == uid && idValido(id)
+          && reciboNuevo(id, request.resource.data);
+      }
     }
 
+    match /config/ajustes {
+      allow get: if activo();
+    }
     match /config/{doc} {
-      allow read: if activo();
-      allow write: if admin();
+      allow read, write: if admin();
     }
-
-    // Contadores para numerar los pedidos (P-0001, S-0001…)
-    match /contadores/{tipo} {
-      allow read, write: if activo();
-    }
-
-    // Avisos informativos: los ve todo el equipo; solo el administrador los crea o cambia
     match /anuncios/{id} {
       allow read: if activo();
       allow write: if admin();
     }
-
-    // Estado de los respaldos (solo el administrador)
-    match /respaldos/{doc} {
+    match /respaldos/estado {
+      allow read, write: if admin();
+    }
+    // La app ya no consulta el directorio histórico de clientes al registrar pedidos.
+    match /clientes/{tel} {
       allow read, write: if admin();
     }
 
-    match /clientes/{tel} {
-      allow read, write: if activo();
+    function idValido(id) { return id.matches('^[0-9a-f]{8}-[0-9a-f]{4}-4[0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$'); }
+    function enteroSeguro(n) { return n is int && n >= 0 && n <= 9007199254740991; }
+    function codigo(tipo, n) {
+      return (tipo == 'personalizado' ? 'P-' : 'S-')
+        + (n < 10 ? '000' : n < 100 ? '00' : n < 1000 ? '0' : '') + string(n);
+    }
+    function pisoValido(d) {
+      return d.keys().hasOnly(['alineado', 'n']) && d.alineado == true && enteroSeguro(d.n);
+    }
+    function incremento(tipo, d) {
+      let id = d.ultimoId;
+      let ep = envioPath(propietarioEnvio(), id);
+      let p = getAfter(pedidoPath(id)).data;
+      let e = getAfter(ep).data;
+      return resource.data.alineado == true && enteroSeguro(resource.data.n)
+        && d.keys().hasOnly(['alineado', 'n', 'ultimoId']) && d.alineado == true
+        && enteroSeguro(d.n) && d.n == resource.data.n + 1 && idValido(id)
+        && !exists(ep) && e.tipo == tipo && e.n == d.n
+        && p.creadorUid == request.auth.uid && p.tipo == tipo && p.consecutivo == d.n;
+    }
+    function reciboNuevo(id, d) {
+      let p = getAfter(pedidoPath(id)).data;
+      let c = getAfter(contadorPath(d.tipo)).data;
+      return d.keys().hasOnly(['tipo', 'codigo', 'n']) && tipoValido(d.tipo)
+        && enteroSeguro(d.n) && d.n > 0 && d.codigo == codigo(d.tipo, d.n)
+        && !exists(pedidoPath(id))
+        && p.creadorUid == request.auth.uid && p.tipo == d.tipo && p.codigo == d.codigo && p.consecutivo == d.n
+        && c.ultimoId == id && c.n == d.n
+        && pagoValido(p);
+    }
+    function reservaNueva(id, p) {
+      let c = getAfter(contadorPath(p.tipo)).data;
+      let e = getAfter(envioPath(propietarioEnvio(), id)).data;
+      return idValido(id) && p.creadorUid == request.auth.uid
+        && enteroSeguro(p.consecutivo) && p.consecutivo > 0 && p.codigo == codigo(p.tipo, p.consecutivo)
+        && c.ultimoId == id && c.n == p.consecutivo && c.n == get(contadorPath(p.tipo)).data.n + 1
+        && e.n == p.consecutivo && e.codigo == p.codigo;
+    }
+    match /contadores/{tipo} {
+      allow get: if activo() && tipoValido(tipo) && (admin() || verTipo(tipo));
+      allow list: if admin();
+      allow create: if admin() && tipoValido(tipo) && pisoValido(request.resource.data);
+      allow update: if activo() && tipoValido(tipo)
+        && ((admin() && pisoValido(request.resource.data)
+              && (!enteroSeguro(resource.data.get('n', -1)) || request.resource.data.n >= resource.data.n))
+          || incremento(tipo, request.resource.data));
     }
 
-    match /fotos/{id} {
-      allow read, create: if activo();
-      allow update, delete: if activo();
+    function pagoValido(p) {
+      return p.pagoVersion == 2 && p.moneda in ['COP', 'USD', 'Bs']
+        && enteroSeguro(p.totalMenor) && p.totalMenor > 0 && p.totalMenor <= 1000000000000
+        && enteroSeguro(p.abonoMenor) && p.abonoMenor <= p.totalMenor
+        && p.items is list && p.items.size() > 0 && p.items.size() <= 8 && !p.items.hasAny([null])
+        && p.totalMenor == sumaPartidas(p.items);
     }
-
+    function importePartida(p) {
+      return p == null ? 0 : importeEntero(p.cant, p.precioMenor);
+    }
+    function importeEntero(cant, precio) {
+      // El máximo de cada subtotal mantiene la suma lejos del mínimo de un importe inválido.
+      return cant is int && precio is int && cant > 0 && precio > 0
+        && cant <= 1000000000000 / precio
+        ? cant * precio : -100000000000000;
+    }
+    function sumaPartidas(partidas) {
+      let n = partidas.size();
+      let p = partidas.concat([null, null, null, null]);
+      // Los nulos agregados son relleno. La entrada original no puede contenerlos.
+      return importePartida(p[0]) + importePartida(p[1]) + importePartida(p[2]) + importePartida(p[3])
+        + (n <= 4 ? 0 : importePartida(p[4]) + importePartida(p[5]) + importePartida(p[6]) + importePartida(p[7]));
+    }
+    function datosPedidoValidos(p) {
+      return p.cliente is map && p.cliente.nombre is string && p.cliente.telefono is string
+        && p.cliente.nombre.size() <= 500 && p.cliente.telefono.matches('^[0-9]{6,15}$')
+        && p.imagenes is list && p.imagenes.size() <= 200 && p.nota is string && p.tema is string;
+    }
+    function pagoCompatible(p, delta, esAdmin) {
+      return !delta.hasAny(['pagoVersion', 'totalMenor', 'abonoMenor', 'moneda', 'precio', 'precios', 'abono', 'items'])
+        || (!delta.hasAny(['precio', 'precios', 'abono']) && pagoValido(p))
+        || (esAdmin && p.get('restaurado', false) == true
+          && resource.data.get('pagoVersion', 0) in [0, 1] && p.get('pagoVersion', 0) in [0, 1]);
+    }
+    function accesoCoherente(p) {
+      return p.publico is bool && p.lectores is list && p.denegados is list && p.asignados is list
+        && !p.lectores.hasAny(p.denegados) && (!p.publico || p.denegados.size() == 0);
+    }
+    function esAutor(p, delta, k) {
+      return !delta.hasAny([k]) || p.get(k, null) in [null, me().usuario];
+    }
+    function edicionEmpleado(p, delta) {
+      return delta.hasOnly([
+        'cliente', 'tema', 'servicio', 'servicios', 'prendaDe', 'etiqueta', 'items', 'fechaEntrega',
+        'moneda', 'pagoVersion', 'totalMenor', 'abonoMenor', 'motivoSinAbono',
+        'urgente', 'imagenes', 'nota', 'editadoEn', 'editadoPor', 'revisar', 'revisarCambios', 'revisarPor',
+        'revisarEn', 'estado', 'listoEn', 'listoPor', 'avisado', 'avisadoPor', 'avisadoEn',
+        'recordadoEn', 'entregadoEn', 'posponerHasta', 'lectores', 'publico', 'denegados', 'asignados'
+      ]) && esAutor(p, delta, 'editadoPor') && esAutor(p, delta, 'listoPor') && esAutor(p, delta, 'avisadoPor')
+        && (!delta.hasAny(['revisar', 'revisarCambios', 'revisarPor', 'revisarEn'])
+          || (p.revisar == true && p.revisarPor == me().usuario))
+        && (!delta.hasAny(['estado']) || p.estado in ['pendiente', 'listo', 'entregado'])
+        && (!delta.hasAny(['lectores', 'publico', 'denegados', 'asignados'])
+          || (me().get('bloquear', false) == true && resource.data.creadoPor == me().usuario
+            && accesoCoherente(p) && me().usuario in p.lectores));
+    }
+    function pedidoEditable(p) {
+      let delta = p.diff(resource.data).affectedKeys();
+      let esAdmin = admin();
+      let esRestauracion = esAdmin && p.get('restaurado', false) == true;
+      return (esAdmin || puedeVerEmpleado(resource.data))
+        && !delta.hasAny(['tipo', 'codigo', 'creadoPor', 'creadoEn', 'creadorUid', 'consecutivo', 'demo'])
+        && (!delta.hasAny(['cliente', 'imagenes', 'nota', 'tema']) || datosPedidoValidos(p) || esRestauracion)
+        && (esAdmin
+          ? (!delta.hasAny(['lectores', 'publico', 'denegados', 'asignados']) || accesoCoherente(p) || esRestauracion)
+          : edicionEmpleado(p, delta))
+        && pagoCompatible(p, delta, esAdmin);
+    }
+    function altaNormal(id, p) {
+      return tipoValido(p.tipo) && (admin() || verTipo(p.tipo))
+        && p.creadoPor == me().usuario && p.creadoEn is string && p.estado == 'pendiente' && p.avisado == false
+        && p.keys().hasOnly([
+          'tipo', 'codigo', 'consecutivo', 'creadorUid', 'creadoPor', 'creadoEn', 'estado', 'avisado',
+          'cliente', 'tema', 'servicio', 'servicios', 'prendaDe', 'etiqueta', 'items', 'fechaEntrega',
+          'moneda', 'pagoVersion', 'totalMenor', 'abonoMenor', 'motivoSinAbono',
+          'urgente', 'imagenes', 'nota', 'lectores', 'publico', 'denegados', 'asignados'
+        ]) && accesoCoherente(p) && me().usuario in p.lectores
+        && (admin() || me().get('bloquear', false)
+          || (p.publico == true && p.lectores == [me().usuario] && p.asignados.size() == 0))
+        // El contador exige un recibo nuevo. La escritura de ese recibo valida el pago
+        // del mismo pedido dentro de la transacción.
+        && datosPedidoValidos(p) && reservaNueva(id, p);
+    }
+    function altaAdministrativa(p) {
+      return admin() && tipoValido(p.tipo)
+        && ((p.get('demo', false) == true && p.codigo.matches('^[PS]-T[0-9]+$'))
+          || (p.get('restaurado', false) == true && (p.get('pagoVersion', 0) in [0, 1] || pagoValido(p))));
+    }
     match /pedidos/{id} {
-      allow read: if puedeVer(resource.data);
-      allow create: if activo()
-        && (admin() || verTipo(request.resource.data.tipo))
-        && request.resource.data.creadoPor == me().usuario
-        && me().usuario in request.resource.data.lectores;
-      allow update: if admin()
-        || (puedeVer(resource.data)
-            && request.resource.data.creadoEn == resource.data.creadoEn
-            && request.resource.data.creadoPor == resource.data.creadoPor
-            && request.resource.data.codigo == resource.data.codigo
-            && request.resource.data.tipo == resource.data.tipo
-            && ((request.resource.data.lectores == resource.data.lectores
-                 && request.resource.data.publico == resource.data.publico)
-                // "Bloquear pedidos": quien lo creó puede decidir qué empleados no lo ven
-                || (me().bloquear == true
-                    && resource.data.creadoPor == me().usuario
-                    && me().usuario in request.resource.data.lectores)));
-      allow delete: if admin() || (puedeVer(resource.data) && me().eliminar == true);
+      allow get, list: if puedeVer(resource.data);
+      allow create: if activo() && (altaNormal(id, request.resource.data) || altaAdministrativa(request.resource.data));
+      allow update: if pedidoEditable(request.resource.data);
+      allow delete: if admin() || (puedeVer(resource.data) && me().get('eliminar', false) == true);
+    }
+
+    function fotoVinculada(id, f, p) {
+      return f.baseId is string && f.mini is bool
+        && id == f.baseId + (f.mini ? '_m' : '') && f.baseId in p.imagenes;
+    }
+    function fotoNueva(id, f) {
+      let p = getAfter(pedidoPath(f.pedidoId)).data;
+      return f.keys().hasOnly(['pedidoId', 'baseId', 'por', 'creadoEn', 'data', 'mini'])
+        && f.por == me().usuario && f.creadoEn is string && idValido(f.baseId)
+        && f.data is string && f.data.size() <= 600000 && f.data.matches('^data:image/(jpeg|webp|png);base64,.*$')
+        && fotoVinculada(id, f, p) && puedeVer(p)
+        && (p.get('editadoPor', '') == me().usuario || p.creadoPor == me().usuario);
+    }
+    match /fotos/{id} {
+      allow get: if admin() || (activo() && resource.data.keys().hasAll(['pedidoId'])
+        && puedeVer(get(pedidoPath(resource.data.pedidoId)).data)
+        && fotoVinculada(id, resource.data, get(pedidoPath(resource.data.pedidoId)).data));
+      allow list: if admin();
+      allow create: if activo() && (admin() || fotoNueva(id, request.resource.data));
+      allow update, delete: if admin();
     }
   }
 }

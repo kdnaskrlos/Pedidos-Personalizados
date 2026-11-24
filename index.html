@@ -1150,9 +1150,12 @@ html,body{overflow-x:clip}
 
 <script type="module">
 import { firebaseConfig } from "./config.js";
+import { consecutivoDe, documentosFoto, registrarPedido } from "./pedidos-sync.mjs";
+import { guardarPendiente, leerPendientes, borrarPendiente, guardarFotoLocal, leerFotoLocal, borrarFotoLocal } from "./cola-local.mjs";
+import { MAX_PARTIDAS, centavos, centavosHistoricos, cantidad, clavePrecio, precioHistorico, validarPago, validarPagoEnCentavos, actualizarPagoPendiente } from "./pagos.mjs";
 import { initializeApp, deleteApp } from "https://www.gstatic.com/firebasejs/10.12.2/firebase-app.js";
 import { getAuth, onAuthStateChanged, signInWithEmailAndPassword, createUserWithEmailAndPassword, signOut, updatePassword, reauthenticateWithCredential, EmailAuthProvider } from "https://www.gstatic.com/firebasejs/10.12.2/firebase-auth.js";
-import { initializeFirestore, getFirestore, persistentLocalCache, persistentMultipleTabManager, doc, collection, query, where, onSnapshot, getDoc, getDocFromCache, getDocs, setDoc as fsSetDoc, updateDoc as fsUpdateDoc, deleteDoc as fsDeleteDoc, writeBatch as fsWriteBatch, runTransaction } from "https://www.gstatic.com/firebasejs/10.12.2/firebase-firestore.js";
+import { initializeFirestore, getFirestore, persistentLocalCache, persistentMultipleTabManager, doc, collection, query, where, onSnapshot, getDoc, getDocFromCache, getDocFromServer, getDocsFromServer, setDoc as fsSetDoc, updateDoc as fsUpdateDoc, deleteDoc as fsDeleteDoc, writeBatch as fsWriteBatch, runTransaction } from "https://www.gstatic.com/firebasejs/10.12.2/firebase-firestore.js";
 // Guardado sin esperar a internet: Firebase guarda el cambio en el teléfono al instante y lo sube
 // cuando hay conexión. La app sigue en cuanto el cambio quedó guardado localmente.
 const sinEsperar = p => {
@@ -1165,7 +1168,7 @@ const updateDoc = (...a) => sinEsperar(fsUpdateDoc(...a));
 const deleteDoc = (...a) => sinEsperar(fsDeleteDoc(...a));
 const writeBatch = db => { const b = fsWriteBatch(db), c = b.commit.bind(b); b.commit = () => sinEsperar(c()); return b; };
 
-const VERSION = "v3.66";
+const VERSION = "v3.68";
 /* ================= Utilidades ================= */
 const $ = (s, r = document) => r.querySelector(s);
 const esc = s => String(s ?? "").replace(/[&<>"']/g, c => ({"&":"&amp;","<":"&lt;",">":"&gt;",'"':"&quot;","'":"&#39;"}[c]));
@@ -1181,22 +1184,18 @@ const fmtDate = s => { if (!s) return ""; const d = parseYmd(s); return `${DIAS[
 // Hora en formato de 12 horas: 3:05 pm
 const hora12 = d => { const h = d.getHours(); return `${h % 12 || 12}:${pad(d.getMinutes())} ${h < 12 ? "am" : "pm"}`; };
 const fmtDT = iso => { if (!iso) return ""; const d = new Date(iso); return `${pad(d.getDate())}/${pad(d.getMonth()+1)}/${d.getFullYear()} ${hora12(d)}`; };
-// Lee montos escritos como 50000, 50.000, 50.000,50 o 12.5
-const num = v => {
-  if (typeof v === "number") return isFinite(v) ? v : 0;
-  let s = String(v ?? "").replace(/\s/g, "");
-  if (s.includes(",")) s = s.replace(/\./g, "").replace(",", ".");
-  else if (/^-?\d{1,3}(\.\d{3})+$/.test(s)) s = s.replace(/\./g, "");
-  const n = parseFloat(s); return isFinite(n) ? n : 0;
+// El formato de edición usa punto de miles y coma decimal.
+const formatoMonto = new Intl.NumberFormat("es-VE", {maximumFractionDigits:2, useGrouping:"always"});
+const fmtMonto = v => {
+  const texto = String(v ?? "").trim(), n = centavos(v);
+  return n === null ? texto : formatoMonto.format(n / 100);
 };
-// Montos: se escriben sin puntos y al terminar se muestran como 50.000
-const fmtMonto = v => { const s = String(v ?? "").trim(); if (!s) return ""; const n = num(s); return n ? new Intl.NumberFormat("es-VE", {maximumFractionDigits:2, useGrouping:"always"}).format(n) : s; };
 document.addEventListener("focusout", e => { const t = e.target; if (!t.classList || !t.classList.contains("monto")) return; const f = fmtMonto(t.value); if (f !== t.value) { t.value = f; t.dispatchEvent(new Event("input", {bubbles:true})); } });
 const norm = s => String(s||"").toLowerCase().normalize("NFD").replace(/[̀-ͯ]/g, "");
 function money(v, mon){
   const n = Number(v) || 0;
   if (mon === "Bs") return "Bs " + n.toLocaleString("es-VE", {minimumFractionDigits:2, maximumFractionDigits:2});
-  if (mon === "COP") return "COP " + n.toLocaleString("es-CO", {maximumFractionDigits:0});
+  if (mon === "COP") return "COP " + n.toLocaleString("es-CO", {maximumFractionDigits:2});
   return "$ " + n.toLocaleString("en-US", {minimumFractionDigits:2, maximumFractionDigits:2});
 }
 function toast(msg, bad){ if (bad && S.me && S.me.rol !== "admin" && /permission|permiso|denied|denegado/i.test(String(msg))) { console.warn("aviso oculto:", msg); return; } document.querySelectorAll(".toast").forEach(x => x.remove()); const t = document.createElement("div"); t.className = "toast" + (bad ? " bad" : ""); t.textContent = msg; document.body.appendChild(t); setTimeout(() => t.remove(), bad ? 4500 : 2500); }
@@ -1357,13 +1356,14 @@ const cfg = () => {
 const loginEmail = (u, k) => `${u}.${k}@comicshop-pedidos.app`;
 const pinPass = pin => "cs-" + pin;
 const validUser = u => /^[a-z0-9._-]{3,20}$/.test(u);
-const validPin = p => /^\d{4,8}$/.test(p);
+const validPin = p => /^\d{8}$/.test(p) && !/^(\d)\1{7}$/.test(p)
+  && !"01234567890123456789".includes(p) && !"98765432109876543210".includes(p);
 const cleanUser = s => norm(s).replace(/\s+/g, ".").replace(/[^a-z0-9._-]/g, "");
 
 function perm(){
   const m = S.me || {};
   const admin = m.rol === "admin";
-  return {admin, ver:{personalizado: admin || m.verPersonalizado === true, sublimacion: admin || m.verSublimacion === true}, soloAsignados: false, eliminar: admin || !!m.eliminar, bloquear: admin || !!m.bloquear};
+  return {admin, ver:{personalizado: admin || m.verPersonalizado === true, sublimacion: admin || m.verSublimacion === true}, soloAsignados: m.soloAsignados === true, eliminar: admin || !!m.eliminar, bloquear: admin || !!m.bloquear};
 }
 function nameOf(usuario){
   if (!usuario) return "—";
@@ -1381,20 +1381,24 @@ function boot(){
   S.auth = getAuth(S.app);
   try { S.db = initializeFirestore(S.app, {localCache: persistentLocalCache({tabManager: persistentMultipleTabManager()})}); }
   catch(e) { S.db = getFirestore(S.app); }
-  // Arranque local: si hay una copia guardada de la última sesión, la app se muestra al instante (aunque no haya internet)
-  const cop = leerArranque();
-  if (cop) {
-    Object.assign(S, {sistema:cop.sistema, uid:cop.uid, me:cop.me, cfgRaw:cop.cfgRaw || null, usuarios:cop.usuarios || {}, anuncios:cop.anuncios || {}, pedidos:cop.pedidos || {}, resp:cop.resp || null, _local:true, cache:true});
-    route();
-    if (S.me && S.me.activo) { startMe(); startData(true); }
-  }
   onSnapshot(doc(S.db, "sistema/estado"), s => { S.sistema = s.exists() ? s.data() : null; route(); }, e => { console.warn(e); if (S.me) return; gateMsg("alert", "No se pudo conectar", "Revisa tu conexión a internet. Si eres el administrador, verifica que publicaste las reglas de Firestore (GUIA.md, paso 4)."); });
   onAuthStateChanged(S.auth, u => {
-    // Misma sesión que la copia local: se sigue sin reiniciar nada
-    if (S._local && u && u.uid === S.uid) { S._local = false; return; }
-    if (!u) borrarArranque();
-    S._local = false; stopSubs(); S.view = "resumen"; S.viewPushed = false; S.q = ""; S.filtro = "pendientes"; S.uid = u ? u.uid : null; S.me = null; if (u) startMe(); route(); });
-  addEventListener("online", () => { S.online = true; render(); });
+    const cop = leerArranque(), uid = u?.uid || null;
+    stopSubs();
+    S.authReady = true; S.uid = uid; S.me = null;
+    S.view = "resumen"; S.viewPushed = false; S.q = ""; S.filtro = "pendientes";
+    if (uid && cop?.uid === uid) {
+      Object.assign(S, {sistema:cop.sistema, me:cop.me, cfgRaw:cop.cfgRaw || null, usuarios:cop.usuarios || {}, anuncios:cop.anuncios || {}, pedidos:cop.pedidos || {}, resp:cop.resp || null, cache:true});
+      if (S.me.activo) { migrarBorradorLocal(); startData(true); }
+    } else borrarArranque();
+    if (uid) startMe();
+    route();
+  });
+  addEventListener("online", () => { S.online = true; render(); sincronizarPendientes(); });
+  document.addEventListener("visibilitychange", () => {
+    if (document.visibilityState === "visible") { actualizarPendientes(); sincronizarPendientes(); }
+  });
+  setInterval(() => sincronizarPendientes(), 30000);
   addEventListener("offline", () => { S.online = false; render(); });
   addEventListener("beforeinstallprompt", e => { e.preventDefault(); S.installEvt = e; render(); });
   if ("serviceWorker" in navigator && location.protocol === "https:") actualizacionSilenciosa();
@@ -1419,29 +1423,52 @@ function actualizacionSilenciosa(){
   setInterval(() => { if (pendiente && !ocupado()) location.reload(); }, 5000);
 }
 function route(){
-  if (S.sistema === undefined) return;
+  if (S.sistema === undefined || !S.authReady) return;
   if (!S.uid) return S.sistema ? renderLogin() : renderBootstrap();
   if (S.me === null) { $("#app").innerHTML = `<div class="gate"><div class="spin"></div></div>`; return; }
   if (S.me === false || !S.me.activo) return gateMsg("lock", "Acceso desactivado", "Tu usuario no está activo. Pide al administrador que lo active.", true);
   render();
 }
-function stopSubs(){ S.unsubs.forEach(u => { try { u(); } catch(e) {} }); S.unsubs = []; S.pedidos = {}; S.clientes = {}; S.usuarios = {}; S.cfgRaw = null; S._subsOn = false; }
+function limpiarDatos(){
+  (S.dataUnsubs || []).forEach(u => u());
+  S.dataUnsubs = [];
+  S.gen = (S.gen || 0) + 1;
+  S.remerge = null;
+  S.pedidos = {}; S.clientes = {}; S.usuarios = {}; S.cfgRaw = null;
+  S.anuncios = {}; S.resp = null; S.pendientes = []; S.errorCola = false;
+  problemaEnvio.clear();
+  Object.keys(BORRAR).forEach(id => delete BORRAR[id]);
+  Object.keys(fotoCache).forEach(id => delete fotoCache[id]);
+  F = null;
+  [...NAV.stack].reverse().forEach(ov => ov.close());
+}
+function stopSubs(){
+  S.unsubs.forEach(u => u());
+  S.unsubs = [];
+  limpiarDatos();
+}
 function startMe(){
-  const un = onSnapshot(doc(S.db, "usuarios/" + S.uid), { includeMetadataChanges: true }, s => {
-    // Esperar a que el servidor confirme el perfil antes de pedir datos (si no, las reglas aún no lo ven)
-    if (s.metadata && s.metadata.hasPendingWrites) return;
-    const was = S.me;
-    S.me = s.exists() ? s.data() : false;
-    if (S.me && S.me.activo && (!was || was.rol !== S.me.rol || was.soloAsignados !== S.me.soloAsignados || was.verPersonalizado !== S.me.verPersonalizado || was.verSublimacion !== S.me.verSublimacion)) startData();
+  const uid = S.uid;
+  const desactivar = () => { S.me = false; limpiarDatos(); borrarArranque(); route(); };
+  const un = onSnapshot(doc(S.db, "usuarios/" + uid), { includeMetadataChanges: true }, s => {
+    if (uid !== S.uid || s.metadata.hasPendingWrites || (s.metadata.fromCache && !S.me)) return;
+    const was = S.me, perfil = s.exists() ? s.data() : null;
+    if (!perfil?.activo) return desactivar();
+    S.me = perfil;
+    if (!was || ["rol","soloAsignados","verPersonalizado","verSublimacion","bloquear","eliminar"].some(k => was[k] !== perfil[k])) {
+      limpiarDatos();
+      startData();
+    }
     route();
-  }, e => { console.warn(e); S.me = false; route(); });
+    actualizarPendientes();
+    sincronizarPendientes();
+  }, e => { console.warn(e); if (uid === S.uid) desactivar(); });
   S.unsubs.push(un);
 }
 function startData(keep){
-  // reinicia suscripciones de datos (no la del perfil)
-  (S.dataUnsubs || []).forEach(u => { try { u(); } catch(e) {} });
+  S.dataUnsubs.forEach(u => u());
   S.dataUnsubs = []; if (!keep) S.pedidos = {};
-  const add = u => { S.dataUnsubs.push(u); S.unsubs.push(u); };
+  const add = u => S.dataUnsubs.push(u);
   S.errores = [];
   const gen = (S.gen = (S.gen || 0) + 1);
   const err = nombre => e => {
@@ -1456,27 +1483,37 @@ function startData(keep){
   if (perm().admin) add(onSnapshot(doc(S.db, "respaldos/estado"), s => { S.resp = s.exists() ? s.data() : null; render(); }, e => console.warn("respaldo", e)));
   add(onSnapshot(collection(S.db, "anuncios"), s => { const o = {}; s.forEach(d => o[d.id] = Object.assign({_id:d.id}, d.data())); S.anuncios = o; render(); }, e => console.warn("anuncios", e)));
   add(onSnapshot(doc(S.db, "config/ajustes"), s => { S.cfgRaw = s.exists() ? s.data() : null; render(); }, err("ajustes")));
-  add(onSnapshot(collection(S.db, "usuarios"), s => {
+  const equipo = collection(S.db, "usuarios");
+  add(onSnapshot(perm().admin ? equipo : query(equipo, where("activo", "==", true)), s => {
     const o = {}; s.forEach(d => o[d.id] = d.data()); S.usuarios = o; render();
-    // "Solo sus asignados" ya no existe: se apaga a quien lo tenga (lo exigen las reglas de Firebase)
-    if (perm().admin && !S._saFix) { const l = Object.entries(o).filter(([, u]) => u.soloAsignados); if (l.length) { S._saFix = true; const b = writeBatch(S.db); l.forEach(([id]) => b.update(doc(S.db, "usuarios/" + id), {soloAsignados:false})); b.commit().then(() => setTimeout(arreglarLectores, 1500)).catch(e => { console.warn(e); S._saFix = false; }); } }
   }, err("usuarios")));
-  const pr = perm();
-  const parts = {};
+  const pr = perm(), parts = {};
   let nSubs = 0;
-  const merge = () => { if (keep && Object.keys(parts).length < nSubs) return; const all = {}; Object.values(parts).forEach(m => Object.assign(all, m)); Object.keys(BORRAR).forEach(id => delete all[id]); S.pedidos = all; render(); };
+  const merge = () => {
+    if (keep && Object.keys(parts).length < nSubs) return;
+    const all = {}; Object.values(parts).forEach(m => Object.assign(all, m));
+    Object.keys(BORRAR).forEach(id => delete all[id]);
+    S.pedidos = all; render();
+  };
   S.remerge = merge;
-  const sub = (key, q) => (nSubs++, add(onSnapshot(q, { includeMetadataChanges: true }, s => {
-    const m = {}; s.forEach(d => m[d.id] = Object.assign({_id: d.id}, d.data())); parts[key] = m;
-    S.cache = !!(s.metadata && s.metadata.fromCache); if (!S.cache) S.reintento = false; merge();
-    if (key === "todo" && !S.cache) migrarCodigos();
-  }, err("pedidos-" + key))));
+  const sub = (key, q) => {
+    nSubs++;
+    let verificada = false;
+    add(onSnapshot(q, { includeMetadataChanges: true }, s => {
+      if (gen !== S.gen || (!keep && !verificada && s.metadata.fromCache)) return;
+      if (!s.metadata.fromCache) verificada = true;
+      const m = {}; s.forEach(d => m[d.id] = {...d.data(), _id:d.id}); parts[key] = m;
+      S.cache = s.metadata.fromCache; if (!S.cache) S.reintento = false; merge();
+      if (key === "todo" && !S.cache && !s.metadata.hasPendingWrites) alinearContadores(Object.values(m)).catch(e => console.warn("alineación", e.code || e.message));
+    }, err("pedidos-" + key)));
+  };
   const col = collection(S.db, "pedidos");
   if (pr.admin) sub("todo", col);
-  else {
-    sub("mios", query(col, where("lectores", "array-contains", S.me.usuario)));
-    if (!pr.soloAsignados) for (const t of ["personalizado","sublimacion"]) if (pr.ver[t]) sub("pub-" + t, query(col, where("tipo", "==", t), where("publico", "==", true)));
+  else for (const tipo of Object.keys(TIPOS).filter(t => pr.ver[t])) {
+    sub("mios-" + tipo, query(col, where("tipo", "==", tipo), where("lectores", "array-contains", S.me.usuario)));
+    if (!pr.soloAsignados) sub("pub-" + tipo, query(col, where("tipo", "==", tipo), where("publico", "==", true)));
   }
+
 }
 
 /* ================= Pantallas de acceso ================= */
@@ -1519,7 +1556,7 @@ function renderBootstrap(){
     <div><h1>Crear administrador</h1><p class="note">Primera vez que se abre la app. Crea tu usuario de administrador: con él darás de alta al resto del equipo. Esta pantalla no vuelve a aparecer.</p></div>
     <div class="f"><label>Tu nombre</label><input class="inp" id="bn"></div>
     <div class="f"><label>Usuario</label><input class="inp" id="bu" autocapitalize="none" spellcheck="false"><span class="msg mut">Minúsculas, sin espacios (3 a 20 caracteres)</span></div>
-    <div class="f"><label>PIN (4 a 8 números)</label><input class="inp pinin" id="bp" type="password" inputmode="numeric" maxlength="8"></div>
+    <div class="f"><label>PIN (8 dígitos)</label><input class="inp pinin" id="bp" type="password" inputmode="numeric" maxlength="8"></div>
     <div class="f"><label>Repite el PIN</label><input class="inp pinin" id="bp2" type="password" inputmode="numeric" maxlength="8"></div>
     <span class="msg bad" id="bmsg"></span>
     <button class="btn primary" style="min-height:46px">${I("check")}Crear y entrar</button>
@@ -1530,17 +1567,17 @@ function renderBootstrap(){
     const nombre = $("#bn").value.trim(), u = cleanUser($("#bu").value), p = $("#bp").value.trim(), m = $("#bmsg"), b = e.target.querySelector("button");
     if (nombre.length < 2) return m.textContent = "Escribe tu nombre";
     if (!validUser(u)) return m.textContent = "Usuario no válido";
-    if (!validPin(p)) return m.textContent = "El PIN debe tener de 4 a 8 números";
+    if (!validPin(p)) return m.textContent = "Usa un PIN de 8 dígitos sin repeticiones completas ni secuencias";
     if (p !== $("#bp2").value.trim()) return m.textContent = "Los PIN no coinciden";
     b.disabled = true; m.textContent = "";
     try {
       const email = loginEmail(u, rand(4).toLowerCase());
       const cred = await createUserWithEmailAndPassword(S.auth, email, pinPass(p));
-      const bt = writeBatch(S.db);
+      const bt = fsWriteBatch(S.db);
       const now = new Date().toISOString();
       bt.set(doc(S.db, "usuarios/" + cred.user.uid), {usuario:u, nombre, rol:"admin", activo:true, verPersonalizado:true, verSublimacion:true, soloAsignados:false, eliminar:true, creadoEn:now});
       bt.set(doc(S.db, "logins/" + u), {email, uid:cred.user.uid});
-      bt.set(doc(S.db, "sistema/estado"), {iniciado:true, creadoEn:now});
+      bt.set(doc(S.db, "sistema/estado"), {iniciado:true, iniciadoPor:cred.user.uid, creadoEn:now});
       await bt.commit();
     } catch(err) { console.warn(err); m.textContent = "No se pudo crear: " + (err.code || err.message); b.disabled = false; }
   };
@@ -1565,7 +1602,15 @@ function leerArranque(){ try { const c = JSON.parse(localStorage.getItem(ARR) ||
 function borrarArranque(){ try { localStorage.removeItem(ARR); } catch(e) {} }
 let arrT = 0;
 // Fotos: primero la copia del teléfono (instantánea, también sin internet); si no está, se pide a internet
-const leerFoto = ref => getDocFromCache(ref).then(s => s.exists() ? s : getDoc(ref)).catch(() => getDoc(ref));
+async function leerFoto(ref){
+  if (!S.me?.activo || S.auth.currentUser?.uid !== S.uid) throw new Error("Sesión no disponible");
+  if (!S.online) return getDocFromCache(ref);
+  try { return await getDocFromServer(ref); }
+  catch(e) {
+    if (e.code === "unavailable") return getDocFromCache(ref);
+    throw e;
+  }
+}
 function guardarArranque(){
   clearTimeout(arrT);
   arrT = setTimeout(() => {
@@ -1640,6 +1685,7 @@ function doRender(){
       <button class="rfb" data-act="refrescar" title="Actualizar">${I("refresh")}</button><button class="pill tdate" data-act="agenda" title="Calendario de pedidos">${I("cal")}${fechaCorta(d)}</button>
     </div>
     <main class="main">
+      ${S.view === "resumen" || S.view === "pedidos" ? pendientesHTML() : ""}
       ${pr.admin && S.view === "avisos" && revisarList().length ? `<button class="revbar" data-act="revisar">${I("edit")}<span><b>${revisarList().length}</b> pedido${revisarList().length === 1 ? "" : "s"} editado${revisarList().length === 1 ? "" : "s"} por el equipo</span><em>Ver</em></button>` : ""}
       ${S.view === "avisos" ? viewAvisos(a) : S.view === "pedidos" ? viewPedidos(a, pr) : S.view === "equipo" && pr.admin ? viewEquipo() : S.view === "ajustes" && pr.admin ? viewAjustes() : viewResumen(a, pr)}
     </main>
@@ -1762,6 +1808,7 @@ function respaldoCard(){
         <button class="btn" id="rLocal">${I("download")}Guardar en el dispositivo</button>
         <button class="btn primary" id="rDrive">${I("drive")}Subir a Google Drive</button>
         <button class="btn" id="rRest">${I("upload")}Restaurar un respaldo</button>
+        <button class="btn" id="rFotos">${I("image")}Vincular fotos históricas</button>
       </div>
       <details class="rdrive"${i.clientId ? "" : " open"}><summary>Conexión con Google Drive${i.clientId ? " · configurada" : " · sin configurar"}</summary>
         <div class="f"><label>ID de cliente de Google (OAuth)</label><input class="inp" id="rCid" value="${esc(i.clientId)}" placeholder="xxxxxxxx.apps.googleusercontent.com"></div>
@@ -1780,6 +1827,7 @@ function bindRespaldo(){
   g("rLocal").onclick = () => respaldoLocal();
   g("rDrive").onclick = () => respaldoDrive();
   g("rRest").onclick = () => g("rFile").click();
+  g("rFotos").onclick = () => confirmar("¿Vincular las fotos históricas?", "El equipo podrá abrirlas según los permisos de sus pedidos.", "Vincular", vincularFotosHistoricas);
   g("rFile").onchange = e => { const f = e.target.files[0]; e.target.value = ""; if (f) restaurarArchivo(f); };
 }
 function openRespaldo(){
@@ -1791,7 +1839,7 @@ function openRespaldo(){
   $("#mrDrive", ov).onclick = () => { ov.close(); respaldoDrive(); };
 }
 async function armarRespaldo(){
-  const leer = async n => { const o = {}; (await getDocs(collection(S.db, n))).forEach(d => o[d.id] = d.data()); return o; };
+  const leer = async n => { const o = {}; (await getDocsFromServer(collection(S.db, n))).forEach(d => o[d.id] = d.data()); return o; };
   const data = {app:"comicshop-pedidos", formato:1, version:VERSION, creado:new Date().toISOString(), por:S.me.usuario, colecciones:{}};
   for (const n of ["pedidos","clientes","fotos","config","contadores"]) data.colecciones[n] = await leer(n);
   // Equipo: solo los datos visibles (los PIN los guarda Firebase y no se pueden copiar)
@@ -1857,6 +1905,64 @@ async function subirDrive(tok){
     await marcarRespaldo("drive"); toast("Respaldo subido a Drive");
   } catch(e) { console.warn(e); if (/401/.test(e.message)) S.driveTok = null; toast("Error al subir: " + e.message, true); }
 }
+function vinculosFotos(pedidos){
+  const vinculos = new Map();
+  for (const [pedidoId, p] of pedidos) for (const baseId of (p.imagenes || [])) {
+    for (const [id, mini] of [[baseId,false], [baseId + "_m",true]]) {
+      const anterior = vinculos.get(id);
+      vinculos.set(id, anterior === undefined || (anterior?.pedidoId === pedidoId && anterior.baseId === baseId)
+        ? {pedidoId, baseId, mini} : null);
+    }
+  }
+  return vinculos;
+}
+async function escribirRespaldo(ops){
+  let lote = fsWriteBatch(S.db), peso = 0, cnt = 0;
+  for (const [path, datos, actualizar] of ops) {
+    const bytes = new TextEncoder().encode(JSON.stringify(datos)).length;
+    if (cnt && (cnt >= 400 || peso + bytes > 8_000_000)) {
+      await lote.commit(); lote = fsWriteBatch(S.db); peso = 0; cnt = 0;
+    }
+    const ref = doc(S.db, path);
+    if (actualizar) lote.update(ref, datos);
+    else lote.set(ref, datos);
+    peso += bytes; cnt++;
+  }
+  if (cnt) await lote.commit();
+}
+async function vincularFotosHistoricas(){
+  if (!perm().admin) return;
+  const pedidos = await getDocsFromServer(collection(S.db, "pedidos"));
+  const vinculos = vinculosFotos(pedidos.docs.map(d => [d.id, d.data()]));
+  const fotos = await getDocsFromServer(collection(S.db, "fotos"));
+  const ops = []; let compartidas = 0;
+  for (const foto of fotos.docs) {
+    const link = vinculos.get(foto.id), datos = foto.data();
+    if (link === null) { compartidas++; continue; }
+    if (link && !datos.pedidoId) ops.push([foto.ref.path, link, true]);
+  }
+  await escribirRespaldo(ops);
+  Object.keys(fotoCache).forEach(id => delete fotoCache[id]);
+  render();
+  toast(`${ops.length} fotos vinculadas${compartidas ? ` · ${compartidas} referencias compartidas requieren revisión` : ""}`);
+}
+const fechaRespaldo = v => [v.editadoEn, v.creadoEn, v.listoEn, v.avisadoEn, v.entregadoEn, v.recordadoEn, v.revisarEn, v.actualizadoEn, v.posponerHasta]
+  .filter(x => typeof x === "string").sort().pop() || "";
+function validarPedidoRespaldo(p){
+  if (!p || !Object.hasOwn(TIPOS, p.tipo) || typeof p.codigo !== "string" || typeof p.creadoPor !== "string"
+      || !p.cliente || typeof p.cliente.nombre !== "string" || typeof p.cliente.telefono !== "string"
+      || !Array.isArray(p.items) || p.items.some(i => !i || typeof i.prenda !== "string" || typeof i.color !== "string")
+      || (p.imagenes && (!Array.isArray(p.imagenes) || p.imagenes.some(id => typeof id !== "string" || !id || id.includes("/")))))
+    throw new Error("El respaldo incluye un pedido con formato inválido");
+  if (p.pagoVersion === 1) {
+    const pago = validarPago(p.items, i => precioUnitario(p, i) / 100, p.abono, p.moneda, Infinity);
+    if (pago.error || pago.total !== p.totalMenor || pago.abono !== p.abonoMenor)
+      throw new Error("El respaldo contiene un pago histórico inconsistente");
+  } else if (p.pagoVersion === 2) {
+    const pago = validarPagoEnCentavos(p.items, p.abonoMenor, p.moneda);
+    if (pago.error || pago.total !== p.totalMenor) throw new Error("El respaldo contiene un pago inconsistente");
+  } else if (p.pagoVersion !== undefined) throw new Error("El respaldo usa una versión de pago desconocida");
+}
 async function restaurarArchivo(f){
   if (!perm().admin) return;
   let data;
@@ -1865,29 +1971,69 @@ async function restaurarArchivo(f){
   const C = data.colecciones, n = k => Object.keys(C[k] || {}).length;
   confirmar("¿Restaurar este respaldo?", `${fmtDT(data.creado)} · ${n("pedidos")} pedidos, ${n("clientes")} clientes, ${n("fotos")} fotos y ajustes. Si un dato existe en la app y en el respaldo, se queda la versión más reciente.`, "Restaurar", async () => {
     toast("Restaurando…");
-    // Fecha más reciente de cualquier cambio en un pedido o cliente
-    const fecha = v => [v.editadoEn, v.creadoEn, v.listoEn, v.avisadoEn, v.entregadoEn, v.recordadoEn, v.revisarEn, v.actualizadoEn, v.posponerHasta].filter(x => typeof x === "string").sort().pop() || "";
-    const ops = []; let nuevos = 0, reemplazados = 0, iguales = 0;
-    for (const k of ["config","contadores","clientes","fotos","pedidos"]) {
-      const act = {}; (await getDocs(collection(S.db, k))).forEach(d => act[d.id] = d.data());
-      for (const [id, v] of Object.entries(C[k] || {})) {
-        const a = act[id];
-        if (!a) { ops.push([k + "/" + id, v]); if (k === "pedidos") nuevos++; continue; }
-        if (k === "contadores") { if ((Number(v.n) || 0) > (Number(a.n) || 0)) ops.push([k + "/" + id, v]); continue; }
-        if (k === "config" || k === "fotos") continue; // ya existen: se conservan los actuales
-        if (fecha(v) > fecha(a)) { ops.push([k + "/" + id, v]); if (k === "pedidos") reemplazados++; }
-        else if (k === "pedidos") iguales++;
-      }
+    const colecciones = ["config","clientes","fotos","pedidos"];
+    for (const k of [...colecciones, "contadores"]) {
+      if (C[k] && (typeof C[k] !== "object" || Array.isArray(C[k])
+        || Object.entries(C[k]).some(([id, v]) => !id || id.includes("/") || !v || typeof v !== "object" || Array.isArray(v))))
+        throw new Error("El respaldo contiene documentos inválidos");
     }
-    let b = writeBatch(S.db), peso = 0, cnt = 0;
-    for (const [path, v] of ops) {
-      const t = JSON.stringify(v).length;
-      if (cnt && (cnt >= 400 || peso + t > 8e6)) { await b.commit(); b = writeBatch(S.db); peso = 0; cnt = 0; }
-      b.set(doc(S.db, path), v); peso += t; cnt++;
+    const limites = {personalizado:0, sublimacion:0};
+    const respaldoPedidos = Object.entries(C.pedidos || {});
+    for (const [,p] of respaldoPedidos) {
+      validarPedidoRespaldo(p);
+      if (!p.demo) limites[p.tipo] = Math.max(limites[p.tipo], consecutivoDe(p.tipo, p.codigo) ?? 0);
     }
-    if (cnt) await b.commit();
+    for (const tipo of Object.keys(limites)) {
+      const respaldo = C.contadores?.[tipo]?.n;
+      if (Number.isSafeInteger(respaldo) && respaldo >= 0) limites[tipo] = Math.max(limites[tipo], respaldo);
+    }
+    // Elevar el piso antes de importar deja esos códigos fuera de las nuevas altas concurrentes.
+    const previos = await getDocsFromServer(collection(S.db, "pedidos"));
+    if (previos.metadata.hasPendingWrites) throw new Error("Espera a que se sincronicen los cambios antes de restaurar");
+    validarIdentidades(new Map(previos.docs.map(d => [d.id, d.data()])), respaldoPedidos);
+    await alinearContadores(previos.docs.map(d => d.data()), limites);
+    const actual = Object.fromEntries(await Promise.all(colecciones.map(async k => {
+      const s = await getDocsFromServer(collection(S.db, k));
+      return [k, new Map(s.docs.map(d => [d.id, d.data()]))];
+    })));
+    validarIdentidades(actual.pedidos, respaldoPedidos);
+    const ops = []; let nuevos = 0, reemplazados = 0;
+    const pedidos = new Map(actual.pedidos);
+    for (const [id, v] of respaldoPedidos) {
+      const anterior = pedidos.get(id);
+      if (anterior && fechaRespaldo(v) <= fechaRespaldo(anterior)) continue;
+      if (anterior) reemplazados++; else nuevos++;
+      const pedido = {...v, restaurado:true};
+      pedidos.set(id, pedido);
+      ops.push([`pedidos/${id}`, pedido]);
+    }
+    const vinculos = vinculosFotos(pedidos);
+    for (const [id, foto] of Object.entries(C.fotos || {})) {
+      if (actual.fotos.has(id)) continue;
+      const {pedidoId, baseId, ...v} = foto;
+      ops.push([`fotos/${id}`, {...v, ...vinculos.get(id)}]);
+    }
+    for (const k of ["config","clientes"]) for (const [id, v] of Object.entries(C[k] || {})) {
+      const a = actual[k].get(id);
+      if (!a || (k === "clientes" && fechaRespaldo(v) > fechaRespaldo(a))) ops.push([`${k}/${id}`, v]);
+    }
+    await escribirRespaldo(ops);
     toast(`Restaurado: ${nuevos} recuperados, ${reemplazados} actualizados`);
   });
+}
+function validarIdentidades(actual, respaldo){
+  const inmutables = ["tipo","codigo","creadoPor","creadoEn","creadorUid","consecutivo","demo"];
+  const clave = p => p.tipo + ":" + (consecutivoDe(p.tipo, p.codigo) ?? p.codigo);
+  const codigos = new Set();
+  for (const p of actual.values()) if (!p.demo && p.codigo) codigos.add(clave(p));
+  for (const [id, p] of respaldo) {
+    const a = actual.get(id);
+    if (a && inmutables.some(k => a[k] !== p[k])) throw new Error("El respaldo cambia la identidad de un pedido existente");
+    if (p.demo || a) continue;
+    const k = clave(p);
+    if (codigos.has(k)) throw new Error("El respaldo repite un código de pedido");
+    codigos.add(k);
+  }
 }
 /* ===== Cambios del equipo (solo administrador) ===== */
 const revisarList = () => pedidosList().filter(p => p.revisar).sort((a, b) => String(b.revisarEn).localeCompare(String(a.revisarEn)));
@@ -1967,32 +2113,61 @@ function dueTag(p){
 const itemLine = i => `${i.prenda} ${i.color} ${i.talla}${i.nombre ? " — " + i.nombre : ""}${i.numero ? " #" + i.numero : ""}`;
 function grupos(p){
   const g = {};
-  (p.items || []).forEach(i => { const k = `${i.prenda} ${i.color}${i.horma ? " (" + i.horma + ")" : ""}`; g[k] = g[k] || {}; g[k][i.talla] = (g[k][i.talla] || 0) + (i.cant || 1); });
+  (p.items || []).forEach(i => { const k = `${i.prenda} ${i.color}${i.horma ? " (" + i.horma + ")" : ""}`; g[k] = g[k] || {}; g[k][i.talla] = (g[k][i.talla] || 0) + unidadesDe(i, p); });
   return Object.entries(g).map(([k, t]) => `${k}: ${Object.entries(t).map(([s, n]) => `${s}×${n}`).join(", ")}`);
 }
 function servsDe(p){ return Array.isArray(p.servicios) ? [...p.servicios] : p.servicio ? String(p.servicio).split(", ").filter(Boolean) : []; }
 // Tallas 2XL en adelante ("Unisex Plus") llevan su propio precio
-const esPlusTxt = t => /^([2-9])\s*XL$|^X{2,}L$/i.test(String(t || "").trim());
+const esPlusTxt = t => /^(?:(?:[2-9]|[1-9]\d+)\s*XL|X{2,}L)$/i.test(String(t || "").trim());
 const esPlus = t => { const v = String(t || "").trim(); return !!v && cfg().cat.tallasPlus.includes(v); };
-// Niño y Niña comparten el mismo precio
-const hormaPrecio = h => /^niñ[oa]s?$/i.test(String(h || "").trim()) ? "Niño/Niña" : h;
-const prKey = i => i.prenda ? [i.prenda, hormaPrecio(i.horma), esPlus(i.talla) ? i.talla : ""].filter(Boolean).join(" · ") : "";
-function precioDe(p, prenda){
-  if (p.pr) return num(p.pr[prenda]);
-  if (Array.isArray(p.precios)) {
-    // Busca el precio exacto; si es un pedido viejo, el de la misma prenda sin talla u horma
-    const partes = String(prenda).split(" · ");
-    const busca = k => p.precios.find(z => z.n === k || (k.includes("Niño/Niña") && (z.n === k.replace("Niño/Niña", "Niño") || z.n === k.replace("Niño/Niña", "Niña"))));
-    for (let n = partes.length; n > 0; n--) { const x = busca(partes.slice(0, n).join(" · ")); if (x) return num(x.v); }
+const claveBase = (i, p) => clavePrecio(i, cfg().cat.tallasPlus, Array.isArray(p?.precios) ? p.precios : []);
+const prKey = (i, p) => {
+  const base = claveBase(i, p);
+  if (i.precioMenor && p?._preciosDistintos?.has(base)) return `${base} · ${fmtMonto(i.precioMenor / 100)}`;
+  return base;
+};
+function detectarPreciosDistintos(p){
+  const porClave = new Map(), distintas = new Set();
+  if (p.pagoVersion !== 2) return distintas;
+  for (const item of p.items) {
+    const clave = claveBase(item, p), anterior = porClave.get(clave);
+    if (anterior !== undefined && anterior !== item.precioMenor) distintas.add(clave);
+    porClave.set(clave, item.precioMenor);
   }
-  return num(p.precio);
+  return distintas;
 }
-function prendasDe(p){ const g = {}; (p.items || []).forEach(i => { const k = prKey(i); if (k) g[k] = (g[k] || 0) + (Number(i.cant) || 1); }); return g; }
+const precioUnitario = (p, i) => p.pr ? (centavos(p.pr[prKey(i, p)]) ?? 0)
+  : p.pagoVersion === 2 ? i.precioMenor : precioHistorico(p, claveBase(i, p));
+const abonoMenor = p => p.pagoVersion === 2 && !p.pr ? p.abonoMenor : centavosHistoricos(p.abono);
+const unidadesDe = (i, p) => cantidad(i.cant) ?? (p.pr ? 0 : 1);
+const importeLinea = (p, i) => unidadesDe(i, p) * precioUnitario(p, i) / 100;
+function prendasDe(p){
+  const grupos = Object.create(null);
+  for (const i of (p.items || [])) {
+    const k = prKey(i, p);
+    if (k) grupos[k] = (grupos[k] || 0) + unidadesDe(i, p);
+  }
+  return grupos;
+}
 function totales(p){
-  const piezas = (p.items || []).reduce((s, i) => s + (Number(i.cant) || 1), 0);
-  const total = (p.items || []).reduce((s, i) => s + (Number(i.cant) || 1) * precioDe(p, prKey(i)), 0);
-  return {piezas, total, abono:num(p.abono), saldo:Math.max(0, total - num(p.abono))};
+  let piezas = 0, total = 0;
+  for (const i of (p.items || [])) {
+    const unidades = unidadesDe(i, p);
+    piezas += unidades;
+    total += unidades * precioUnitario(p, i);
+  }
+  const abono = abonoMenor(p);
+  return {piezas, total:total / 100, abono:abono / 100, saldo:(total - abono) / 100};
 }
+const pagoDelFormulario = () => validarPago(F.items.filter(i => !itemVacio(i)), i => F.pr[prKey(i, F)], F.abono, F.moneda);
+const erroresPago = {
+  precio:"Escribe un precio positivo de hasta dos decimales por prenda",
+  total:"El total supera el importe permitido",
+  abono:"Escribe un abono no negativo de hasta dos decimales",
+  sobrepago:"El abono no puede ser mayor que el total",
+  moneda:"Elige una moneda válida",
+  partidas:`El máximo es de ${MAX_PARTIDAS} partidas por pedido`
+};
 function dueShort(p){
   if (p.estado === "entregado") return {t:"Entregado", c:"ok"};
   if (p.estado === "listo") return p.avisado ? {t:"Sin retirar", c:"vio"} : {t:"Por avisar", c:"info"};
@@ -2000,55 +2175,116 @@ function dueShort(p){
   const n = daysUntil(p.fechaEntrega), d = cfg().dias;
   return {t: n < 0 ? `Vencido ${-n} d` : n === 0 ? "Hoy" : n === 1 ? "Mañana" : `En ${n} días`, c: n < 0 ? "err" : n <= d ? "warn" : ""};
 }
-const fmtCodigo = (tipo, n) => TIPOS[tipo].pre + "-" + String(n).padStart(4, "0");
-async function siguienteCodigo(tipo){
-  if (!navigator.onLine || S.online === false) return codigoLocal(tipo); // sin internet: número según los pedidos del teléfono
-  const ref = doc(S.db, "contadores/" + tipo), re0 = new RegExp("^" + TIPOS[tipo].pre + "-(\\d{4,})$");
-  const local = Object.values(S.pedidos).reduce((m, p) => { const x = re0.exec(p.codigo || ""); return x ? Math.max(m, Number(x[1])) : m; }, 0);
+const SDK_PEDIDOS = {doc, getDocFromServer, runTransaction};
+const identidadCola = (perfil, uid) => perfil?.identidadCola ?? uid;
+const ownerLocal = () => firebaseConfig.projectId + ":" + identidadCola(S.me, S.uid);
+let sincronizando = false;
+const problemaEnvio = new Map();
+const avisoCola = typeof BroadcastChannel !== "undefined" ? new BroadcastChannel("pedidos-cola-local") : null;
+if (avisoCola) avisoCola.onmessage = () => actualizarPendientes();
+
+async function actualizarPendientes(){
+  if (!S.uid || !S.me?.activo) return;
+  const uid = S.uid, owner = ownerLocal();
   try {
-    const n = await Promise.race([
-      runTransaction(S.db, async tx => { const s = await tx.get(ref); const n = Math.max((s.exists() && s.data().n) || 0, local) + 1; tx.set(ref, {n}); return n; }),
-      new Promise((_, r) => setTimeout(() => r(new Error("sin conexión")), 4000))
-    ]);
-    return fmtCodigo(tipo, n);
-  } catch(e) { return codigoLocal(tipo); }
-}
-function codigoLocal(tipo){
-  {
-    const re = new RegExp("^" + TIPOS[tipo].pre + "-(\\d{4,})$");
-    const max = Object.values(S.pedidos).reduce((m, p) => { const x = re.exec(p.codigo || ""); return x ? Math.max(m, Number(x[1])) : m; }, 0);
-    return fmtCodigo(tipo, max + 1);
+    const pedidos = await leerPendientes(owner);
+    if (uid !== S.uid || owner !== ownerLocal() || !S.me?.activo) return;
+    S.pendientes = pedidos.sort((a, b) => a.pedido.creadoEn.localeCompare(b.pedido.creadoEn));
+    S.errorCola = false;
+  } catch(e) {
+    if (uid !== S.uid || owner !== ownerLocal() || !S.me?.activo) return;
+    S.errorCola = true;
+    console.warn("cola local", e.name);
   }
+  render();
 }
-// Una sola vez (administrador): numera los pedidos antiguos como P-0001, P-0002… por fecha de creación
-async function migrarCodigos(){
-  // Administrador: si hay pedidos con el formato antiguo, renumera todos los de ese tipo por fecha de creación (P-0001, P-0002…)
-  if (S.migrando || S.migraFallo || !perm().admin) return; S.migrando = true;
+async function sincronizarPendientes(forzar = false){
+  if (sincronizando || !S.online || !S.me?.activo || S.auth.currentUser?.uid !== S.uid) return;
+  const uid = S.uid, owner = ownerLocal(), identidad = identidadCola(S.me, uid);
+  sincronizando = true;
   try {
-    for (const t of Object.keys(TIPOS)) {
-      const re = new RegExp("^" + TIPOS[t].pre + "-\\d{4,}$");
-      const lst = Object.values(S.pedidos).filter(p => p.tipo === t && !p.demo).sort((a, b) => String(a.creadoEn).localeCompare(String(b.creadoEn)));
-      if (!lst.some(p => !re.test(p.codigo || ""))) continue;
-      const b = writeBatch(S.db);
-      lst.forEach((p, i) => { const c = fmtCodigo(t, i + 1); if (p.codigo !== c) b.update(doc(S.db, "pedidos/" + p._id), {codigo:c}); });
-      await b.commit();
-      await setDoc(doc(S.db, "contadores/" + t), {n:lst.length}).catch(e => console.warn("contador", e));
+    const pendientes = await leerPendientes(owner);
+    for (const entrada of pendientes) {
+      if (uid !== S.uid || !S.me?.activo || !S.online) break;
+      if (!forzar && ["permission-denied","contador-agotado","pago-pendiente"].includes(problemaEnvio.get(entrada.id))) continue;
+      try {
+        await registrarPedido(S.db, SDK_PEDIDOS, uid, entrada, identidad,
+          p => actualizarPagoPendiente(p, i => claveBase(i, p)));
+        await borrarPendiente(owner, entrada.id);
+        problemaEnvio.delete(entrada.id);
+        avisoCola?.postMessage("actualizar");
+      } catch(e) {
+        problemaEnvio.set(entrada.id, e.code || "error");
+        if (e.code === "unavailable") break;
+      }
     }
-  } catch(e) { console.warn("migrar códigos", e); S.migraFallo = true; }
-  S.migrando = false;
-}
-// Pedidos con "acceso denegado": recalcula quién sí puede verlos (tras quitar "Solo sus asignados")
-async function arreglarLectores(){
-  if (!perm().admin) return;
-  const b = writeBatch(S.db); let n = 0;
-  for (const p of Object.values(S.pedidos)) {
-    const den = p.denegados || []; if (!den.length || p.publico) continue;
-    const tipoK = p.tipo === "sublimacion" ? "verSublimacion" : "verPersonalizado";
-    const pueden = Object.values(S.usuarios).filter(u => u.activo && (u.rol === "admin" || u[tipoK] === true) && !den.includes(u.usuario)).map(u => u.usuario);
-    const lec = [...new Set([...(den.includes(p.creadoPor) ? [] : [p.creadoPor]), S.me.usuario, ...pueden])];
-    if (JSON.stringify([...lec].sort()) !== JSON.stringify([...(p.lectores || [])].sort())) { b.update(doc(S.db, "pedidos/" + p._id), {lectores:lec}); n++; }
+  } catch(e) { console.warn("cola local", e.name); }
+  finally {
+    sincronizando = false;
+    await actualizarPendientes();
+    if (uid !== S.uid) sincronizarPendientes();
   }
-  if (n) await b.commit().catch(e => console.warn("lectores", e));
+}
+function pendientesHTML(){
+  if (S.errorCola) return '<p class="msg bad">No se puede acceder a los pedidos locales en este navegador.</p>';
+  const n = (S.pendientes || []).length;
+  return n ? `<button class="revbar" data-act="cola">${I("clock")}<span>${n} pedido${n === 1 ? "" : "s"} pendiente${n === 1 ? "" : "s"} de envío</span><em>Ver</em></button>` : "";
+}
+function abrirPendientes(){
+  const filas = (S.pendientes || []).map(({id, pedido:p, fotos}) => {
+    const error = problemaEnvio.get(id);
+    const estado = error === "permission-denied" ? "El servidor rechazó el envío. Revisa tu acceso con el administrador."
+      : error === "contador-pendiente" ? "Un administrador debe conectar la app para alinear la numeración."
+      : error === "contador-agotado" ? "La numeración alcanzó su límite."
+      : error === "pago-pendiente" ? "El pago anterior requiere revisión. Los datos siguen guardados aquí."
+      : error ? "Sin confirmación del servidor. Puedes reintentar." : "Guardado en este dispositivo";
+    return `<details class="card"><summary><b>${esc(p.cliente.nombre)}</b> · ${esc(TIPOS[p.tipo].label)}</summary>
+      <p class="note">${estado} · ${esc(id)}</p><div class="pdnote">${esc(resumenTexto({...p, codigo:"Pendiente de envío"}))}</div>
+      ${fotos.length ? `<div class="imgs">${fotos.map(f => `<div class="imgbox"><img alt="Referencia local" src="${esc(f.mini)}"></div>`).join("")}</div>` : ""}
+      </details>`;
+  });
+  const ov = modal(`<div class="mh"><h2>Pendientes de envío</h2><button class="ib" data-close aria-label="Cerrar">${I("x")}</button></div>
+    <div class="mb">${filas.join("") || '<p class="note">No quedan pedidos locales pendientes.</p>'}</div>
+    <div class="mf"><button class="btn" data-close>Cerrar</button><button class="btn primary" id="reintentar-cola">Reintentar envío</button></div>`);
+  $("#reintentar-cola", ov).onclick = async e => {
+    if (!S.online) return toast("Sin conexión. Los pedidos siguen guardados aquí.", true);
+    e.currentTarget.disabled = true;
+    if (sincronizando) { ov.close(); return toast("El envío ya está en curso"); }
+    await sincronizarPendientes(true);
+    if (ov.isConnected && !ov._cerrando) { ov.close(); abrirPendientes(); }
+  };
+}
+async function alinearContadores(pedidos, limites = {}){
+  if (!perm().admin) throw new Error("Se requiere un administrador");
+  while (S.alineando) {
+    if (!Object.keys(limites).length) return;
+    await S.alineando.catch(() => {});
+  }
+  const uid = S.uid;
+  try {
+    const pisos = Object.fromEntries(Object.keys(TIPOS).map(tipo => [tipo, limites[tipo] || 0]));
+    for (const p of pedidos) {
+      if (!Object.hasOwn(pisos, p.tipo) || p.demo) continue;
+      pisos[p.tipo] = Math.max(pisos[p.tipo], consecutivoDe(p.tipo, p.codigo) ?? 0);
+    }
+    const refs = Object.keys(pisos).map(tipo => [tipo, doc(S.db, "contadores", tipo)]);
+    S.alineando = runTransaction(S.db, async tx => {
+      const estados = await Promise.all(refs.map(([,ref]) => tx.get(ref)));
+      estados.forEach((estado, i) => {
+        const [tipo, ref] = refs[i], data = estado.data();
+        const actual = Number.isSafeInteger(data?.n) && data.n >= 0 ? data.n : 0;
+        const n = Math.max(actual, pisos[tipo]);
+        if (data?.alineado !== true || n !== data?.n) tx.set(ref, {n, alineado:true});
+      });
+    });
+    await S.alineando;
+    S.errorAlinear = false;
+    if (uid === S.uid && !Object.keys(limites).length) sincronizarPendientes();
+  } catch(e) {
+    if (uid === S.uid && !S.errorAlinear) toast("No se pudo alinear la numeración histórica", true);
+    S.errorAlinear = true;
+    throw e;
+  } finally { S.alineando = null; }
 }
 /* ===== Modo prueba: pedidos de ejemplo (se marcan con demo:true y se pueden quitar) ===== */
 const hayDemo = () => Object.values(S.pedidos || {}).some(p => p.demo);
@@ -2252,6 +2488,7 @@ function bindMain(){
     if (d.tab) { S.tab = d.tab; render(); return; }
     if (d.filtro) { S.filtro = d.filtro; autoTab(); render(); return; }
     if (d.act === "nuevo") return nuevoPedido(d.tipo);
+    if (d.act === "cola") return abrirPendientes();
     if (d.act === "revisar") return openRevisar();
     if (d.act === "anuncio") return editarAnuncio(null);
     if (d.act === "agenda") return openAgenda();
@@ -2273,7 +2510,7 @@ function bindMain(){
     if (d.ladd) { const k = d.ladd, v = ($("#lin").value || "").trim(); if (!v) return $("#lin").focus(); const cat = JSON.parse(JSON.stringify(cfg().cat)); const names = cat[k].map(x => norm(Array.isArray(x) ? x[0] : x)); if (names.includes(norm(v))) return toast("Ya existe", true); cat[k].push(k === "colores" ? [v, $("#lcol").value] : v); return guardarListas(cat); }
     if (d.utog) { abrirUsuario(S.uOpen === d.utog ? null : d.utog); return; }
     if (d.reset) return resetPin(d.reset);
-    if (d.deluser) { const u = S.usuarios[d.deluser]; return confirmar(`¿Eliminar a ${u.nombre}?`, "No podrá entrar más. Sus pedidos se conservan.", "Eliminar", async () => { const bt = writeBatch(S.db); bt.delete(doc(S.db, "usuarios/" + d.deluser)); bt.delete(doc(S.db, "logins/" + u.usuario)); await bt.commit(); toast("Usuario eliminado"); }); }
+    if (d.deluser) { const u = S.usuarios[d.deluser]; return confirmar(`¿Eliminar a ${u.nombre}?`, "No podrá entrar más. Sus pedidos se conservan.", "Eliminar", async () => { const bt = fsWriteBatch(S.db); bt.delete(doc(S.db, "usuarios/" + d.deluser)); bt.delete(doc(S.db, "logins/" + u.usuario)); await bt.commit(); toast("Usuario eliminado"); }); }
   };
   const q = $("#q");
   if (q) q.oninput = () => { S.q = q.value; clearTimeout(q._t); q._t = setTimeout(() => { if (S.q) autoTab(); render(); }, 160); };
@@ -2321,7 +2558,16 @@ async function crearCuenta(u, pin){
     return {uid: cred.user.uid, email};
   } finally { deleteApp(sec).catch(() => {}); }
 }
-const genPin = () => String(100000 + (crypto.getRandomValues(new Uint32Array(1))[0] % 900000));
+function genPin(){
+  const muestra = new Uint32Array(1), rango = 100_000_000;
+  let pin;
+  do {
+    crypto.getRandomValues(muestra);
+    if (muestra[0] >= Math.floor(2 ** 32 / rango) * rango) continue;
+    pin = String(muestra[0] % rango).padStart(8, "0");
+  } while (!pin || !validPin(pin));
+  return pin;
+}
 function credText(nombre, u, pin){ return `Hola ${nombre.split(" ")[0]} 👋\nYa tienes acceso a la app de pedidos de ${cfg().negocio}.\n\nUsuario: ${u}\nPIN: ${pin}\n\nEntra en: ${location.origin + location.pathname}\n\nConsejo: en el celular, ábrela y elige "Agregar a la pantalla de inicio" para tenerla como app.`; }
 function showCred(nombre, u, pin){
   const t = credText(nombre, u, pin);
@@ -2360,12 +2606,12 @@ function nuevoUsuario(){
     const nombre = $("#nn", ov).value.trim(), u = cleanUser($("#nu", ov).value), pin = $("#np", ov).value.trim(), m = $("#nm", ov), b = $("#ns", ov);
     if (nombre.length < 2) return m.textContent = "Escribe el nombre";
     if (!validUser(u)) return m.textContent = "Usuario no válido (3 a 20 letras o números, sin espacios)";
-    if (!validPin(pin)) return m.textContent = "El PIN debe tener de 4 a 8 números";
+    if (!validPin(pin)) return m.textContent = "Usa un PIN de 8 dígitos sin repeticiones completas ni secuencias";
     b.disabled = true; m.textContent = "";
     try {
-      if ((await getDoc(doc(S.db, "logins/" + u))).exists()) { b.disabled = false; return m.textContent = "Ese usuario ya existe, elige otro"; }
+      if ((await getDocFromServer(doc(S.db, "logins/" + u))).exists()) { b.disabled = false; return m.textContent = "Ese usuario ya existe, elige otro"; }
       const {uid, email} = await crearCuenta(u, pin);
-      const bt = writeBatch(S.db);
+      const bt = fsWriteBatch(S.db);
       bt.set(doc(S.db, "usuarios/" + uid), {usuario:u, nombre, rol:"empleado", activo:true, verPersonalizado:$("#vp", ov).checked, verSublimacion:$("#vs", ov).checked, soloAsignados:false, eliminar:$("#el", ov).checked, bloquear:$("#bl", ov).checked, creadoEn:new Date().toISOString()});
       bt.set(doc(S.db, "logins/" + u), {email, uid});
       await bt.commit();
@@ -2375,26 +2621,33 @@ function nuevoUsuario(){
 }
 function resetPin(oldUid){
   const u = S.usuarios[oldUid]; if (!u) return;
-  confirmar(`¿Generar un PIN nuevo para ${u.nombre}?`, "El PIN anterior dejará de funcionar y su sesión abierta se cerrará.", "Generar PIN", async () => {
+  confirmar(`¿Generar un PIN nuevo para ${u.nombre}?`, "El PIN anterior dejará de funcionar. Los pedidos pendientes se recuperan al entrar con el nuevo PIN en el mismo navegador.", "Generar PIN", async () => {
     const pin = genPin();
     const {uid, email} = await crearCuenta(u.usuario, pin);
-    const bt = writeBatch(S.db);
-    bt.set(doc(S.db, "usuarios/" + uid), Object.assign({}, u, {pinCambiadoEn:new Date().toISOString()}));
-    bt.delete(doc(S.db, "usuarios/" + oldUid));
-    bt.set(doc(S.db, "logins/" + u.usuario), {email, uid});
-    await bt.commit();
+    const perfil = doc(S.db, "usuarios", oldUid), login = doc(S.db, "logins", u.usuario);
+    await runTransaction(S.db, async tx => {
+      const [anterior, acceso] = await Promise.all([tx.get(perfil), tx.get(login)]);
+      if (!anterior.exists() || acceso.data()?.uid !== oldUid)
+        throw new Error("El usuario ya cambió. Actualiza el equipo y vuelve a intentarlo.");
+      const datos = anterior.data();
+      tx.set(doc(S.db, "usuarios", uid), {
+        ...datos, identidadCola:identidadCola(datos, oldUid), pinCambiadoEn:new Date().toISOString()
+      });
+      tx.delete(perfil);
+      tx.set(login, {email, uid});
+    });
     showCred(u.nombre, u.usuario, pin);
   });
 }
 function cambiarMiPin(){
   const ov = modal(`<div class="mh"><h2>Cambiar mi PIN</h2><button class="ib" data-close>${I("x")}</button></div>
     <div class="mb"><div class="f"><label>PIN actual</label><input class="inp pinin" id="p0" type="password" inputmode="numeric" maxlength="8"></div>
-    <div class="f"><label>PIN nuevo (4 a 8 números)</label><input class="inp pinin" id="p1" type="password" inputmode="numeric" maxlength="8"></div>
+    <div class="f"><label>PIN nuevo (8 dígitos)</label><input class="inp pinin" id="p1" type="password" inputmode="numeric" maxlength="8"></div>
     <div class="f"><label>Repite el PIN nuevo</label><input class="inp pinin" id="p2" type="password" inputmode="numeric" maxlength="8"></div><span class="msg bad" id="pm"></span></div>
     <div class="mf"><button class="btn" data-close>Cancelar</button><button class="btn primary" id="ps">${I("check")}Guardar</button></div>`, "sm");
   $("#ps", ov).onclick = async () => {
     const p0 = $("#p0", ov).value.trim(), p1 = $("#p1", ov).value.trim(), m = $("#pm", ov);
-    if (!validPin(p1)) return m.textContent = "El PIN nuevo debe tener de 4 a 8 números";
+    if (!validPin(p1)) return m.textContent = "Usa un PIN nuevo de 8 dígitos sin repeticiones completas ni secuencias";
     if (p1 !== $("#p2", ov).value.trim()) return m.textContent = "Los PIN nuevos no coinciden";
     try {
       const user = S.auth.currentUser;
@@ -2475,16 +2728,38 @@ function confirmar(title, text, okTxt, fn){
   return ov;
 }
 /* ===== Pedido en curso (borrador local por si la app se cierra) ===== */
-const draftKey = () => "cs-borrador-" + ((S.me && S.me.usuario) || "");
+const draftKey = () => "cs-borrador-" + ownerLocal();
+const draftKeyAnterior = () => "cs-borrador-" + S.me.usuario;
 // Número sin el código del país (el código ya se ve en el selector)
 const telLocal = e164 => { const pp = prettyPhone(e164); return ccOf(e164) ? pp.replace(/^\+\d+\s*/, "") : pp; };
+function migrarBorradorLocal(){
+  try {
+    const anterior = localStorage.getItem(draftKeyAnterior());
+    if (anterior && !localStorage.getItem(draftKey())) localStorage.setItem(draftKey(), anterior);
+    if (anterior) localStorage.removeItem(draftKeyAnterior());
+  } catch(e) {}
+}
 function leerBorrador(){ try { const d = JSON.parse(localStorage.getItem(draftKey()) || "null"); return d && d.F && TIPOS[d.F.tipo] ? d : null; } catch(e) { return null; } }
-function borrarBorrador(){ try { localStorage.removeItem(draftKey()); } catch(e) {} }
+function borrarBorrador(form){
+  try {
+    const anterior = leerBorrador()?.F;
+    if (!form || !anterior?.envioId || anterior.envioId === form.envioId) {
+      localStorage.removeItem(draftKey());
+    }
+  } catch(e) {}
+  for (const im of (form?.imagenes || [])) {
+    if (im.local && im.id) borrarFotoLocal(form._owner || ownerLocal(), im.id).catch(() => {});
+  }
+}
 function guardarBorrador(){
   if (!F || !F._nuevo) return;
   const x = {};
   for (const k of Object.keys(F)) if (!k.startsWith("_") && k !== "visto") x[k] = F[k];
-  x.imagenes = (F.imagenes || []).filter(i => i.id && !i.error).map(i => i.id);
+  x.imagenes = (F.imagenes || []).flatMap(im => {
+    const i = im.id ? im : im.anterior;
+    if (!i?.id) return [];
+    return [i.local ? {id:i.id, local:true} : i.id];
+  });
   const t = F._ov && F._ov.querySelector("#in-tel"), ps = F._ov && F._ov.querySelector("#in-pais");
   if (t) { x.telRaw = t.value; x.paisRaw = ps ? ps.value : ""; }
   const hay = (x.cliente && (x.cliente.nombre || x.cliente.telefono)) || x.telRaw || x.tema || (x.items || []).length || x.fechaEntrega;
@@ -2501,7 +2776,7 @@ function nuevoPedido(tipo){
     <div class="mb"><div class="pcur" style="--c:${TIPOS[q.tipo].c}"><span class="chip">${I(TIPOS[q.tipo].icon)}</span><div><b>${esc(quien)}</b><small>${esc(TIPOS[q.tipo].label)}${q.tema ? " · " + esc(q.tema) : ""}</small></div></div></div>
     <div class="mf"><button class="btn" id="dcan">Cancelar</button><button class="btn primary" id="dok">${I("check")}Continuar</button></div>`, "sm pop");
   $("#dok", ov).onclick = () => { ov.close(); openForm(null, q.tipo, null, q); };
-  $("#dcan", ov).onclick = () => { ov.close(); borrarBorrador(); chooseTipo(); };
+  $("#dcan", ov).onclick = () => { ov.close(); borrarBorrador(q); chooseTipo(); };
 }
 function chooseTipo(cliente){
   const pr = perm(), tipos = ["personalizado","sublimacion"].filter(t => pr.ver[t]);
@@ -2561,21 +2836,21 @@ function lightbox(src, lista, editar){
 
 /* ================= Fotos (comprimidas dentro de Firestore) ================= */
 const fotoCache = {};
-// Miniatura liviana para las tarjetas; si una foto antigua no la tiene, se crea una sola vez
+// Si el pedido histórico no tiene miniatura, se muestra la imagen completa.
 function loadMini(id){
   const k = id + "_m";
-  if (!fotoCache[k]) fotoCache[k] = leerFoto(doc(S.db, "fotos/" + k)).then(async s => {
-    if (s.exists() && s.data().data) return s.data().data;
-    if (!fotoCache[id]) fotoCache[id] = leerFoto(doc(S.db, "fotos/" + id)).then(x => x.exists() ? x.data().data : "");
-    const full = await fotoCache[id]; if (!full) return "";
-    try {
-      const img = await new Promise((res, rej) => { const i = new Image(); i.onload = () => res(i); i.onerror = rej; i.src = full; });
-      const mini = dibujar(img, 240, .7);
-      setDoc(doc(S.db, "fotos/" + k), {data:mini, mini:true, por:(S.me && S.me.usuario) || "", creadoEn:new Date().toISOString()}).catch(() => {});
-      return mini;
-    } catch(e) { return full; }
-  }).catch(() => "");
+  if (!fotoCache[k]) fotoCache[k] = leerFoto(doc(S.db, "fotos", k))
+    .then(s => s.exists() ? s.data().data : "")
+    .catch(() => "")
+    .then(data => data || leerImagen(id))
+    .catch(e => { delete fotoCache[k]; throw e; });
   return fotoCache[k];
+}
+function leerImagen(id){
+  if (!fotoCache[id]) fotoCache[id] = leerFoto(doc(S.db, "fotos", id))
+    .then(s => s.exists() ? s.data().data : "")
+    .catch(e => { delete fotoCache[id]; throw e; });
+  return fotoCache[id];
 }
 function loadFotos(root){
   root.querySelectorAll("img[data-mini]").forEach(async img => {
@@ -2585,13 +2860,12 @@ function loadFotos(root){
   root.querySelectorAll("img[data-foto]").forEach(async img => {
     const id = img.dataset.foto;
     try {
-      if (!fotoCache[id]) fotoCache[id] = leerFoto(doc(S.db, "fotos/" + id)).then(s => s.exists() ? s.data().data : "");
-      const src = await fotoCache[id];
+      const src = await leerImagen(id);
       if (src && /^data:image\//.test(src)) img.src = src; else img.style.visibility = "hidden";
     } catch(e) { img.style.visibility = "hidden"; }
   });
 }
-function loadImage(file){ return new Promise((res, rej) => { const u = URL.createObjectURL(file); const i = new Image(); i.onload = () => res(i); i.onerror = rej; i.src = u; }); }
+function loadImage(file){ return new Promise((res, rej) => { const u = URL.createObjectURL(file); const i = new Image(); i.onload = () => { URL.revokeObjectURL(u); res(i); }; i.onerror = e => { URL.revokeObjectURL(u); rej(e); }; i.src = u; }); }
 // Comprime en WebP si el navegador puede (más liviano con la misma calidad); si no, JPEG
 const WEBP = (() => { try { return document.createElement("canvas").toDataURL("image/webp").startsWith("data:image/webp"); } catch(e) { return false; } })();
 function dibujar(img, max, q){
@@ -2609,18 +2883,17 @@ async function toDataURL(file){
     if (data.length < 380000) break; // ~280 KB
     max = Math.round(max * .85); q = Math.max(.6, q - .05);
   }
+  if (!data.startsWith("data:image/") || data.length > 600_000)
+    throw new Error("La foto excede el tamaño permitido");
   return {data, mini:dibujar(img, 240, .7)};
 }
-async function subirFoto(file){
-  const {data, mini} = await toDataURL(file);
-  const ref = doc(collection(S.db, "fotos"));
-  const meta = {por:S.me.usuario, creadoEn:new Date().toISOString()};
-  await setDoc(ref, Object.assign({data}, meta));
-  setDoc(doc(S.db, "fotos/" + ref.id + "_m"), Object.assign({data:mini, mini:true}, meta)).catch(() => {});
-  fotoCache[ref.id] = Promise.resolve(data); fotoCache[ref.id + "_m"] = Promise.resolve(mini);
-  return ref.id;
+async function prepararFoto(file, im, form){
+  const foto = {id:crypto.randomUUID(), ...await toDataURL(file)};
+  if (form._nuevo) await guardarFotoLocal({owner:form._owner, ...foto});
+  Object.assign(im, foto, {local:true, preview:foto.data});
+  delete im.subiendo;
+  if (F === form) guardarBorrador();
 }
-
 /* ================= Calendario emergente ================= */
 function openCalendar(current, onPick, opts = {}){
   let sel = current ? parseYmd(current) : null;
@@ -2785,12 +3058,24 @@ function openForm(id, tipo, cliente, borrador){
   F = orig ? JSON.parse(JSON.stringify(orig)) : {tipo, cliente:{nombre:(cliente && cliente.nombre) || "", telefono:(cliente && cliente.telefono) || ""}, tema:"", servicio:"", prendaDe:"", etiqueta:"", items:[], fechaEntrega:"", precio:"", moneda:"COP", abono:"", motivoSinAbono:"", urgente:false, imagenes:[], nota:"", asignados:[]};
   if (borrador && !orig) F = JSON.parse(JSON.stringify(borrador));
   F._nuevo = !orig;
-  F.items = (F.items || []).map(i => Object.assign({etiqueta: F.etiqueta || ""}, i));
-  F.imagenes = (F.imagenes || []).map(id => ({id}));
+  F._owner = ownerLocal();
+  if (!orig) F.envioId ||= crypto.randomUUID();
+  F.abono = orig?.pagoVersion === 2 ? String(orig.abonoMenor / 100) : (F.abono ?? "");
+  F.items = (F.items || []).map(i => Object.assign({etiqueta:F.etiqueta || "", cant:1}, i));
+  F.imagenes = (F.imagenes || []).map(im => typeof im === "string" ? {id:im} : {...im, subiendo:true});
   F.servicios = servsDe(F);
   const prBorr = borrador && !orig && borrador.pr ? Object.assign({}, borrador.pr) : null;
-  { const pr = {}; delete F.pr; (F.items || []).forEach(i => { const k = prKey(i); if (k && pr[k] === undefined) { const v = precioDe(F, k); pr[k] = v ? String(v) : ""; } }); F.pr = pr; }
-  if (prBorr) F.pr = Object.assign(F.pr, prBorr);
+  const precios = Object.create(null);
+  delete F.pr;
+  F._preciosDistintos = detectarPreciosDistintos(F);
+  for (const item of F.items) {
+    const clave = prKey(item, F);
+    if (clave && precios[clave] === undefined) {
+      const valor = precioUnitario(F, item);
+      precios[clave] = valor ? String(valor / 100) : "";
+    }
+  }
+  F.pr = Object.assign(precios, prBorr);
   const pasoBorr = prBorr || borrador ? Math.min(3, Number(borrador.step) || 0) : 0;
   F.step = 0; F.visto = [true, false, false, false];
   const marcas = c.cat.marcas.includes(F.etiqueta) || !F.etiqueta ? c.cat.marcas : [...c.cat.marcas, F.etiqueta];
@@ -2838,8 +3123,8 @@ function openForm(id, tipo, cliente, borrador){
         <div class="fsec"><div class="sec">${I("cash")}Pago</div>
           <div class="f" id="f-precio"><label>Precio por unidad <span class="req">*</span></label><div class="prl" id="prl"></div><span class="msg"></span></div>
           <div class="g2 keep">
-            <div class="f"><label>Moneda</label><select class="inp" id="in-mon">${["COP","USD","Bs"].map(m => `<option ${F.moneda === m ? "selected" : ""}>${m}</option>`).join("")}</select></div>
-            <div class="f" id="f-abono"><label>Abono</label><input class="inp monto" id="in-abono" inputmode="decimal" value="${esc(fmtMonto(F.abono))}"></div>
+            <div class="f" id="f-moneda"><label>Moneda</label><select class="inp" id="in-mon">${["COP","USD","Bs"].includes(F.moneda) ? "" : '<option value="" disabled selected>Elige una moneda</option>'}${["COP","USD","Bs"].map(m => `<option ${F.moneda === m ? "selected" : ""}>${m}</option>`).join("")}</select><span class="msg"></span></div>
+            <div class="f" id="f-abono"><label>Abono</label><input class="inp monto" id="in-abono" inputmode="decimal" value="${esc(fmtMonto(F.abono))}"><span class="msg"></span></div>
           </div>
           <span class="msg" id="pago-msg"></span>
           <div class="f" id="f-motivo"><label>Motivo por el que no hay abono</label><input class="inp" id="in-motivo" value="${esc(F.motivoSinAbono || "")}"><span class="msg"></span></div>
@@ -2868,7 +3153,13 @@ function openForm(id, tipo, cliente, borrador){
     if (e.target.closest(".irow3, .iswipe, .addbar, button, input, textarea, select, a, label")) return;
     cambiarAbierta(null);
   });
-  const salir = () => confirmar("¿Salir sin guardar?", "Los datos de este pedido se perderán.", "Salir", async () => { if (F && F._nuevo) borrarBorrador(); ov.close(); F = null; });
+  const salir = () => {
+    if ($("#save", ov).disabled) return;
+    confirmar("¿Salir sin guardar?", "Los datos de este pedido se perderán.", "Salir", async () => {
+      if (F?._nuevo) borrarBorrador(F);
+      ov.close(); F = null;
+    });
+  };
   ov.querySelectorAll("[data-cerrar]").forEach(b => b.onclick = salir);
   ov.onBack = () => { navPush(); if (F && F.step > 0) goStep(F.step - 1); else salir(); };
 
@@ -2919,9 +3210,9 @@ function openForm(id, tipo, cliente, borrador){
 
   $("#in-tema", ov).oninput = e => { mayus(e.target, true); F.tema = e.target.value; clearErr("f-tema"); };
   $("#in-nota", ov).oninput = e => F.nota = e.target.value;
-  $("#in-mon", ov).onchange = e => { F.moneda = e.target.value; renderTotals(); };
+  $("#in-mon", ov).onchange = e => { F.moneda = e.target.value; clearErr("f-moneda"); renderTotals(); };
   $("#prl", ov).oninput = e => { const x = e.target.closest("[data-pr]"); if (!x) return; F.pr[x.dataset.pr] = x.value; x.classList.remove("bad"); if (!erroresPaso(2).some(z => z[0] === "f-precio")) clearErr("f-precio"); renderTotals(); };
-  $("#in-abono", ov).oninput = e => { F.abono = e.target.value; renderTotals(); };
+  $("#in-abono", ov).oninput = e => { F.abono = e.target.value; clearErr("f-abono"); renderTotals(); };
   $("#in-motivo", ov).oninput = e => { F.motivoSinAbono = e.target.value; clearErr("f-motivo"); };
   ov.addEventListener("click", e => {
     const b = e.target.closest("[data-servicio],[data-prendade],[data-urg],[data-deny]"); if (!b) return;
@@ -2938,6 +3229,16 @@ function openForm(id, tipo, cliente, borrador){
   $("#fileCam", ov).onchange = e => { addFiles(e.target.files); e.target.value = ""; };
   $("#save", ov).onclick = () => saveForm(ov, orig);
   renderItems(); renderPrecios(); renderTotals(); renderImgs(); goStep(0);
+  const form = F;
+  for (const im of form.imagenes.filter(im => im.local)) {
+    leerFotoLocal(form._owner, im.id).then(foto => {
+      if (!foto) throw new Error("La foto local no está disponible");
+      Object.assign(im, {data:foto.data, mini:foto.mini, preview:foto.data});
+    }).catch(() => { im.error = true; }).finally(() => {
+      im.subiendo = false;
+      if (F === form) renderImgs();
+    });
+  }
   if (borrador && !orig && borrador.telRaw) { if (borrador.paisRaw !== undefined) inPais.value = borrador.paisRaw; inTel.value = borrador.telRaw; checkTel(); }
   delete F.telRaw; delete F.paisRaw;
   if (pasoBorr) { for (let i = 0; i <= pasoBorr; i++) F.visto[i] = true; goStep(pasoBorr); }
@@ -2978,22 +3279,27 @@ function erroresPaso(i){
     const llenas = F.items.filter(x => !itemVacio(x));
     const incompl = F.items.findIndex(x => !itemVacio(x) && (reqItem().some(f => !x[f])));
     if (!llenas.length) e.push(["f-items", "Agrega una prenda"]);
+    else if (llenas.length > MAX_PARTIDAS) e.push(["f-items", erroresPago.partidas]);
     else if (incompl >= 0) e.push(["f-items", "Completa lo marcado en rojo"]);
+    else if (llenas.some(x => cantidad(x.cant) === null)) e.push(["f-items", "Las unidades deben ser un entero positivo"]);
   }
   if (i === 2) {
     if (!F.fechaEntrega) e.push(["f-fecha", "Elige la fecha"]);
-    const prs = Object.keys(prendasDe(F));
-    if (!prs.length) e.push(["f-precio", "Agrega prendas primero"]);
-    else if (prs.some(k => !(num(F.pr[k]) > 0))) e.push(["f-precio", "Falta un precio"]);
+    const {error} = pagoDelFormulario();
+    const campo = {precio:"f-precio", total:"f-precio", abono:"f-abono", sobrepago:"f-abono", moneda:"f-moneda"}[error];
+    if (campo) e.push([campo, erroresPago[error]]);
   }
-  if (i === 3 && F.imagenes.some(x => x.subiendo)) e.push(["", "Espera las imágenes"]);
+  if (i === 3) {
+    if (F.imagenes.some(x => x.subiendo)) e.push(["", "Espera a que se preparen las imágenes"]);
+    if (F.imagenes.some(x => x.error)) e.push(["", "Vuelve a añadir o quita las imágenes con error"]);
+  }
   return e;
 }
 function marcarErrores(errs){
   const ov = F._ov;
   if (errs.some(([id]) => id === "f-tel")) { const t = F._checkTel(); $("#f-tel", ov).classList.add("err"); $("#tel-msg", ov).innerHTML = `<span class="ti bad">${I("alert")}${esc(t.msg)}</span>`; $("#tel-msg", ov)._h = null; }
   if (errs.some(([id]) => id === "f-items")) marcarFilas();
-  if (errs.some(([id]) => id === "f-precio")) ov.querySelectorAll("#prl [data-pr]").forEach(x => x.classList.toggle("bad", !(num(F.pr[x.dataset.pr]) > 0)));
+  if (errs.some(([id]) => id === "f-precio")) ov.querySelectorAll("#prl [data-pr]").forEach(x => x.classList.toggle("bad", !(centavos(F.pr[x.dataset.pr]) > 0)));
   errs.forEach(([id, msg]) => {
     const el = id && $("#" + id, ov); if (!el) return;
     el.classList.add("err");
@@ -3086,10 +3392,10 @@ function quitarPrenda(n, wrap, deslizado, luego){
   wrap.animate([{height:h + "px", marginBottom:mb}, {height:"0px", marginBottom:"0px"}], {duration:240, delay:deslizado ? 0 : 110, easing:"cubic-bezier(.4,0,.2,1)", fill:"forwards"}).onfinish = fin;
 }
 function cambiarAbierta(n){ animarPrendas(() => { F.iOpen = n; renderItems(); }); }
-const qtyHTML = it => `<div class="qty">${it.cant === 1 ? `<button type="button" class="del" data-del title="Quitar">${I("trash")}</button>` : `<button type="button" data-q="-1">−</button>`}<input class="qin" type="text" inputmode="numeric" pattern="[0-9]*" data-cant value="${it.cant || 1}" placeholder="1" aria-label="Unidades"><button type="button" data-q="1">+</button></div>`;
+const qtyHTML = it => `<div class="qty">${cantidad(it.cant) === 1 ? `<button type="button" class="del" data-del title="Quitar">${I("trash")}</button>` : `<button type="button" data-q="-1">−</button>`}<input class="qin" type="text" inputmode="numeric" pattern="[0-9]*" data-cant value="${esc(it.cant ?? "")}" aria-label="Unidades"><button type="button" data-q="1">+</button></div>`;
 function renderItems(){
   const ov = F._ov, c = cfg().cat;
-  const box = $("#items", ov), n = F.items.filter(i => !itemVacio(i)).reduce((s, i) => s + (Number(i.cant) || 1), 0);
+  const box = $("#items", ov), n = F.items.filter(i => !itemVacio(i)).reduce((s, i) => s + unidadesDe(i, F), 0);
   $("#itcount", ov).textContent = n ? `${n} pieza${n > 1 ? "s" : ""}` : "";
   const hexOf = name => (c.colores.find(x => x[0] === name) || [])[1] || "";
   const isSub = F.tipo === "sublimacion";
@@ -3133,22 +3439,20 @@ function renderItems(){
     if (row.hasAttribute("data-abrir")) { cambiarAbierta(Number(row.dataset.i)); const r = box.querySelector(`[data-i="${F.iOpen}"]`); if (r) setTimeout(() => r.scrollIntoView({behavior:"smooth", block:"nearest"}), 290); return; }
     const n = Number(row.dataset.i), it = F.items[n], t = e.target.closest("button"); if (!t) return;
     if (t.dataset.pick) return elegir(it, t.dataset.pick);
-    if (t.dataset.q) { it.cant = Math.max(1, it.cant + Number(t.dataset.q)); renderItems(); renderTotals(); }
+    if (t.dataset.q) { it.cant = Math.min(Number.MAX_SAFE_INTEGER, Math.max(1, (cantidad(it.cant) ?? 1) + Number(t.dataset.q))); renderItems(); renderTotals(); }
     if (t.hasAttribute("data-del")) { const quitado = F.items[n]; quitarPrenda(n, row.closest(".iswipe") || row, false, () => toastUndo("Prenda eliminada", async () => { if (!F) return; animarPrendas(() => { F.items.splice(n, 0, quitado); renderItems(); }); renderTotals(); })); }
   };
   box.oninput = e => {
     const row = e.target.closest("[data-i]"); if (!row) return;
     const it = F.items[Number(row.dataset.i)], f = e.target.dataset.fld;
     if (f === "nombre") it.nombre = e.target.value;
-    if (e.target.hasAttribute("data-cant")) { e.target.value = e.target.value.replace(/\D/g, "").slice(0, 4); const n = parseInt(e.target.value) || 0; if (n > 0) { it.cant = n; renderTotals(); } }
+    if (e.target.hasAttribute("data-cant")) {
+      it.cant = e.target.value;
+      e.target.classList.toggle("bad", cantidad(it.cant) === null);
+      renderTotals();
+    }
   };
-  const onIn = e => { if (e.target.hasAttribute("data-cant")) { e.target.placeholder = ""; e.target.value = ""; } };
-  const onOut = e => {
-    if (!e.target.hasAttribute("data-cant")) return;
-    const row = e.target.closest("[data-i]"), it = F.items[Number(row.dataset.i)];
-    it.cant = Math.max(1, parseInt(e.target.value) || Number(it.cant) || 1); renderItems(); renderTotals();
-  };
-  if (!box._qbound) { box._qbound = true; box.addEventListener("focusin", onIn); box.addEventListener("focusout", onOut); deslizarBorrar(box); }
+  if (!box._qbound) { box._qbound = true; deslizarBorrar(box); }
   // Si había un aviso en rojo de las prendas, se vuelve a revisar: desaparece cuando ya no aplica
   const fi = $("#f-items", ov);
   if (fi && fi.classList.contains("err")) {
@@ -3258,9 +3562,10 @@ function elegirMarca(){
 }
 function marcarFilas(){
   const box = $("#items", F._ov);
-  if (F.items.length > 3) { const k = F.items.findIndex(it => !itemVacio(it) && reqItem().some(f => !it[f])); if (k >= 0 && k !== F.iOpen) { F.iOpen = k; renderItems(); } }
+  if (F.items.length > 3) { const k = F.items.findIndex(it => !itemVacio(it) && (reqItem().some(f => !it[f]) || cantidad(it.cant) === null)); if (k >= 0 && k !== F.iOpen) { F.iOpen = k; renderItems(); } }
   F.items.forEach((it, i) => {
     if (itemVacio(it) && F.items.length > 1) return;
+    if (cantidad(it.cant) === null) box.querySelector(`[data-i="${i}"] [data-cant]`)?.classList.add("bad");
     reqItem().forEach(f => { if (!it[f]) box.querySelector(`[data-i="${i}"] [data-err="${f}"]`)?.classList.add("bad"); });
   });
 }
@@ -3268,22 +3573,30 @@ function renderPrecios(){
   const box = $("#prl", F._ov); if (!box) return;
   const g = prendasDe(F), ks = Object.keys(g);
   ks.forEach(k => { if (F.pr[k] === undefined) F.pr[k] = ""; });
-  box.innerHTML = ks.length ? ks.map(k => `<div class="prrow"><span class="prn"><b>${esc(k.split(" · ")[0])}</b><small>${k.includes(" · ") ? esc(k.split(" · ").slice(1).join(" · ").replace("Niño/Niña", [...new Set((F.items || []).filter(i => prKey(i) === k).map(i => i.horma))].join(" y "))) + " · " : ""}${g[k]} pieza${g[k] === 1 ? "" : "s"}</small></span><input class="inp num monto${F._prShow && !(num(F.pr[k]) > 0) ? " bad" : ""}" data-pr="${esc(k)}" inputmode="decimal" value="${esc(fmtMonto(F.pr[k]))}"></div>`).join("") : `<div class="prempty">Agrega prendas en el paso anterior</div>`;
+  box.innerHTML = ks.length ? ks.map(k => `<div class="prrow"><span class="prn"><b>${esc(k.split(" · ")[0])}</b><small>${k.includes(" · ") ? esc(k.split(" · ").slice(1).join(" · ").replace("Niño/Niña", [...new Set((F.items || []).filter(i => prKey(i, F) === k).map(i => i.horma))].join(" y "))) + " · " : ""}${g[k]} pieza${g[k] === 1 ? "" : "s"}</small></span><input class="inp num monto${F._prShow && !(centavos(F.pr[k]) > 0) ? " bad" : ""}" data-pr="${esc(k)}" inputmode="decimal" value="${esc(fmtMonto(F.pr[k]))}"></div>`).join("") : `<div class="prempty">Agrega prendas en el paso anterior</div>`;
 }
 function renderTotals(){
-  const t = totales(F), ab = num(F.abono);
-  $("#totals", F._ov).innerHTML = `<div class="tot"><small>Total</small><b class="num">${esc(money(t.total, F.moneda))}</b></div><div class="tot"><small>Saldo</small><b class="num" style="color:${t.saldo > 0 ? "var(--err)" : "var(--ok)"}">${esc(money(t.saldo, F.moneda))}</b></div>`;
+  const t = totales(F), ab = centavos(F.abono);
+  const {error} = pagoDelFormulario();
+  const saldo = ["abono","total"].includes(error) ? "—" : money(t.saldo, F.moneda);
+  $("#totals", F._ov).innerHTML = `<div class="tot"><small>Total</small><b class="num">${esc(error === "total" ? "—" : money(t.total, F.moneda))}</b></div><div class="tot"><small>Saldo</small><b class="num" style="color:${t.saldo !== 0 ? "var(--err)" : "var(--ok)"}">${esc(saldo)}</b></div>`;
   const m = $("#pago-msg", F._ov);
-  if (ab > t.total && t.total > 0) { m.className = "msg warn"; m.textContent = "⚠ El abono es mayor que el total"; } else m.textContent = "";
+  m.className = "msg warn";
+  m.textContent = ["abono","sobrepago","total"].includes(error) ? erroresPago[error] : "";
   $("#f-motivo", F._ov).hidden = ab > 0;
 }
 function renderImgs(){
   const box = $("#imgs", F._ov);
-  box.innerHTML = F.imagenes.map((im, n) => `<div class="imgbox">${im.preview ? `<img src="${esc(im.preview)}" alt="">` : `<img data-foto="${esc(im.id)}" alt="">`}<button type="button" class="rm" data-rmimg="${n}">${I("x")}</button>${im.subiendo ? `<div class="st">Subiendo…</div>` : im.error ? `<div class="st" style="background:#b91c1c">Error</div>` : ""}</div>`).join("")
+  box.innerHTML = F.imagenes.map((im, n) => `<div class="imgbox">${im.preview ? `<img src="${esc(im.preview)}" alt="">` : im.id && !im.local ? `<img data-foto="${esc(im.id)}" alt="">` : ""}<button type="button" class="rm" data-rmimg="${n}">${I("x")}</button>${im.subiendo ? `<div class="st">Preparando…</div>` : im.error ? `<div class="st" style="background:#b91c1c">Error</div>` : ""}</div>`).join("")
     + `<button type="button" class="addimg" id="btnCam">${I("camera")}Tomar foto</button><button type="button" class="addimg" id="btnGal">${I("image")}Galería</button>`;
   $("#btnCam", F._ov).onclick = () => $("#fileCam", F._ov).click();
   $("#btnGal", F._ov).onclick = () => $("#fileGal", F._ov).click();
-  box.onclick = e => { const r = e.target.closest("[data-rmimg]"); if (r) { F.imagenes.splice(Number(r.dataset.rmimg), 1); return renderImgs(); } const i = e.target.closest("img"); if (i && i.src) {
+  box.onclick = e => { const r = e.target.closest("[data-rmimg]"); if (r) {
+    const [im] = F.imagenes.splice(Number(r.dataset.rmimg), 1);
+    if (im.local && F._nuevo) borrarFotoLocal(F._owner, im.id).catch(() => {});
+    guardarBorrador();
+    return renderImgs();
+  } const i = e.target.closest("img"); if (i && i.src) {
       // El lápiz para editar está dentro del visor
       const imgs = [...box.querySelectorAll(".imgbox img")];
       lightbox(i.src, imgs.map(x => x.src), s => { const k = imgs.findIndex(x => x.src === s); const im = F && F.imagenes[k]; if (k < 0 || !im || im.subiendo || im.error) return false; editarImagen(k, s); });
@@ -3345,22 +3658,37 @@ async function editarImagen(n, src){
       ov.close();
       const blob = await new Promise(r => out.toBlob(r, "image/png"));
       if (!F || !F.imagenes[n] || !blob) return;
-      const tmp = {preview:URL.createObjectURL(blob), subiendo:true}; F.imagenes[n] = tmp; renderImgs();
-      try { tmp.id = await subirFoto(blob); delete tmp.subiendo; toast("Imagen editada"); }
-      catch(err) { console.warn(err); tmp.subiendo = false; tmp.error = true; toast("Error al guardar imagen", true); }
-      if (F && F._ov) renderImgs();
+      const form = F, anterior = form.imagenes[n], tmp = {subiendo:true, anterior};
+      form.imagenes[n] = tmp; renderImgs();
+      try {
+        await prepararFoto(blob, tmp, form);
+        delete tmp.anterior;
+        if (anterior.local && form._nuevo) borrarFotoLocal(form._owner, anterior.id).catch(() => {});
+        toast("Imagen editada");
+      } catch(err) {
+        console.warn(err.name);
+        const pos = form.imagenes.indexOf(tmp);
+        if (pos !== -1) form.imagenes[pos] = anterior;
+        toast("No se pudo preparar la imagen editada", true);
+      }
+      if (F === form) renderImgs();
     }
   });
   requestAnimationFrame(pintar);
 }
 async function addFiles(files){
+  const form = F;
   for (const f of Array.from(files)) {
+    if (F !== form) break;
     if (!/^image\//.test(f.type)) { toast("Solo imágenes", true); continue; }
-    const tmp = {preview:URL.createObjectURL(f), subiendo:true};
-    F.imagenes.push(tmp); renderImgs();
-    try { tmp.id = await subirFoto(f); delete tmp.subiendo; }
-    catch(e) { console.warn(e); tmp.subiendo = false; tmp.error = true; toast("Error al subir imagen", true); }
-    if (F && F._ov) renderImgs();
+    const tmp = {subiendo:true};
+    form.imagenes.push(tmp); renderImgs();
+    try { await prepararFoto(f, tmp, form); }
+    catch(e) {
+      console.warn(e.name); tmp.subiendo = false; tmp.error = true;
+      toast(e.name === "QuotaExceededError" ? "No hay espacio para guardar la imagen" : "Error al preparar la imagen", true);
+    }
+    if (F === form) renderImgs();
   }
 }
 async function saveForm(ov, orig){
@@ -3374,20 +3702,21 @@ async function saveForm(ov, orig){
     avisarSinCampo(todos[primero]);
     return;
   }
-  const tel = F._checkTel(), isP = F.tipo === "personalizado";
+  const tel = F._checkTel(), isP = F.tipo === "personalizado", pago = pagoDelFormulario();
   const now = new Date().toISOString(), nombre = F.cliente.nombre.trim().replace(/\s+/g, " "), pr = perm();
   const data = {
     cliente:{nombre, telefono:tel.e164}, tema:(F.tema || "").trim(), servicio:isP ? F.servicios.join(", ") : "", servicios:isP ? [...F.servicios] : [], prendaDe:isP ? F.prendaDe : "tienda",
     etiqueta:isP ? [...new Set(F.items.filter(i => !itemVacio(i)).map(i => i.etiqueta).filter(Boolean))].join(", ") : "",
-    items:F.items.filter(i => !itemVacio(i)).map(i => ({etiqueta:isP ? (i.etiqueta || "") : "", prenda:i.prenda, color:isP ? i.color : "Fullprint", horma:i.horma || "", talla:i.talla, cant:Number(i.cant) || 1, nombre:(i.nombre || "").trim(), numero:(i.numero || "").trim()})),
-    fechaEntrega:F.fechaEntrega, precios:Object.keys(prendasDe(F)).map(k => ({n:k, v:num(F.pr[k])})), precio:(() => { const v = [...new Set(Object.keys(prendasDe(F)).map(k => num(F.pr[k])))]; return v.length === 1 ? v[0] : 0; })(), moneda:F.moneda, abono:num(F.abono), motivoSinAbono:num(F.abono) > 0 ? "" : (F.motivoSinAbono || "").trim(), urgente:!!F.urgente,
+    items:F.items.filter(i => !itemVacio(i)).map(i => ({etiqueta:isP ? (i.etiqueta || "") : "", prenda:i.prenda, color:isP ? i.color : "Fullprint", horma:i.horma || "", talla:i.talla, cant:cantidad(i.cant), precioMenor:precioUnitario(F, i), nombre:(i.nombre || "").trim(), numero:(i.numero || "").trim()})),
+    fechaEntrega:F.fechaEntrega, moneda:F.moneda, pagoVersion:2, totalMenor:pago.total, abonoMenor:pago.abono,
+    motivoSinAbono:pago.abono > 0 ? "" : (F.motivoSinAbono || "").trim(), urgente:!!F.urgente,
     imagenes:F.imagenes.filter(i => i.id && !i.error).map(i => i.id), nota:(F.nota || "").trim(),
     editadoEn:now, editadoPor:S.me.usuario
   };
   const creador = orig ? orig.creadoPor : S.me.usuario;
   if (pr.admin || (pr.bloquear && (!orig || orig.creadoPor === S.me.usuario))) {
     // Sin denegados: lo ven todos los que tienen permiso para ese tipo. Con denegados: se guarda la lista de quienes sí pueden verlo.
-    const den = F.denegados.filter(u => u !== S.me.usuario); // se le puede negar incluso a quien lo registró
+    const den = [...new Set(F.denegados.filter(u => u !== S.me.usuario))]; // se le puede negar incluso a quien lo registró
     data.denegados = den; data.asignados = [];
     if (!den.length) { data.publico = true; data.lectores = [creador]; } // al desmarcar todos, vuelve a verse como antes
     else {
@@ -3400,49 +3729,73 @@ async function saveForm(ov, orig){
     // Avisar al administrador qué cambió un empleado
     const J = x => JSON.stringify(x === undefined ? null : x);
     const campos = [["Cliente", o => [o.cliente && o.cliente.nombre, o.cliente && o.cliente.telefono]], ["Diseño", o => o.tema], ["Estampado", o => o.servicio], ["Quién pone la prenda", o => o.prendaDe],
-      ["Prendas", o => (o.items || []).map(i => [i.etiqueta, i.prenda, i.color, i.horma, i.talla, Number(i.cant) || 1, i.nombre || "", i.numero || ""])], ["Fecha de entrega", o => o.fechaEntrega],
-      ["Precios", o => (o.items || []).map(i => precioDe(o, prKey(i)))], ["Pago", o => [num(o.abono), o.moneda]], ["Urgente", o => !!o.urgente], ["Referencias", o => o.imagenes || []], ["Nota", o => (o.nota || "").trim()]];
+      ["Prendas", o => (o.items || []).map(i => [i.etiqueta, i.prenda, i.color, i.horma, i.talla, unidadesDe(i, o), i.nombre || "", i.numero || ""])], ["Fecha de entrega", o => o.fechaEntrega],
+      ["Precios", o => (o.items || []).map(i => precioUnitario(o, i))], ["Pago", o => [abonoMenor(o), o.moneda]], ["Urgente", o => !!o.urgente], ["Referencias", o => o.imagenes || []], ["Nota", o => (o.nota || "").trim()]];
     const cambios = campos.filter(([, f]) => J(f(orig)) !== J(f(data))).map(([n]) => n);
     if (cambios.length) Object.assign(data, {revisar:true, revisarCambios:[...new Set([...(orig.revisar ? orig.revisarCambios || [] : []), ...cambios])], revisarPor:S.me.usuario, revisarEn:now});
   }
+  const form = F, uid = S.uid;
+  const fotos = form.imagenes.filter(i => i.local).map(({id, data, mini}) => ({id, data, mini}));
+  const peso = new TextEncoder().encode(JSON.stringify({data, fotos})).length;
+  if (form.imagenes.length > 200 || peso > 8_000_000) return toast("Las referencias superan el tamaño permitido. Quita algunas imágenes.", true);
   const btn = $("#save", ov); btn.disabled = true;
+  let envioLocal = false;
   try {
-    if (orig) await updateDoc(doc(S.db, "pedidos/" + orig._id), data);
-    else {
-      if (!pr.admin && data.lectores === undefined) Object.assign(data, {asignados:[], publico:true, lectores:[creador]});
-      Object.assign(data, {tipo:F.tipo, codigo:await siguienteCodigo(F.tipo), creadoEn:now, creadoPor:creador, estado:"pendiente", avisado:false});
+    if (orig) {
+      const batch = writeBatch(S.db);
+      batch.update(doc(S.db, "pedidos", orig._id), data);
+      for (const [id, foto] of documentosFoto(orig._id, fotos, S.me.usuario, now))
+        batch.set(doc(S.db, "fotos", id), foto);
+      envioLocal = (await batch.commit()) === "local";
+    } else {
+      if (data.lectores === undefined) Object.assign(data, {asignados:[], denegados:[], publico:true, lectores:[creador]});
+      Object.assign(data, {tipo:form.tipo, creadoEn:now, creadoPor:creador, estado:"pendiente", avisado:false});
       delete data.editadoEn; delete data.editadoPor;
-      await setDoc(doc(collection(S.db, "pedidos")), data);
+      await guardarPendiente({owner:form._owner, id:form.envioId, pedido:data, fotos});
+      avisoCola?.postMessage("actualizar");
     }
-    // (los clientes ya no se guardan aparte: cada pedido lleva su propio nombre y teléfono)
-    S.tab = F.tipo;
-    if (F._nuevo) borrarBorrador();
+    if (uid !== S.uid || F !== form) return;
+    S.tab = form.tipo;
+    if (form._nuevo) borrarBorrador(form);
     ov.close(); F = null;
     setView("pedidos"); render();
-    toast("Guardado");
-  } catch(e) { console.warn(e); btn.disabled = false; toast("No se pudo guardar: " + (e.code === "permission-denied" ? "no tienes permiso" : "revisa tu conexión"), true); }
+    if (orig) toast(envioLocal ? "Cambio pendiente de sincronización" : "Cambio guardado");
+    else {
+      toast("Guardado en este dispositivo. Pendiente de confirmación.");
+      actualizarPendientes();
+      sincronizarPendientes();
+    }
+  } catch(e) {
+    console.warn("guardar pedido", e.code || e.name);
+    btn.disabled = false;
+    const mensaje = e.name === "QuotaExceededError" ? "No hay espacio para guardar el pedido. El formulario sigue abierto."
+      : e.name === "ConstraintError" ? "Este pedido ya está en la cola local."
+      : e.code === "permission-denied" ? "El servidor rechazó el cambio."
+      : "No se pudo guardar el pedido.";
+    toast(mensaje, true);
+  }
 }
 
 /* ================= Detalle ================= */
 function waLink(p, plantilla){
-  const c = cfg(), t = totales(p), pz = {};
-  (p.items || []).forEach(i => pz[i.prenda] = (pz[i.prenda] || 0) + (i.cant || 1));
+  const c = cfg(), t = totales(p), pz = Object.create(null);
+  (p.items || []).forEach(i => pz[i.prenda] = (pz[i.prenda] || 0) + unidadesDe(i, p));
   const resumen = Object.entries(pz).map(([k, n]) => `${n} ${k}`).join(", ");
   const msg = (plantilla || c.plantilla).replace(/\{cliente\}/g, (p.cliente.nombre || "").split(" ")[0]).replace(/\{negocio\}/g, c.negocio).replace(/\{codigo\}/g, p.codigo).replace(/\{resumen\}/g, resumen)
-    .replace(/\{saldo\}/g, t.saldo > 0 ? money(t.saldo, p.moneda) : "ninguno, ¡ya está pagado!").replace(/\{total\}/g, money(t.total, p.moneda)).replace(/\{fecha\}/g, fmtDate(p.fechaEntrega));
+    .replace(/\{saldo\}/g, t.saldo < 0 ? `sobrepago de ${money(-t.saldo, p.moneda)}` : t.saldo > 0 ? money(t.saldo, p.moneda) : "ninguno, ¡ya está pagado!").replace(/\{total\}/g, money(t.total, p.moneda)).replace(/\{fecha\}/g, fmtDate(p.fechaEntrega));
   return `https://wa.me/${p.cliente.telefono}?text=${encodeURIComponent(msg)}`;
 }
 function resumenTexto(p){
   const t = totales(p);
   return [`*${TIPOS[p.tipo].label.toUpperCase()}* · ${p.codigo}${p.urgente ? " · 🔥 URGENTE" : ""}`, p.tema && `Tema: ${p.tema}`, p.servicio && `Tipo estampado: ${p.servicio}`, p.prendaDe === "cliente" && "Prenda: la trae el cliente",
     p.etiqueta && `Etiqueta: ${p.etiqueta}`, " ",
-    ...(p.items || []).map(i => `• ${i.cant > 1 ? i.cant + "× " : ""}${itemLine(i)}${i.horma ? " (" + i.horma + ")" : ""}`), " ", p.nota && `Nota: ${p.nota}`,
+    ...(p.items || []).map(i => `• ${unidadesDe(i, p) > 1 ? unidadesDe(i, p) + "× " : ""}${itemLine(i)}${i.horma ? " (" + i.horma + ")" : ""}`), " ", p.nota && `Nota: ${p.nota}`,
     `Cliente: ${p.cliente.nombre}`, `WhatsApp: ${prettyPhone(p.cliente.telefono)}`, `Entrega: ${fmtDate(p.fechaEntrega)}`,
-    ...Object.keys(prendasDe(p)).map(k => `Precio ${k}: ${money(precioDe(p, k), p.moneda)}`), `Total: ${money(t.total, p.moneda)}`, `Abono: ${money(t.abono, p.moneda)} · Saldo: ${money(t.saldo, p.moneda)}`, p.motivoSinAbono && `Sin abono: ${p.motivoSinAbono}`].filter(Boolean).join("\n").replace(/\n \n/g, "\n\n");
+    ...new Set((p.items || []).map(i => `Precio ${claveBase(i, p)}: ${money(precioUnitario(p, i) / 100, p.moneda)}`)), `Total: ${money(t.total, p.moneda)}`, `Abono: ${money(t.abono, p.moneda)} · Saldo: ${money(t.saldo, p.moneda)}`, p.motivoSinAbono && `Sin abono: ${p.motivoSinAbono}`].filter(Boolean).join("\n").replace(/\n \n/g, "\n\n");
 }
 function tallyTable(p){
   const c = cfg().cat, order = [...c.tallasAdulto, ...c.tallasPlus, ...c.tallasNino], g = {}, ts = new Set();
-  (p.items || []).forEach(i => { const k = `${i.prenda} ${i.color}${i.horma ? " · " + i.horma : ""}`; g[k] = g[k] || {}; g[k][i.talla] = (g[k][i.talla] || 0) + (i.cant || 1); ts.add(i.talla); });
+  (p.items || []).forEach(i => { const k = `${i.prenda} ${i.color}${i.horma ? " · " + i.horma : ""}`; g[k] = g[k] || {}; g[k][i.talla] = (g[k][i.talla] || 0) + unidadesDe(i, p); ts.add(i.talla); });
   const ix = t => order.indexOf(t) < 0 ? 999 : order.indexOf(t);
   const tl = [...ts].sort((a, b) => ix(a) - ix(b));
   return `<div class="gridwrap"><table class="tally"><thead><tr><th>Prenda</th>${tl.map(t => `<th>${esc(t)}</th>`).join("")}<th>Total</th></tr></thead><tbody>${Object.entries(g).map(([k, r]) => `<tr><td>${esc(k)}</td>${tl.map(t => `<td class="num">${r[t] || ""}</td>`).join("")}<td class="num"><b>${Object.values(r).reduce((a, b) => a + b, 0)}</b></td></tr>`).join("")}</tbody></table></div>`;
@@ -3476,13 +3829,14 @@ function openDetail(id){
         ${extra.length ? `<div class="pdextra">${extra.map(x => `<span>${esc(x)}</span>`).join("")}</div>` : ""}
         <hr>
         <div class="pdrow"><span class="pdlbl">PRENDAS</span><span class="pdmut">${t.piezas} ${t.piezas === 1 ? "pieza" : "piezas"}</span></div>
-        <ul class="pdit">${(p.items || []).map(i => { const sub = [i.talla ? "Talla " + i.talla : "", i.horma, i.etiqueta, i.nombre, i.numero ? "N° " + i.numero : ""].filter(Boolean); return `<li><span class="q num">${i.cant}</span><span class="d"><b>${esc(i.prenda)} ${esc(i.color.toLowerCase())}</b>${sub.length ? `<small>${esc(sub.join(" · "))}</small>` : ""}</span><span class="pr num">${esc(money((Number(i.cant) || 1) * precioDe(p, prKey(i)), p.moneda))}</span></li>`; }).join("")}</ul>
+        <ul class="pdit">${(p.items || []).map(i => { const sub = [i.talla ? "Talla " + i.talla : "", i.horma, i.etiqueta, i.nombre, i.numero ? "N° " + i.numero : ""].filter(Boolean); return `<li><span class="q num">${esc(unidadesDe(i, p))}</span><span class="d"><b>${esc(i.prenda)} ${esc(String(i.color || "").toLowerCase())}</b>${sub.length ? `<small>${esc(sub.join(" · "))}</small>` : ""}</span><span class="pr num">${esc(money(importeLinea(p, i), p.moneda))}</span></li>`; }).join("")}</ul>
       </div>
       <div class="pdcard">
         <div class="pdrow"><span class="pdlbl ic">${I("cash")}PAGO</span></div>
         <hr>
         <div class="pdrow"><b class="pdtl">Total</b><b class="pdtot num">${esc(money(t.total, p.moneda))}</b></div>
-        <div class="pdpay"><div class="ab"><small>ABONO</small><b class="num">${esc(money(t.abono, p.moneda))}</b></div><div class="sa ${t.saldo > 0 ? "" : "ok"}"><small>SALDO</small><b class="num">${esc(money(t.saldo, p.moneda))}</b></div></div>
+        <div class="pdpay"><div class="ab"><small>ABONO</small><b class="num">${esc(money(t.abono, p.moneda))}</b></div><div class="sa ${t.saldo !== 0 ? "" : "ok"}"><small>SALDO</small><b class="num">${esc(money(t.saldo, p.moneda))}</b></div></div>
+        ${t.saldo < 0 ? `<p class="msg warn">El abono supera el total.</p>` : ""}
         ${p.motivoSinAbono ? `<p class="pdmut"><b>Sin abono:</b> ${esc(p.motivoSinAbono)}</p>` : ""}
       </div>
       ${(p.imagenes || []).length ? `<div class="pdcard"><div class="pdlbl">REFERENCIAS</div><div class="imgs">${p.imagenes.map(im => `<div class="imgbox"><img data-foto="${esc(im)}" alt=""></div>`).join("")}</div></div>` : ""}
@@ -3556,7 +3910,10 @@ function toastUndo(msg, onUndo, ms = 7000, onEnd){
 // Cambia campos de un pedido y ofrece deshacer (vuelve a poner los valores anteriores)
 async function cambiar(id, data, msg, errMsg = "Error al guardar"){
   const p = S.pedidos[id] || {}, prev = {};
-  Object.keys(data).forEach(k => prev[k] = p[k] === undefined ? null : p[k]);
+  Object.keys(data).forEach(k => {
+    const anterior = p[k] ?? null;
+    prev[k] = !perm().admin && ["listoPor","avisadoPor","editadoPor"].includes(k) && anterior ? S.me.usuario : anterior;
+  });
   try { await updateDoc(doc(S.db, "pedidos/" + id), data); }
   catch(e) { toast(errMsg, true); return false; }
   toastUndo(msg, () => updateDoc(doc(S.db, "pedidos/" + id), prev));
@@ -3565,8 +3922,25 @@ async function cambiar(id, data, msg, errMsg = "Error al guardar"){
 // Eliminar con deshacer: el pedido se oculta y se borra de verdad al terminar el aviso
 const BORRAR = {};
 function borrarPedido(p){
-  const id = p._id;
-  const real = () => { if (!BORRAR[id]) return; delete BORRAR[id]; deleteDoc(doc(S.db, "pedidos/" + id)).then(() => { for (const im of (p.imagenes || [])) { deleteDoc(doc(S.db, "fotos/" + im)).catch(() => {}); deleteDoc(doc(S.db, "fotos/" + im + "_m")).catch(() => {}); } }).catch(() => { toast("Error al eliminar", true); S.remerge && S.remerge(); }); };
+  const id = p._id, uid = S.uid;
+  const real = async () => {
+    if (!BORRAR[id]) return;
+    delete BORRAR[id];
+    if (uid !== S.uid || S.auth.currentUser?.uid !== uid || !S.me?.activo) return;
+    const admin = perm().admin;
+    try {
+      await fsDeleteDoc(doc(S.db, "pedidos", id));
+      if (admin && uid === S.uid && perm().admin) {
+        // Las fotos vinculadas quedan inaccesibles al equipo en cuanto se borra el pedido.
+        for (const im of (p.imagenes || [])) for (const fotoId of [im, im + "_m"]) {
+          const ref = doc(S.db, "fotos", fotoId);
+          getDocFromServer(ref).then(f => {
+            if (f.exists() && f.data().pedidoId === id) return fsDeleteDoc(ref);
+          }).catch(() => {});
+        }
+      }
+    } catch(e) { toast("Error al eliminar", true); S.remerge && S.remerge(); }
+  };
   BORRAR[id] = real; S.remerge && S.remerge();
   toastUndo("Eliminado", async () => { delete BORRAR[id]; S.remerge && S.remerge(); }, 7000, real);
 }
