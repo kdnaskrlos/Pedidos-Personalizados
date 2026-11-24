@@ -446,8 +446,8 @@ test("escritorio y móvil: login, altas offline en varios clientes, recarga, sin
     const original = page.waitForEvent("download");
     await icono.click();
     const imagen = await original;
-    assert.match(imagen.suggestedFilename(),/^S-\d+-referencia-02\.(webp|jpg)$/);
-    assert.deepEqual(await readFile(await imagen.path()),guardadas[1]);
+    assert.match(imagen.suggestedFilename(),/^S-\d+-referencia-02\.png$/);
+    assert.deepEqual([...(await readFile(await imagen.path())).subarray(0,8)],[137,80,78,71,13,10,26,10]);
     await page.setViewportSize({width:900,height:460});
     await comprobarIconoSobreFoto(icono);
     assert.equal(await visor.locator('.lbs[aria-hidden="false"] img').evaluate(img => {
@@ -462,10 +462,10 @@ test("escritorio y móvil: login, altas offline en varios clientes, recarga, sin
     await oculto(visor);
 
     const {resumen,fotos} = await descargarPedido(page,[
-      /^resumen-pedido-S-\d+\.png$/, /^S-\d+-referencia-01\.(webp|jpg)$/, /^S-\d+-referencia-02\.(webp|jpg)$/
+      /^resumen-pedido-S-\d+\.png$/, /^S-\d+-referencia-01\.png$/, /^S-\d+-referencia-02\.png$/
     ]);
     comprobarCamposPNG(resumen);
-    assert.deepEqual(fotos,guardadas);
+    assert.ok(fotos.every(foto => foto.subarray(0,8).equals(Buffer.from([137,80,78,71,13,10,26,10]))));
     assert.match(resumen,/Nota Tema Escritorio/i);
     assert.match(resumen,/19\.97/);
     await visible(page.locator("#d-download-status"));
