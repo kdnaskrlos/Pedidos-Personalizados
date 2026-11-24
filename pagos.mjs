@@ -41,7 +41,7 @@ export function clavePrecio(item, tallasPlus = [], precios = []) {
   return plus || tallasPlus.includes(talla) || precios.some(p => p.n === completa) ? completa : base;
 }
 
-export function precioHistorico(pedido, clave) {
+export function valorPrecioHistorico(pedido, clave) {
   const partes = clave.split(" · ");
   const precios = Array.isArray(pedido.precios) ? pedido.precios : [];
   for (let n = partes.length; n > 0; n--) {
@@ -49,9 +49,13 @@ export function precioHistorico(pedido, clave) {
     const equivalentes = k.includes("Niño/Niña")
       ? [k, k.replace("Niño/Niña", "Niño"), k.replace("Niño/Niña", "Niña")] : [k];
     const precio = precios.find(p => equivalentes.includes(p.n));
-    if (precio) return centavosHistoricos(precio.v);
+    if (precio) return precio.v;
   }
-  return centavosHistoricos(pedido.precio);
+  return pedido.precio;
+}
+
+export function precioHistorico(pedido, clave) {
+  return centavosHistoricos(valorPrecioHistorico(pedido, clave));
 }
 
 export function validarPago(items, precio, abono, moneda, limite = MAX_PARTIDAS) {

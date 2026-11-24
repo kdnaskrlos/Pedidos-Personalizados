@@ -7,7 +7,7 @@ import { promisify } from "node:util";
 import { test } from "node:test";
 import { chromium, devices } from "playwright-core";
 import { initializeTestEnvironment } from "@firebase/rules-unit-testing";
-import { doc, writeBatch } from "firebase/firestore";
+import { doc, getDocFromServer, writeBatch } from "firebase/firestore";
 
 const projectId = "demo-pedidos-codex";
 const root = new URL("../", import.meta.url);
@@ -66,7 +66,7 @@ async function appDePrueba() {
           sdk.set(path,asset);
         }
         data = await sdk.get(path);
-      } else if (/^\/(?:[a-z0-9-]+\.(?:js|mjs|png|webmanifest))$/.test(path)) {
+      } else if (/^\/(?:(?:vendor\/)?[a-z0-9-]+\.(?:js|mjs|png|webmanifest))$/.test(path)) {
         res.setHeader("Content-Type",mime[path.split(".").at(-1)]);
         data = await readFile(new URL(path.slice(1),root));
       } else {
@@ -82,6 +82,76 @@ async function appDePrueba() {
 
 const visible = selector => selector.waitFor({state:"visible"});
 const oculto = selector => selector.waitFor({state:"hidden"});
+async function descargarPedido(page, nombres) {
+  // Registra las solicitudes y el texto dibujado, manteniendo las descargas reales de Chromium.
+  await page.evaluate(() => {
+    const click = HTMLAnchorElement.prototype.click, trazar = CanvasRenderingContext2D.prototype.fillText;
+    window.descargasPrueba = [];
+    window.textosResumen = [];
+    HTMLAnchorElement.prototype.click = function() {
+      if (this.download) window.descargasPrueba.push(this.download);
+      return click.call(this);
+    };
+    CanvasRenderingContext2D.prototype.fillText = function(texto,...args) {
+      if (this.canvas.width > 300) window.textosResumen.push(String(texto));
+      return trazar.call(this,texto,...args);
+    };
+    window.restaurarDescargas = () => {
+      HTMLAnchorElement.prototype.click = click;
+      CanvasRenderingContext2D.prototype.fillText = trazar;
+    };
+  });
+  try {
+    const esperas = nombres.map(n => page.waitForEvent("download",{
+      predicate:d => n.test(d.suggestedFilename()),timeout:12000
+    }));
+    const [archivos] = await Promise.all([Promise.all(esperas),page.locator("#d-download").click()]);
+    const [png,...fotos] = await Promise.all(archivos.map(async a => readFile(await a.path())));
+    const solicitados = await page.evaluate(() => window.descargasPrueba);
+    assert.deepEqual(solicitados,archivos.map(a => a.suggestedFilename()));
+    assert.deepEqual([...png.subarray(0,8)],[137,80,78,71,13,10,26,10]);
+    assert.equal(png.readUInt32BE(16),1440);
+    return {fotos,alto:png.readUInt32BE(20),resumen:await page.evaluate(() => window.textosResumen.join("\n"))};
+  } finally {
+    await page.evaluate(() => window.restaurarDescargas());
+  }
+}
+
+function comprobarCamposPNG(resumen) {
+  const lineas = resumen.split("\n");
+  for (const campo of ["Datos del pedido","Creación","Entrega","Cliente","Tema","Subtotal","Total","Abono","Saldo"])
+    assert.ok(lineas.includes(campo),campo);
+  for (const titulo of ["Prendas","Pago","Notas","Seguimiento"])
+    assert.ok(!lineas.includes(titulo),titulo);
+  assert.match(resumen,/\bPrecio\s+unitario\b/);
+  assert.match(resumen,/Cantidad: \d/);
+  assert.match(resumen,/Talla: /);
+  assert.doesNotMatch(resumen,/RESUMEN DEL PEDIDO|\b[PS]-\d{4}\b|Teléfono|Estado|Urgente|Moneda|584120000000|12025550142/);
+}
+
+async function comprobarIconoSobreFoto(icono) {
+  await visible(icono);
+  assert.ok(await icono.evaluate(b => {
+    const foto = b.parentElement.querySelector("img");
+    const a = b.getBoundingClientRect(), f = foto.getBoundingClientRect();
+    return a.width >= 44 && a.height >= 44 && Math.abs(f.right - a.right - 4) <= 2 &&
+      Math.abs(a.top - f.top - 4) <= 2 && a.right <= innerWidth;
+  }));
+}
+
+async function comprobarChat(page, destino) {
+  const enlace = page.locator(".pdwa"), contexto = page.context();
+  await contexto.route(destino, ruta => ruta.fulfill({contentType:"text/plain",body:"WhatsApp simulado"}));
+  assert.equal(await enlace.getAttribute("href"),destino);
+  const popup = contexto.waitForEvent("page");
+  await enlace.click();
+  const chat = await popup;
+  await chat.waitForURL(destino);
+  assert.equal(await chat.locator("body").innerText(),"WhatsApp simulado");
+  await chat.close();
+  await visible(page.locator(".pdmd"));
+}
+
 async function iniciar(page, url, usuario, pin) {
   if (url) await page.goto(url);
   await page.locator("#lu").fill(usuario);
@@ -120,7 +190,17 @@ async function crearSublimado(page, tema, opciones = {}) {
   }
   await page.locator("#next").click();
   await page.locator("#in-fecha").click();
-  await page.getByRole("button",{name:"Mañana",exact:true}).click();
+  const selector = page.getByRole("dialog",{name:"Fecha de entrega"});
+  await visible(selector);
+  if (opciones.errores) {
+    const elegido = selector.locator('.dpg:not([inert]) button[aria-pressed="true"]');
+    const antes = await elegido.getAttribute("data-d");
+    await page.keyboard.press("ArrowRight");
+    assert.notEqual(await elegido.getAttribute("data-d"),antes);
+  }
+  await selector.getByRole("button",{name:"Mañana",exact:true}).click();
+  await visible(selector);
+  await selector.getByRole("button",{name:"Confirmar fecha"}).click();
   await page.locator("#in-mon").selectOption("USD");
   const precios = page.locator("#prl input");
   await precios.first().fill("10,11");
@@ -135,11 +215,122 @@ async function crearSublimado(page, tema, opciones = {}) {
   await page.locator("#next").click();
   await page.locator("#in-nota").fill("Nota " + tema);
   if (opciones.foto) {
-    await page.locator("#fileGal").setInputFiles(new URL("icono-192.png",root).pathname);
-    await visible(page.locator('#imgs img[src^="data:image/"]'));
+    const entrada = page.locator("#fileGal");
+    if (opciones.errores) {
+      await entrada.setInputFiles({name:"invalida.heic",mimeType:"image/heic",buffer:Buffer.from("invalida")});
+      await visible(page.getByText(/No se pudo (abrir|convertir) la foto HEIC/).first());
+      assert.equal(await page.locator("#in-nota").inputValue(), "Nota " + tema);
+      await page.locator("[data-rmimg]").click();
+      await entrada.setInputFiles({
+        name:"referencia.HEIF",mimeType:"application/octet-stream",
+        buffer:await readFile(new URL("tests/fixtures/referencia-orientacion-6.heic",root))
+      });
+      await page.waitForFunction(() => {
+        const foto = document.querySelector("#imgs img");
+        return foto?.naturalWidth === 48 && foto.naturalHeight === 96;
+      });
+    }
+    await entrada.setInputFiles(new URL("icono-192.png",root).pathname);
+    await visible(page.locator('#imgs img[src^="data:image/"]').last());
   }
   await page.locator("#save").click();
   await oculto(page.locator("#save"));
+}
+
+async function comprobarEtiquetas(page, env) {
+  const tienda = page.locator('[data-prendade="tienda"]');
+  const cliente = page.locator('[data-prendade="cliente"]');
+  const etiquetas = page.locator('[data-pick="etiqueta"]');
+  const abrir = () => page.locator('.side [data-act="nuevo"]').click();
+  const elegir = async (campo,valor) => {
+    await page.locator(`[data-pick="${campo}"]`).click();
+    await page.locator(".pkgrid [data-v]").filter({hasText:new RegExp("^" + valor + "$")}).click();
+  };
+  const continuar = async (mezclar = false) => {
+    await page.reload();
+    await visible(page.locator(".shell"));
+    if (mezclar) {
+      // Simula un borrador antiguo con una etiqueta que ya no corresponde.
+      await page.evaluate(() => {
+        const clave = Object.keys(localStorage).find(k => k.startsWith("cs-borrador-"));
+        const borrador = JSON.parse(localStorage.getItem(clave));
+        borrador.F.items[0].etiqueta = "Etiqueta antigua";
+        borrador.F.etiqueta = "Etiqueta antigua";
+        localStorage.setItem(clave,JSON.stringify(borrador));
+      });
+    }
+    await abrir();
+    await page.locator("#dok").click();
+    await visible(page.locator('.step[data-step="1"]'));
+  };
+  const comprobarGuardado = (id, origen, etiqueta) => env.withSecurityRulesDisabled(async contexto => {
+    const snap = await getDocFromServer(doc(contexto.firestore(),"pedidos",id));
+    assert.ok(snap.exists(), "El pedido debe estar confirmado en Firestore");
+    const pedido = snap.data();
+    assert.equal(pedido.prendaDe,origen);
+    assert.equal(pedido.etiqueta,etiqueta);
+    assert.equal(pedido.items[0].etiqueta,etiqueta);
+  });
+
+  await abrir();
+  await page.locator('[data-t="personalizado"]').click();
+  await page.locator("#in-nombre").fill("Cliente ficticio");
+  await page.locator("#in-tel").fill("04120000000");
+  await page.locator("#in-tema").fill("Etiqueta de prueba");
+  await page.locator('[data-servicio="DTF"]').click();
+  await tienda.click();
+  await page.locator("#next").click();
+  await page.locator("#addItem").click();
+  await elegir("etiqueta","Comic Shop");
+  await elegir("prenda","Franela");
+  await elegir("color","Negro");
+  await elegir("horma","Unisex");
+  await elegir("talla","M");
+  await page.waitForFunction(() => Object.entries(localStorage).some(([k,v]) => k.startsWith("cs-borrador-") && JSON.parse(v).F.items[0]?.talla === "M"));
+  await continuar();
+  assert.match(await etiquetas.innerText(),/Comic Shop/);
+
+  await page.locator('[data-go="0"]').click();
+  await cliente.click();
+  await page.locator("#next").click();
+  assert.equal(await etiquetas.count(),0);
+  await page.waitForFunction(() => Object.entries(localStorage).some(([k,v]) => {
+    if (!k.startsWith("cs-borrador-")) return false;
+    const f = JSON.parse(v).F;
+    return f.prendaDe === "cliente" && f.step === 1 && f.items[0]?.etiqueta === "";
+  }));
+  await continuar(true);
+  assert.equal(await etiquetas.count(),0);
+  await page.locator("#next").click();
+  await page.locator("#in-fecha").click();
+  await page.getByRole("button",{name:"Confirmar fecha"}).click();
+  await page.locator("#in-mon").selectOption("USD");
+  await page.locator("#prl input").fill("10");
+  await page.locator("#in-abono").fill("2");
+  await page.locator("#next").click();
+  await page.locator("#save").click();
+  await oculto(page.locator("#save"));
+  const tarjeta = page.locator(".oc2:visible").filter({hasText:/Etiqueta de Prueba/i});
+  await visible(tarjeta);
+  const id = await tarjeta.getAttribute("data-open");
+  await comprobarGuardado(id,"cliente","");
+
+  await tarjeta.click();
+  await page.locator("#d-edit").click();
+  await page.locator('[data-go="1"]').click();
+  assert.equal(await etiquetas.count(),0);
+  await page.locator('[data-go="0"]').click();
+  await tienda.click();
+  await page.locator("#next").click();
+  await visible(etiquetas);
+  await page.locator("#next").click();
+  assert.match(await page.locator("#f-items").innerText(),/Completa lo marcado en rojo/);
+  await elegir("etiqueta","Comic Shop");
+  await page.locator('[data-go="3"]').click();
+  await page.locator("#save").click();
+  await oculto(page.locator("#save"));
+  await visible(page.getByText("Cambio guardado",{exact:true}));
+  await comprobarGuardado(id,"tienda","Comic Shop");
 }
 
 test("escritorio y móvil: login, altas offline en varios clientes, recarga, sincronización y funciones del pedido", {timeout:150000}, async () => {
@@ -212,7 +403,7 @@ test("escritorio y móvil: login, altas offline en varios clientes, recarga, sin
     assert.match(await page.locator('[data-act="cola"]').innerText(), /2 pedidos/);
     await page.locator(".mb details summary").first().click();
     await visible(page.getByText(/Nota Tema Escritorio/i));
-    await visible(page.locator(".mb details img"));
+    await visible(page.locator(".mb details img").first());
     await page.getByRole("button",{name:"Cerrar",exact:true}).filter({visible:true}).last().click();
 
     const otraPestana = await desktop.newPage();
@@ -236,8 +427,76 @@ test("escritorio y móvil: login, altas offline en varios clientes, recarga, sin
     await page.locator(".oc2:visible").filter({hasText:/Tema Escritorio/i}).click();
     await visible(page.getByText("Nota Tema Escritorio",{exact:false}));
     assert.match(await page.locator(".pdpay").innerText(),/19\.97/);
-    await page.waitForFunction(() => document.querySelector(".pdmd img[data-foto]")?.naturalWidth > 0);
+    await page.waitForFunction(() => [...document.querySelectorAll(".pdmd img[data-foto]")].filter(img => img.naturalWidth).length === 2);
+    const detalle = page.locator(".pdmd"), visor = page.getByRole("dialog",{name:"Referencias"});
+    const bytesDe = async (tab, n) => Buffer.from((await tab.locator(".pdmd img[data-foto]").nth(n).getAttribute("src")).split(",")[1],"base64");
+    const guardadas = await Promise.all([bytesDe(page,0),bytesDe(page,1)]);
+    assert.equal(await detalle.locator(".imgbox button").count(),2);
+    assert.equal(await detalle.getByRole("button",{name:/Descargar referencia/}).count(),0);
+    await oculto(visor);
+
+    await detalle.getByRole("button",{name:"Abrir referencia 1"}).click();
+    await visible(visor);
+    assert.equal(await visor.locator(".lbx-prev").isDisabled(),true);
+    const icono = visor.getByRole("button",{name:"Descargar foto"});
+    await comprobarIconoSobreFoto(icono);
+    await visor.locator(".lbx-next").click();
+    assert.equal(await visor.locator(".lbx-next").isDisabled(),true);
+    await comprobarIconoSobreFoto(icono);
+    const original = page.waitForEvent("download");
+    await icono.click();
+    const imagen = await original;
+    assert.match(imagen.suggestedFilename(),/^S-\d+-referencia-02\.(webp|jpg)$/);
+    assert.deepEqual(await readFile(await imagen.path()),guardadas[1]);
+    await page.setViewportSize({width:900,height:460});
+    await comprobarIconoSobreFoto(icono);
+    assert.equal(await visor.locator('.lbs[aria-hidden="false"] img').evaluate(img => {
+      const {top,bottom,left,right} = img.getBoundingClientRect();
+      return getComputedStyle(img).objectFit === "contain" && top >= 0 && left >= 0 && bottom <= innerHeight && right <= innerWidth;
+    }),true);
+    await page.keyboard.press("ArrowLeft");
+    assert.equal(await visor.locator(".lbx-prev").isDisabled(),true);
+    await comprobarIconoSobreFoto(icono);
+    await page.setViewportSize({width:1440,height:900});
+    await page.keyboard.press("Escape");
+    await oculto(visor);
+
+    const {resumen,fotos} = await descargarPedido(page,[
+      /^resumen-pedido-S-\d+\.png$/, /^S-\d+-referencia-01\.(webp|jpg)$/, /^S-\d+-referencia-02\.(webp|jpg)$/
+    ]);
+    comprobarCamposPNG(resumen);
+    assert.deepEqual(fotos,guardadas);
+    assert.match(resumen,/Nota Tema Escritorio/i);
+    assert.match(resumen,/19\.97/);
+    await visible(page.locator("#d-download-status"));
+    assert.match(await page.locator("#d-download-status").textContent(),/elige Permitir/);
+    await comprobarChat(page,"https://web.whatsapp.com/send/?phone=584120000000");
+
+    await cel.locator(".oc2:visible").filter({hasText:/Tema Escritorio/i}).click();
+    await oculto(cel.locator("#d-download"));
+    await comprobarChat(cel,"https://wa.me/584120000000");
+    await cel.getByRole("button",{name:"Abrir referencia 1"}).click();
+    const visorMovil = cel.getByRole("dialog",{name:"Referencias"});
+    await visible(visorMovil);
+    for (const control of [".lbx-prev",".lbx-next",".lbx-down"]) await oculto(visorMovil.locator(control));
+    await visorMovil.locator(".lbvp").evaluate(el => {
+      for (const [tipo,x] of [["pointerdown",290],["pointermove",105],["pointerup",105]])
+        el.dispatchEvent(new PointerEvent(tipo,{bubbles:true,cancelable:true,pointerId:1,pointerType:"touch",clientX:x,clientY:300}));
+    });
+    assert.equal(await visorMovil.locator(".lbx-next").isDisabled(),true);
+    await visorMovil.getByRole("button",{name:"Cerrar"}).click();
+    await cel.locator(".pdback").click();
+
     await page.locator("#d-edit").click();
+    await page.locator('[data-go="2"]').click();
+    await page.locator("#in-fecha").click();
+    const selector = page.getByRole("dialog",{name:"Fecha de entrega"});
+    await visible(selector.locator('.dpg:not([inert]) button[aria-pressed="true"][aria-label$="3 entregas"]'));
+    assert.equal(await selector.locator(".agrow").count(),3);
+    assert.equal(await selector.locator(".agrow[data-open]").count(),0);
+    await selector.locator(".agrow").first().click();
+    await visible(selector);
+    await selector.getByRole("button",{name:"Cancelar fecha"}).click();
     await page.locator('[data-go="3"]').click();
     await page.locator("#in-nota").fill("Nota editada desde escritorio");
     await page.locator("#save").click();
@@ -304,10 +563,15 @@ test("escritorio y móvil: login, altas offline en varios clientes, recarga, sin
     await env.withSecurityRulesDisabled(async context => {
       const db = context.firestore(), lote = writeBatch(db);
       lote.set(doc(db,"pedidos","pedido-historico"),{
-        tipo:"sublimacion",codigo:"S-0011",creadoPor:"equipoprueba",creadoEn:"2024-01-01",estado:"pendiente",
+        tipo:"sublimacion",codigo:"S-0011",creadoPor:"equipoprueba",creadoEn:"2024-01-01",fechaEntrega:"2026-12-04",estado:"pendiente",
         tema:"Pedido histórico",nota:"Nota histórica",cliente:{nombre:"Cuenta histórica",telefono:"584120000000"},
         items:[{prenda:"Franela",horma:"Unisex",color:"Fullprint",talla:"M",cant:2}],
-        moneda:"USD",precio:5.20,abono:1.00,imagenes:[foto],publico:true,lectores:["equipoprueba"]
+        moneda:"USD",precio:5.20,abono:1.00,imagenes:[foto,"foto-inasequible","otra-foto-inasequible"],publico:true,lectores:["equipoprueba"]
+      });
+      lote.set(doc(db,"pedidos","pedido-restringido"),{
+        tipo:"sublimacion",codigo:"S-0012",tema:"Pedido restringido",fechaEntrega:"2026-12-04",
+        creadoPor:"adminprueba",creadoEn:"2024-01-01",estado:"pendiente",items:[],
+        cliente:{nombre:"Cuenta restringida",telefono:"584120000000"},publico:false,lectores:["adminprueba"]
       });
       lote.set(doc(db,"fotos",foto),{data:"data:image/png;base64," + bytes.toString("base64"),por:"equipoprueba"});
       await lote.commit();
@@ -325,6 +589,68 @@ test("escritorio y móvil: login, altas offline en varios clientes, recarga, sin
     assert.match(await cel.locator(".pdpay").innerText(),/9\.40/);
     await visible(cel.getByText("Nota histórica"));
     await cel.waitForFunction(() => document.querySelector(".pdmd img[data-foto]")?.naturalWidth > 0);
+    assert.deepEqual(await bytesDe(cel,0),bytes);
+    await cel.locator("#d-edit").click();
+    await cel.locator('[data-go="2"]').click();
+    await cel.locator("#in-fecha").click();
+    const agendaRestringida = cel.getByRole("dialog",{name:"Fecha de entrega"});
+    await visible(agendaRestringida.locator('.dpg:not([inert]) button[data-d="2026-12-04"][aria-label$="1 entrega"]'));
+    assert.equal(await agendaRestringida.locator(".agrow").count(),1);
+    assert.doesNotMatch(await agendaRestringida.innerText(),/Cuenta restringida|Pedido restringido/);
+    await pedidosNav(page).click();
+    await page.locator('[data-filtro="pendientes"]:visible').click();
+    await page.locator(".oc2:visible").filter({hasText:"Pedido histórico"}).click();
+    const incompleto = await descargarPedido(page,[/^resumen-pedido-S-0011\.png$/,/^S-0011-referencia-01\.png$/]);
+    assert.deepEqual(incompleto.fotos,[bytes]);
+    await visible(page.getByText("No se pudieron descargar las referencias 02, 03.",{exact:false}));
+    assert.match(incompleto.resumen,/9\.40/);
+    await page.locator(".pdback").click();
+
+    await page.locator(".oc2:visible").filter({hasText:/Tema Adicional/i}).click();
+    const sinFotos = await descargarPedido(page,[/^resumen-pedido-S-\d+\.png$/]);
+    assert.deepEqual(sinFotos.fotos,[]);
+    await oculto(page.locator("#d-download-status"));
+    await page.locator(".pdback").click();
+
+    const historicoLargo = await page.evaluate(async () => {
+      const {archivoResumenPng} = await import("/pedido-export.mjs");
+      const trazar = CanvasRenderingContext2D.prototype.fillText;
+      const cajas = [];
+      CanvasRenderingContext2D.prototype.fillText = function(texto,x,y) {
+        if (this.canvas.width > 300) {
+          const escala = this.getTransform().a, medida = this.measureText(texto);
+          const derecha = this.textAlign === "right";
+          cajas.push({
+            texto,y,
+            dentro:(x - (derecha ? medida.width : 0)) * escala >= 0 &&
+              (x + (derecha ? 0 : medida.width)) * escala <= this.canvas.width &&
+              (y + medida.actualBoundingBoxDescent) * escala < this.canvas.height
+          });
+        }
+        return trazar.call(this,texto,x,y);
+      };
+      try {
+        const prendas = Array.from({length:12},(_,i) => [
+          "Franela " + (i + 1),"Unisex","M","Azul",2,"","",
+          i === 11 ? "Una etiqueta extensa para comprobar que el contenido se ajusta al ancho de la partida".repeat(3) : "",
+          "$ 10.11","$ 20.22"
+        ]);
+        const {datos} = await archivoResumenPng({codigo:"S-0011",datos:[["Cliente","Cliente ficticio"]],prendas,
+          pago:[["Saldo","$ 19.97"]], nota:"Una nota extensa con un salto de línea. ".repeat(90) + "\nFin de la nota",seguimiento:[]});
+        const ultimas = cajas.filter(c => /^(?:\d+\. Franela|Fin de la nota)/.test(c.texto));
+        return {formato:datos.type,dentro:cajas.every(c => c.dentro),filas:ultimas.map(c => c.texto),
+          orden:ultimas.every((c,i) => !i || c.y > ultimas[i-1].y)};
+      } finally {
+        CanvasRenderingContext2D.prototype.fillText = trazar;
+      }
+    });
+    assert.equal(historicoLargo.formato,"image/png");
+    assert.ok(historicoLargo.dentro && historicoLargo.orden);
+    assert.equal(historicoLargo.filas.length,13);
+    assert.equal(historicoLargo.filas.at(-2),"12. Franela 12");
+    assert.equal(historicoLargo.filas.at(-1),"Fin de la nota");
+
+    await comprobarEtiquetas(page,env);
     assert.deepEqual(errores,[]);
     assert.deepEqual(inesperadas,[]);
   } catch(e) {
@@ -334,5 +660,80 @@ test("escritorio y móvil: login, altas offline en varios clientes, recarga, sin
     await env?.cleanup();
     await navegador?.close();
     await new Promise(resolve => server.close(resolve));
+  }
+});
+
+test("demo independiente: agenda, HEIC, PNG, Etiqueta y WhatsApp sin servicios externos", {timeout:30000}, async () => {
+  const executablePath = process.env.CHROMIUM_PATH || (existsSync("/usr/bin/chromium") ? "/usr/bin/chromium" : chromium.executablePath());
+  const navegador = await chromium.launch({executablePath,args:["--no-sandbox"]});
+  try {
+    const context = await navegador.newContext({viewport:{width:1280,height:800},reducedMotion:"reduce"});
+    const externas = [], errores = [];
+    await context.route(/^https?:/,route => { externas.push(route.request().url()); return route.abort(); });
+    context.on("page",tab => tab.on("pageerror",e => errores.push(e.message)));
+    let page = await context.newPage();
+    const archivo = new URL("demo/mejoras-pedidos-v369.html",root);
+    try { await page.goto(archivo.href); }
+    catch (error) {
+      if (!error.message.includes("ERR_BLOCKED_BY_ADMINISTRATOR")) throw error;
+      // Chromium administrado bloquea file://. El documento se carga en una
+      // pestaña vacía con origen opaco y las solicitudes externas bloqueadas.
+      await page.close();
+      page = await context.newPage();
+      await page.setContent(await readFile(archivo,"utf8"));
+    }
+    await page.getByRole("button",{name:/P-0042/}).click();
+    await page.locator(".pdwa").click();
+    await visible(page.getByText("https://web.whatsapp.com/send/?phone=12025550142",{exact:true}));
+    await page.getByRole("button",{name:"Cerrar",exact:true}).click();
+    assert.equal(await page.locator(".pdmd .imgbox button").count(),2);
+    assert.equal(await page.getByRole("button",{name:/Descargar referencia/}).count(),0);
+    const visor = page.getByRole("dialog",{name:"Referencias"});
+    await page.getByRole("button",{name:"Abrir referencia 1"}).click();
+    await visor.getByRole("button",{name:"Foto siguiente"}).click();
+    assert.equal(await visor.locator('[role="status"]').textContent(),"Foto 2 de 2");
+    const fotoActiva = visor.locator('.lbs[aria-hidden="false"] img');
+    assert.ok(await fotoActiva.evaluate(img => img.naturalHeight > img.naturalWidth));
+    const botonFoto = visor.getByRole("button",{name:"Descargar foto"});
+    await comprobarIconoSobreFoto(botonFoto);
+    await page.setViewportSize({width:800,height:450});
+    await comprobarIconoSobreFoto(botonFoto);
+    await page.setViewportSize({width:1280,height:800});
+    await visor.getByRole("button",{name:"Cerrar"}).click();
+    await page.getByRole("button",{name:"Editar",exact:true}).click();
+    await page.getByRole("button",{name:/Prendas/}).click();
+    assert.equal(await page.getByLabel("Etiqueta",{exact:true}).count(),2);
+    await page.getByRole("button",{name:/Cliente/}).click();
+    await page.getByRole("button",{name:"El cliente la trae"}).click();
+    await page.getByRole("button",{name:/Prendas/}).click();
+    assert.equal(await page.getByLabel("Etiqueta",{exact:true}).count(),0);
+    await page.getByRole("button",{name:/Entrega y fotos/}).click();
+    await page.locator("#in-fecha").click();
+    const calendario = page.getByRole("dialog",{name:"Fecha de entrega"});
+    await visible(calendario.getByText("2 entregas",{exact:true}));
+    await calendario.getByRole("button",{name:"+3 días",exact:true}).click();
+    await calendario.getByRole("button",{name:"Confirmar fecha"}).click();
+    await page.getByRole("button",{name:"Probar HEIC"}).click();
+    await visible(page.getByText("Referencia lista para guardar."));
+    await page.waitForFunction(() => [...document.querySelectorAll("#imgs img")].at(-1)?.naturalHeight === 96);
+    await page.getByRole("button",{name:"Guardar",exact:true}).click();
+    const {resumen,fotos,alto} = await descargarPedido(page,[
+      /^resumen-pedido-P-0042\.png$/, /^P-0042-referencia-01\.jpg$/,
+      /^P-0042-referencia-02\.jpg$/, /^P-0042-referencia-03\.(jpg|webp)$/
+    ]);
+    comprobarCamposPNG(resumen);
+    assert.equal(fotos.length,3);
+    assert.ok(alto < 2400, "Dos partidas deben caber en un resumen compacto");
+    assert.match(resumen,/Camisetas del club/);
+    assert.match(resumen,/1\. Franela/);
+    assert.match(resumen,/2\. Franela/);
+    assert.match(resumen,/\$ 38\.00/);
+    assert.match(resumen,/Prenda a cargo de\nCliente/);
+    assert.match(resumen,/Confirmar la ubicación del número/);
+    assert.match(resumen,/Registrado por/);
+    assert.deepEqual(errores,[]);
+    assert.deepEqual(externas,[]);
+  } finally {
+    await navegador.close();
   }
 });
