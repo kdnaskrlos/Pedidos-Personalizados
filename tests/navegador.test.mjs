@@ -82,30 +82,57 @@ async function appDePrueba() {
 
 const visible = selector => selector.waitFor({state:"visible"});
 const oculto = selector => selector.waitFor({state:"hidden"});
-async function descargarResumen(page, prefijo) {
-  // Observa los textos dibujados sin alterar el PNG que genera el navegador.
+async function descargarPedido(page, nombres) {
+  // Registra las solicitudes y el texto dibujado, manteniendo las descargas reales de Chromium.
   await page.evaluate(() => {
-    const original = CanvasRenderingContext2D.prototype.fillText;
+    const click = HTMLAnchorElement.prototype.click, trazar = CanvasRenderingContext2D.prototype.fillText;
+    window.descargasPrueba = [];
     window.textosResumen = [];
-    CanvasRenderingContext2D.prototype.fillText = function(texto,...args) {
-      window.textosResumen.push(String(texto));
-      original.call(this,texto,...args);
+    HTMLAnchorElement.prototype.click = function() {
+      if (this.download) window.descargasPrueba.push(this.download);
+      return click.call(this);
     };
-    window.restaurarCanvas = () => CanvasRenderingContext2D.prototype.fillText = original;
+    CanvasRenderingContext2D.prototype.fillText = function(texto,...args) {
+      if (this.canvas.width > 300) window.textosResumen.push(String(texto));
+      return trazar.call(this,texto,...args);
+    };
+    window.restaurarDescargas = () => {
+      HTMLAnchorElement.prototype.click = click;
+      CanvasRenderingContext2D.prototype.fillText = trazar;
+    };
   });
   try {
-    const descarga = page.waitForEvent("download");
-    await page.locator("#d-download").click();
-    const archivo = await descarga;
-    assert.ok(prefijo.test(archivo.suggestedFilename()));
-    const contenido = await readFile(await archivo.path());
-    assert.deepEqual([...contenido.subarray(0,8)],[137,80,78,71,13,10,26,10]);
-    assert.equal(contenido.readUInt32BE(16),1440);
-    assert.ok(contenido.readUInt32BE(20) > 1000);
-    return page.evaluate(() => window.textosResumen.join("\n"));
+    const esperas = nombres.map(n => page.waitForEvent("download",{
+      predicate:d => n.test(d.suggestedFilename()),timeout:12000
+    }));
+    const [archivos] = await Promise.all([Promise.all(esperas),page.locator("#d-download").click()]);
+    const [png,...fotos] = await Promise.all(archivos.map(async a => readFile(await a.path())));
+    const solicitados = await page.evaluate(() => window.descargasPrueba);
+    assert.deepEqual(solicitados,archivos.map(a => a.suggestedFilename()));
+    assert.deepEqual([...png.subarray(0,8)],[137,80,78,71,13,10,26,10]);
+    assert.equal(png.readUInt32BE(16),1440);
+    return {fotos,alto:png.readUInt32BE(20),resumen:await page.evaluate(() => window.textosResumen.join("\n"))};
   } finally {
-    await page.evaluate(() => window.restaurarCanvas());
+    await page.evaluate(() => window.restaurarDescargas());
   }
+}
+
+function comprobarCamposPNG(resumen) {
+  for (const campo of ["Creación","Entrega","Cliente","Tema","Precio unitario","Subtotal","Total","Abono","Saldo"])
+    assert.ok(resumen.split("\n").includes(campo),campo);
+  assert.match(resumen,/Cantidad: \d/);
+  assert.match(resumen,/Talla: /);
+  assert.doesNotMatch(resumen,/RESUMEN DEL PEDIDO|\b[PS]-\d{4}\b|Teléfono|Estado|Urgente|Moneda|584120000000|12025550142/);
+}
+
+async function comprobarIconoSobreFoto(icono) {
+  await visible(icono);
+  assert.ok(await icono.evaluate(b => {
+    const foto = b.parentElement.querySelector("img");
+    const a = b.getBoundingClientRect(), f = foto.getBoundingClientRect();
+    return a.width >= 44 && a.height >= 44 && Math.abs(f.right - a.right - 4) <= 2 &&
+      Math.abs(a.top - f.top - 4) <= 2 && a.right <= innerWidth;
+  }));
 }
 
 async function comprobarChat(page, destino) {
@@ -400,34 +427,56 @@ test("escritorio y móvil: login, altas offline en varios clientes, recarga, sin
     const detalle = page.locator(".pdmd"), visor = page.getByRole("dialog",{name:"Referencias"});
     const bytesDe = async (tab, n) => Buffer.from((await tab.locator(".pdmd img[data-foto]").nth(n).getAttribute("src")).split(",")[1],"base64");
     const guardadas = await Promise.all([bytesDe(page,0),bytesDe(page,1)]);
+    const miniatura = detalle.getByRole("button",{name:"Descargar referencia 2"});
+    await comprobarIconoSobreFoto(miniatura);
+    const individual = page.waitForEvent("download");
+    await miniatura.click();
+    const fotoMiniatura = await individual;
+    assert.match(fotoMiniatura.suggestedFilename(),/^S-\d+-referencia-02\.(webp|jpg)$/);
+    assert.deepEqual(await readFile(await fotoMiniatura.path()),guardadas[1]);
+    await oculto(visor);
+    await visible(detalle);
+
     await detalle.getByRole("button",{name:"Abrir referencia 1"}).click();
     await visible(visor);
     assert.equal(await visor.locator(".lbx-prev").isDisabled(),true);
+    const icono = visor.getByRole("button",{name:"Descargar foto"});
+    await comprobarIconoSobreFoto(icono);
     await visor.locator(".lbx-next").click();
     assert.equal(await visor.locator(".lbx-next").isDisabled(),true);
-    await page.keyboard.press("ArrowLeft");
+    await comprobarIconoSobreFoto(icono);
     const original = page.waitForEvent("download");
-    await visor.getByRole("button",{name:"Descargar foto"}).click();
+    await icono.click();
     const imagen = await original;
-    assert.match(imagen.suggestedFilename(),/^S-\d+-referencia-01\.(webp|jpg)$/);
-    assert.deepEqual(await readFile(await imagen.path()),guardadas[0]);
+    assert.match(imagen.suggestedFilename(),/^S-\d+-referencia-02\.(webp|jpg)$/);
+    assert.deepEqual(await readFile(await imagen.path()),guardadas[1]);
     await page.setViewportSize({width:900,height:460});
-    assert.equal(await visor.locator(".lbs img").first().evaluate(img => {
+    await comprobarIconoSobreFoto(icono);
+    assert.equal(await visor.locator('.lbs[aria-hidden="false"] img').evaluate(img => {
       const {top,bottom,left,right} = img.getBoundingClientRect();
       return getComputedStyle(img).objectFit === "contain" && top >= 0 && left >= 0 && bottom <= innerHeight && right <= innerWidth;
     }),true);
+    await page.keyboard.press("ArrowLeft");
+    assert.equal(await visor.locator(".lbx-prev").isDisabled(),true);
+    await comprobarIconoSobreFoto(icono);
     await page.setViewportSize({width:1440,height:900});
     await page.keyboard.press("Escape");
     await oculto(visor);
-    const resumen = await descargarResumen(page,/^resumen-pedido-S-\d+\.png$/);
-    for (const campo of ["Creación","Entrega","Cliente","Teléfono","Talla","Cantidad","Precio unitario","Total","Abono","Saldo","Notas"])
-      assert.ok(resumen.split("\n").includes(campo), campo);
+
+    const {resumen,fotos} = await descargarPedido(page,[
+      /^resumen-pedido-S-\d+\.png$/, /^S-\d+-referencia-01\.(webp|jpg)$/, /^S-\d+-referencia-02\.(webp|jpg)$/
+    ]);
+    comprobarCamposPNG(resumen);
+    assert.deepEqual(fotos,guardadas);
     assert.match(resumen,/Nota Tema Escritorio/i);
     assert.match(resumen,/19\.97/);
+    await visible(page.locator("#d-download-status"));
+    assert.match(await page.locator("#d-download-status").textContent(),/elige Permitir/);
     await comprobarChat(page,"https://web.whatsapp.com/send/?phone=584120000000");
 
     await cel.locator(".oc2:visible").filter({hasText:/Tema Escritorio/i}).click();
     await oculto(cel.locator("#d-download"));
+    await oculto(cel.getByRole("button",{name:"Descargar referencia 2"}));
     await comprobarChat(cel,"https://wa.me/584120000000");
     await cel.getByRole("button",{name:"Abrir referencia 1"}).click();
     const visorMovil = cel.getByRole("dialog",{name:"Referencias"});
@@ -520,7 +569,7 @@ test("escritorio y móvil: login, altas offline en varios clientes, recarga, sin
         tipo:"sublimacion",codigo:"S-0011",creadoPor:"equipoprueba",creadoEn:"2024-01-01",fechaEntrega:"2026-12-04",estado:"pendiente",
         tema:"Pedido histórico",nota:"Nota histórica",cliente:{nombre:"Cuenta histórica",telefono:"584120000000"},
         items:[{prenda:"Franela",horma:"Unisex",color:"Fullprint",talla:"M",cant:2}],
-        moneda:"USD",precio:5.20,abono:1.00,imagenes:[foto],publico:true,lectores:["equipoprueba"]
+        moneda:"USD",precio:5.20,abono:1.00,imagenes:[foto,"foto-inasequible","otra-foto-inasequible"],publico:true,lectores:["equipoprueba"]
       });
       lote.set(doc(db,"pedidos","pedido-restringido"),{
         tipo:"sublimacion",codigo:"S-0012",tema:"Pedido restringido",fechaEntrega:"2026-12-04",
@@ -551,6 +600,59 @@ test("escritorio y móvil: login, altas offline en varios clientes, recarga, sin
     await visible(agendaRestringida.locator('.dpg:not([inert]) button[data-d="2026-12-04"][aria-label$="1 entrega"]'));
     assert.equal(await agendaRestringida.locator(".agrow").count(),1);
     assert.doesNotMatch(await agendaRestringida.innerText(),/Cuenta restringida|Pedido restringido/);
+    await pedidosNav(page).click();
+    await page.locator('[data-filtro="pendientes"]:visible').click();
+    await page.locator(".oc2:visible").filter({hasText:"Pedido histórico"}).click();
+    const incompleto = await descargarPedido(page,[/^resumen-pedido-S-0011\.png$/,/^S-0011-referencia-01\.png$/]);
+    assert.deepEqual(incompleto.fotos,[bytes]);
+    await visible(page.getByText("No se pudieron descargar las referencias 02, 03.",{exact:false}));
+    assert.match(incompleto.resumen,/9\.40/);
+    await page.locator(".pdback").click();
+
+    await page.locator(".oc2:visible").filter({hasText:/Tema Adicional/i}).click();
+    const sinFotos = await descargarPedido(page,[/^resumen-pedido-S-\d+\.png$/]);
+    assert.deepEqual(sinFotos.fotos,[]);
+    await oculto(page.locator("#d-download-status"));
+    await page.locator(".pdback").click();
+
+    const historicoLargo = await page.evaluate(async () => {
+      const {archivoResumenPng} = await import("/pedido-export.mjs");
+      const trazar = CanvasRenderingContext2D.prototype.fillText;
+      const cajas = [];
+      CanvasRenderingContext2D.prototype.fillText = function(texto,x,y) {
+        if (this.canvas.width > 300) {
+          const escala = this.getTransform().a, medida = this.measureText(texto);
+          const derecha = this.textAlign === "right";
+          cajas.push({
+            texto,y,
+            dentro:(x - (derecha ? medida.width : 0)) * escala >= 0 &&
+              (x + (derecha ? 0 : medida.width)) * escala <= this.canvas.width &&
+              (y + medida.actualBoundingBoxDescent) * escala < this.canvas.height
+          });
+        }
+        return trazar.call(this,texto,x,y);
+      };
+      try {
+        const prendas = Array.from({length:12},(_,i) => [
+          "Franela " + (i + 1),"Unisex","M","Azul",2,"","",
+          i === 11 ? "Una etiqueta extensa para comprobar que el contenido se ajusta al ancho de la partida".repeat(3) : "",
+          "$ 10.11","$ 20.22"
+        ]);
+        const {datos} = await archivoResumenPng({codigo:"S-0011",datos:[["Cliente","Cliente ficticio"]],prendas,
+          pago:[["Saldo","$ 19.97"]], nota:"Una nota extensa con un salto de línea. ".repeat(90) + "\nFin de la nota",seguimiento:[]});
+        const ultimas = cajas.filter(c => /^(?:\d+\. Franela|Fin de la nota)/.test(c.texto));
+        return {formato:datos.type,dentro:cajas.every(c => c.dentro),filas:ultimas.map(c => c.texto),
+          orden:ultimas.every((c,i) => !i || c.y > ultimas[i-1].y)};
+      } finally {
+        CanvasRenderingContext2D.prototype.fillText = trazar;
+      }
+    });
+    assert.equal(historicoLargo.formato,"image/png");
+    assert.ok(historicoLargo.dentro && historicoLargo.orden);
+    assert.equal(historicoLargo.filas.length,13);
+    assert.equal(historicoLargo.filas.at(-2),"12. Franela 12");
+    assert.equal(historicoLargo.filas.at(-1),"Fin de la nota");
+
     await comprobarEtiquetas(page,env);
     assert.deepEqual(errores,[]);
     assert.deepEqual(inesperadas,[]);
@@ -591,6 +693,13 @@ test("demo independiente: agenda, HEIC, PNG, Etiqueta y WhatsApp sin servicios e
     await page.getByRole("button",{name:"Abrir referencia 1"}).click();
     await visor.getByRole("button",{name:"Foto siguiente"}).click();
     assert.equal(await visor.locator('[role="status"]').textContent(),"Foto 2 de 2");
+    const fotoActiva = visor.locator('.lbs[aria-hidden="false"] img');
+    assert.ok(await fotoActiva.evaluate(img => img.naturalHeight > img.naturalWidth));
+    const botonFoto = visor.getByRole("button",{name:"Descargar foto"});
+    await comprobarIconoSobreFoto(botonFoto);
+    await page.setViewportSize({width:800,height:450});
+    await comprobarIconoSobreFoto(botonFoto);
+    await page.setViewportSize({width:1280,height:800});
     await visor.getByRole("button",{name:"Cerrar"}).click();
     await page.getByRole("button",{name:"Editar",exact:true}).click();
     await page.getByRole("button",{name:/Prendas/}).click();
@@ -609,8 +718,16 @@ test("demo independiente: agenda, HEIC, PNG, Etiqueta y WhatsApp sin servicios e
     await visible(page.getByText("Referencia lista para guardar."));
     await page.waitForFunction(() => [...document.querySelectorAll("#imgs img")].at(-1)?.naturalHeight === 96);
     await page.getByRole("button",{name:"Guardar",exact:true}).click();
-    const resumen = await descargarResumen(page,/^resumen-pedido-P-0042\.png$/);
+    const {resumen,fotos,alto} = await descargarPedido(page,[
+      /^resumen-pedido-P-0042\.png$/, /^P-0042-referencia-01\.jpg$/,
+      /^P-0042-referencia-02\.jpg$/, /^P-0042-referencia-03\.(jpg|webp)$/
+    ]);
+    comprobarCamposPNG(resumen);
+    assert.equal(fotos.length,3);
+    assert.ok(alto < 2400, "Dos partidas deben caber en un resumen compacto");
     assert.match(resumen,/Camisetas del club/);
+    assert.match(resumen,/1\. Franela/);
+    assert.match(resumen,/2\. Franela/);
     assert.match(resumen,/\$ 38\.00/);
     assert.match(resumen,/Prenda a cargo de\nCliente/);
     assert.deepEqual(errores,[]);

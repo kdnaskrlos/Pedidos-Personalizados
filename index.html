@@ -1010,7 +1010,8 @@ html,body{overflow-x:clip}
 .lbdots b.on{background:#fff;transform:scale(1.25)}
 .lbx-x{position:absolute;top:max(14px,env(safe-area-inset-top));right:14px;z-index:2;width:40px;height:40px;border-radius:99px;border:0;background:#ffffff26;color:#fff;display:grid;place-items:center;cursor:pointer}
 .lbx-x svg.i{width:20px;height:20px}
-.lbx-nav,.lbx-x.lbx-down,#d-download{display:none}
+.lbx-nav,.descarga-foto,#d-download,#d-download-status{display:none}
+.lb-foto{display:contents}
 .lbindicador{position:absolute;width:1px;height:1px;overflow:hidden;clip-path:inset(50%)}
 .ref-btn{display:block;width:100%;height:100%;padding:0;border:0;background:none;cursor:zoom-in}
 .agselector .agtitle{align-items:center;border-top:0;padding-top:0}
@@ -1019,13 +1020,21 @@ html,body{overflow-x:clip}
 .dpg i.dd.ag{pointer-events:none}
 @media(min-width:761px){
   .lbx-next svg.i{transform:rotate(-90deg)}
-  .lbx.gal .lbvp{inset:clamp(54px,10dvh,68px) clamp(54px,9vw,94px) clamp(30px,7dvh,48px)}
+  .lbx.gal .lbvp{container-type:size;inset:clamp(54px,10dvh,68px) clamp(54px,9vw,94px) clamp(30px,7dvh,48px)}
   .lbx.gal .lbs{padding:0;grid-template: minmax(0,1fr) / minmax(0,1fr)}
+  .lb-foto{display:grid;position:relative;width:min(100cqw,calc(100cqh * var(--proporcion, 1)));height:min(100cqh,calc(100cqw / var(--proporcion, 1)))}
   .lbx.gal .lbs img{width:100%;height:100%;min-width:0;min-height:0;object-fit:contain;border-radius:0}
+  .pdmd .imgbox{width:104px;height:104px}
+  .descarga-foto{position:absolute;z-index:1;top:4px;right:4px;width:44px;height:44px;border:1px solid #fffc;border-radius:10px;background:#14233ae6;color:#fff;display:grid;place-items:center;padding:0;cursor:pointer}
+  .descarga-foto:hover{background:#14233a}
+  .descarga-foto:disabled{opacity:.65;cursor:wait}
+  .descarga-foto svg.i{width:20px;height:20px}
+  .lb-foto:not([data-lista]) .descarga-foto{visibility:hidden}
+  #d-download-status:not(:empty){display:block;max-height:6em;overflow:auto;align-self:stretch;margin:0;padding:8px 10px;border-radius:8px;background:var(--surface-2);white-space:pre-line}
+  #d-download-status.bad{color:var(--err)}
   .lbx-nav{display:grid;top:50%;transform:translateY(-50%)}
   .lbx-prev{right:auto;left:14px}
   .lbx-nav:disabled{opacity:.35;cursor:default}
-  .lbx-x.lbx-down{display:grid;right:62px}
   .pdmd #d-download{display:inline-flex}
 }
 /* v3.60 mejoras del reporte de diseño: contraste, etiquetas en texto normal, toques de 44 px */
@@ -2823,36 +2832,43 @@ function chooseTipo(cliente){
 }
 // Visor de imágenes: con varias se desliza entre ellas (mismo movimiento que el calendario); tocar cierra
 function lightbox(fotos, {inicio = 0, editar, descargar} = {}){
-  let i = inicio, descargando = false;
+  let i = inicio;
   const origen = document.activeElement, n = fotos.length;
   const lb = document.createElement("div");
   lb.className = "lbx gal";
   lb.setAttribute("role","dialog"); lb.setAttribute("aria-modal","true"); lb.setAttribute("aria-label","Referencias");
   lb.innerHTML = `<button class="lbx-x lbx-close" type="button" aria-label="Cerrar">${I("x")}</button>
     ${editar ? `<button class="lbx-x lbx-ed" type="button" aria-label="Editar imagen" title="Editar imagen">${I("edit")}</button>` : ""}
-    ${descargar ? `<button class="lbx-x lbx-down" type="button" aria-label="Descargar foto" title="Descargar foto">${I("download")}</button>` : ""}
-    <div class="lbvp"><div class="lbtrack">${fotos.map(({src}, k) => `<div class="lbs"><img src="${esc(src)}" alt="Referencia ${k + 1}" draggable="false"></div>`).join("")}</div></div>
+    <div class="lbvp"><div class="lbtrack">${fotos.map(({src}, k) => `<div class="lbs"><div class="lb-foto"><img src="${esc(src)}" alt="Referencia ${k + 1}" draggable="false"></div></div>`).join("")}</div></div>
     ${n > 1 ? `<button class="lbx-x lbx-nav lbx-prev" type="button" aria-label="Foto anterior">${I("back")}</button><button class="lbx-x lbx-nav lbx-next" type="button" aria-label="Foto siguiente">${I("chev")}</button>
       <div class="lbdots" aria-hidden="true">${fotos.map(() => "<b></b>").join("")}</div>` : ""}
     <div class="lbindicador" role="status"></div>`;
   overlay(lb);
   const cerrar = lb.close;
   lb.close = (...a) => { cerrar(...a); origen?.focus(); };
-  const tr = lb.querySelector(".lbtrack"), previa = lb.querySelector(".lbx-prev"), siguiente = lb.querySelector(".lbx-next"), descarga = lb.querySelector(".lbx-down");
-  lb.querySelector(".lbx-close").onclick = () => lb.close();
-  if (editar) lb.querySelector(".lbx-ed").onclick = () => { const foto = fotos[i]; lb.close(); setTimeout(() => editar(foto), 140); };
-  if (descarga) descarga.onclick = async () => {
-    if (descargando) return;
-    descargando = true; descarga.disabled = true; descarga.setAttribute("aria-busy","true");
-    try { await descargar(fotos[i]); }
-    catch { toast("No se pudo descargar la foto. Inténtalo de nuevo.", true); }
-    finally {
-      descargando = false;
-      descarga.disabled = false;
-      descarga.removeAttribute("aria-busy");
-      if (lb.isConnected && document.activeElement === document.body) descarga.focus();
-    }
-  };
+  const tr = $(".lbtrack",lb), previa = $(".lbx-prev",lb), siguiente = $(".lbx-next",lb);
+  const slides = [...tr.querySelectorAll(".lbs")], marcos = slides.map(s => $(".lb-foto",s));
+  for (const marco of marcos) {
+    const foto = $("img",marco);
+    const ajustar = () => {
+      if (!foto.naturalWidth || !foto.naturalHeight) return;
+      marco.style.setProperty("--proporcion",foto.naturalWidth / foto.naturalHeight);
+      marco.setAttribute("data-lista","");
+    };
+    foto.addEventListener("load",ajustar,{once:true});
+    if (foto.complete) ajustar();
+  }
+  const descarga = descargar ? document.createElement("button") : null;
+  $(".lbx-close",lb).onclick = () => lb.close();
+  if (editar) $(".lbx-ed",lb).onclick = () => { const foto = fotos[i]; lb.close(); setTimeout(() => editar(foto), 140); };
+  if (descarga) {
+    descarga.className = "descarga-foto lbx-down";
+    descarga.type = "button";
+    descarga.title = "Descargar foto";
+    descarga.setAttribute("aria-label","Descargar foto");
+    descarga.innerHTML = I("download");
+    descarga.onclick = () => descargarFotoConEstado(descarga,() => descargar(fotos[i]));
+  }
   const pos = (dx, t) => {
     tr.style.transition = t && !MENOS_MOV ? `transform ${t}s cubic-bezier(.22,.9,.3,1)` : "none";
     tr.style.transform = `translate3d(calc(${-i * 100}% + ${dx}px),0,0)`;
@@ -2861,7 +2877,12 @@ function lightbox(fotos, {inicio = 0, editar, descargar} = {}){
     i = Math.max(0, Math.min(n - 1, k));
     pos(0, t);
     lb.querySelectorAll(".lbdots b").forEach((b, j) => b.classList.toggle("on", j === i));
-    tr.querySelectorAll(".lbs").forEach((s, j) => s.setAttribute("aria-hidden", String(j !== i)));
+    slides.forEach((s, j) => s.setAttribute("aria-hidden", String(j !== i)));
+    if (descarga && descarga.parentElement !== marcos[i]) {
+      const teniaFoco = document.activeElement === descarga;
+      marcos[i].append(descarga);
+      if (teniaFoco) descarga.focus({preventScroll:true});
+    }
     lb.querySelector(".lbindicador").textContent = `Foto ${i + 1} de ${n}`;
     if (previa) previa.disabled = i === 0;
     if (siguiente) siguiente.disabled = i === n - 1;
@@ -3957,17 +3978,16 @@ function modeloExportable(p){
   const totalDisponible = items.length > 0 && items.every(i => tienePrecio(i) && cantidad(i.cant) !== null);
   const abonoDisponible = p.pagoVersion === 2 ? Number.isSafeInteger(p.abonoMenor)
     : typeof p.abono === "number" ? Number.isFinite(p.abono) : centavos(p.abono) !== null;
-  return {codigo:p.codigo,tipo:TIPOS[p.tipo]?.label,nota:p.nota,datos:[
+  return {codigo:p.codigo,nota:p.nota,datos:[
     ["Creación",fecha(p.creadoEn)],["Entrega",p.fechaEntrega && Number.isFinite(Date.parse(p.fechaEntrega)) ? fmtDate(p.fechaEntrega) : p.fechaEntrega],["Cliente",p.cliente?.nombre],
-    ["Teléfono",p.cliente?.telefono],["Tema",p.tema],["Servicio",servsDe(p).join(", ")],["Etiqueta",p.etiqueta],
-    ["Prenda a cargo de",({cliente:"Cliente",tienda:"Tienda"})[p.prendaDe]],["Estado",p.estado ? estadoPedido(p) || p.estado : ""],
-    ["Urgente",typeof p.urgente === "boolean" ? (p.urgente ? "Sí" : "No") : ""]
+    ["Tema",p.tema],["Servicio",servsDe(p).join(", ")],["Etiqueta",p.etiqueta],
+    ["Prenda a cargo de",({cliente:"Cliente",tienda:"Tienda"})[p.prendaDe]]
   ], prendas:items.map(i => [
     i.prenda,i.horma,i.talla,i.color,cantidad(i.cant),i.nombre,i.numero,i.etiqueta,
     tienePrecio(i) ? importe(precioUnitario(p,i) / 100) : "",
     tienePrecio(i) && cantidad(i.cant) !== null ? importe(importeLinea(p,i)) : ""
   ]),pago:[
-    ["Moneda",moneda],["Total",totalDisponible ? importe(calculado.total) : ""],
+    ["Total",totalDisponible ? importe(calculado.total) : ""],
     ["Abono",abonoDisponible ? importe(calculado.abono) : ""],
     ["Saldo",totalDisponible && abonoDisponible ? importe(calculado.saldo) : ""],["Motivo sin abono",p.motivoSinAbono]
   ],seguimiento:[
@@ -3985,21 +4005,39 @@ function exigirPedidoVisible(id, uid){
     throw new Error("El pedido ya no está disponible");
   return S.pedidos[id];
 }
+async function prepararArchivoReferencia(codigo, idFoto, indice, {archivoReferencia,codigoParaArchivo}) {
+  const foto = await leerFoto(doc(S.db,"fotos",idFoto));
+  const archivo = archivoReferencia(foto.data()?.data,indice);
+  return {...archivo,nombre:`${codigoParaArchivo(codigo)}-${archivo.nombre}`};
+}
 async function descargarReferenciaPedido(id, uid, {idFoto, indice}){
   const p = exigirPedidoVisible(id, uid);
   if (!(p.imagenes || []).includes(idFoto)) throw new Error("La referencia cambió");
-  const {archivoReferencia,codigoParaArchivo,descargarArchivo} = await import("./pedido-export.mjs");
-  const foto = await leerFoto(doc(S.db,"fotos",idFoto));
+  const exportador = await import("./pedido-export.mjs");
+  const archivo = await prepararArchivoReferencia(p.codigo,idFoto,indice,exportador);
   if (!(exigirPedidoVisible(id, uid).imagenes || []).includes(idFoto)) throw new Error("La referencia cambió");
-  const archivo = archivoReferencia(foto.data()?.data, indice);
-  descargarArchivo({...archivo,nombre:`${codigoParaArchivo(p.codigo)}-${archivo.nombre}`});
+  exportador.descargarArchivo(archivo);
+}
+async function descargarFotoConEstado(boton, descargar) {
+  if (boton.disabled) return;
+  boton.disabled = true;
+  boton.setAttribute("aria-busy","true");
+  try { await descargar(); }
+  catch { toast("No se pudo descargar la foto. Inténtalo de nuevo.",true); }
+  finally {
+    boton.disabled = false;
+    boton.removeAttribute("aria-busy");
+    if (boton.isConnected && document.activeElement === document.body) boton.focus({preventScroll:true});
+  }
 }
 async function descargarPedido(id, uid, boton, estado){
+  if (boton.disabled) return;
   boton.disabled = true;
   const etiqueta = $("span",boton);
   etiqueta.textContent = "Preparando…";
   boton.setAttribute("aria-busy","true");
-  estado.textContent = "Preparando descarga…";
+  estado.classList.remove("bad");
+  estado.textContent = "Preparando resumen y referencias…";
   try {
     let pedido = exigirPedidoVisible(id, uid);
     if (S.online) {
@@ -4007,14 +4045,32 @@ async function descargarPedido(id, uid, boton, estado){
       catch(e) { if (e.code !== "unavailable") throw e; }
     }
     if (!pedido) throw new Error("El pedido no está disponible");
-    const {archivoResumenPng,descargarArchivo} = await import("./pedido-export.mjs");
-    const archivo = await archivoResumenPng(modeloExportable(pedido));
-    exigirPedidoVisible(id, uid);
-    descargarArchivo(archivo);
-    estado.textContent = "";
+    const exportador = await import("./pedido-export.mjs");
+    const ids = pedido.imagenes || [];
+    const [resumen,...referencias] = await Promise.allSettled([
+      exportador.archivoResumenPng(modeloExportable(pedido)),
+      ...ids.map((idFoto,i) => prepararArchivoReferencia(pedido.codigo,idFoto,i,exportador))
+    ]);
+    const actual = exigirPedidoVisible(id,uid);
+    if (!boton.isConnected) return;
+    const solicitar = resultado => {
+      if (resultado.status !== "fulfilled") return false;
+      try { exportador.descargarArchivo(resultado.value); return true; }
+      catch { return false; }
+    };
+    const resumenSolicitado = solicitar(resumen);
+    const faltan = referencias.flatMap((r,i) => (actual.imagenes || []).includes(ids[i]) && solicitar(r) ? [] : [String(i + 1).padStart(2,"0")]);
+    const mensajes = [];
+    if (!resumenSolicitado) mensajes.push("No se pudo preparar o solicitar el resumen PNG.");
+    if (faltan.length) mensajes.push(`No se pudieron descargar las referencias ${faltan.join(", ")}.`);
+    if (Number(resumenSolicitado) + referencias.length - faltan.length > 1) {
+      mensajes.push("Si Chrome pregunta por las descargas múltiples, elige Permitir. Si faltan archivos, habilita Descargas automáticas en la configuración del sitio y vuelve a pulsar Descargar, o usa el icono de cada foto.");
+    }
+    estado.classList.toggle("bad",!resumenSolicitado || faltan.length > 0);
+    estado.textContent = mensajes.join("\n");
   } catch {
-    estado.textContent = "No se pudo descargar el resumen del pedido.";
-    toast(estado.textContent,true);
+    estado.classList.add("bad");
+    estado.textContent = "No se pudieron preparar las descargas de este pedido.";
   } finally {
     boton.disabled = false;
     etiqueta.textContent = "Descargar";
@@ -4065,7 +4121,7 @@ function openDetail(id){
         ${t.saldo < 0 ? `<p class="msg warn">El abono supera el total.</p>` : ""}
         ${p.motivoSinAbono ? `<p class="pdmut"><b>Sin abono:</b> ${esc(p.motivoSinAbono)}</p>` : ""}
       </div>
-      ${(p.imagenes || []).length ? `<div class="pdcard"><div class="pdlbl">REFERENCIAS</div><div class="imgs">${p.imagenes.map((im, k) => `<div class="imgbox"><button type="button" class="ref-btn" aria-label="Abrir referencia ${k + 1}"><img data-foto="${esc(im)}" alt=""></button></div>`).join("")}</div></div>` : ""}
+      ${(p.imagenes || []).length ? `<div class="pdcard"><div class="pdlbl">REFERENCIAS</div><div class="imgs">${p.imagenes.map((im, k) => `<div class="imgbox"><button type="button" class="ref-btn" aria-label="Abrir referencia ${k + 1}"><img data-foto="${esc(im)}" alt=""></button><button type="button" class="descarga-foto" data-descargar-ref="${k}" aria-label="Descargar referencia ${k + 1}" title="Descargar referencia ${k + 1}">${I("download")}</button></div>`).join("")}</div></div>` : ""}
       ${p.nota ? `<div class="pdcard"><div class="pdlbl">NOTA</div><div class="pdnote">${esc(p.nota)}</div></div>` : ""}
       <p class="hist pdhist">Registrado: ${fmtDT(p.creadoEn)} por ${esc(nameOf(p.creadoPor))}${p.editadoEn ? `<br>Última edición: ${fmtDT(p.editadoEn)} por ${esc(nameOf(p.editadoPor))}` : ""}${p.listoEn ? `<br>Completado: ${fmtDT(p.listoEn)}` : ""}${p.avisadoEn ? `<br>Cliente avisado: ${fmtDT(p.avisadoEn)}` : ""}${p.entregadoEn ? `<br>Entregado: ${fmtDT(p.entregadoEn)}` : ""}${(p.asignados || []).length ? `<br>Visible solo para: ${esc(p.asignados.map(nameOf).join(", "))}` : ""}${(p.denegados || []).length ? `<br><span class="pdlock">${I("lock")}Acceso restringido para: ${esc(p.denegados.map(nameOf).join(", "))}</span>` : ""}</p>
     </div>
@@ -4076,12 +4132,16 @@ function openDetail(id){
         <button class="btn" id="d-edit">${I("edit")}Editar</button>
         <button class="btn" id="d-download" type="button">${I("download")}<span>Descargar</span></button>
       </div>
-      <span class="lbindicador" id="d-download-status" role="status"></span>
+      <span class="msg" id="d-download-status" role="status"></span>
       ${est === "pendiente" ? `<button class="btn pdlisto" id="d-listo">${I("check")}Marcar pedido listo</button>` : ""}
       ${est === "listo" ? `<div class="dgrid">${p.avisado ? `<a class="btn wa big" id="d-rec" href="${esc(waLink(p, cfg().plantillaRetiro))}" target="_blank" rel="noopener">${I("msg")}Recordar</a>` : `<a class="btn wa big" id="d-wa" href="${esc(waLink(p))}" target="_blank" rel="noopener">${I("msg")}Avisar al cliente</a>`}<button class="btn listo" id="d-ent">${I("box")}Entregado</button></div>` : ""}
     </div>`, "pdmd");
   loadFotos(ov);
   const uid = S.uid, referencias = [...ov.querySelectorAll(".ref-btn")];
+  for (const boton of ov.querySelectorAll("[data-descargar-ref]")) {
+    const indice = Number(boton.dataset.descargarRef), idFoto = p.imagenes[indice];
+    boton.onclick = () => descargarFotoConEstado(boton,() => descargarReferenciaPedido(id,uid,{idFoto,indice}));
+  }
   let abriendoReferencias = false;
   referencias.forEach(b => b.onclick = async () => {
     if (abriendoReferencias) return;

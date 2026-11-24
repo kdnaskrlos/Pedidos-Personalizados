@@ -30,11 +30,8 @@ const ancho = 960;
 const margen = 48;
 const interior = ancho - margen * 2;
 const fuente = "system-ui, sans-serif";
-const azul = "#14233a";
 const tinta = "#192a40";
 const suave = "#4c6078";
-const acento = "#ffb379";
-const columnasPrenda = ["Prenda","Horma","Talla","Color","Cantidad","Nombre","Número","Etiqueta","Precio unitario","Subtotal"];
 const disponible = valor => valor !== undefined && valor !== null && String(valor).trim() !== "";
 
 function partirTexto(ctx, valor, limite) {
@@ -62,13 +59,19 @@ function partirTexto(ctx, valor, limite) {
 
 function dibujarResumen(ctx, resumen) {
   ctx.textBaseline = "top";
-  const escribir = (valor, x, y, limite, {px = 22, peso = 600, color = tinta, paso = px + 8} = {}) => {
-    ctx.font = `${peso} ${px}px ${fuente}`;
-    ctx.fillStyle = color;
+  const medir = (valor, limite, {px = 22, peso = 600, paso = px + 8} = {}) => {
+    const font = `${peso} ${px}px ${fuente}`;
+    ctx.font = font;
     const lineas = partirTexto(ctx,valor,limite);
-    lineas.forEach((s,i) => ctx.fillText(s,x,y + i * paso));
-    return paso * lineas.length;
+    return {font,lineas,paso,alto:paso * lineas.length};
   };
+  const trazar = (texto, x, y, {color = tinta, alineado = "left"} = {}) => {
+    ctx.font = texto.font;
+    ctx.fillStyle = color;
+    ctx.textAlign = alineado;
+    texto.lineas.forEach((s,i) => ctx.fillText(s,x,y + i * texto.paso));
+  };
+  const escribir = (valor, x, y, limite, estilo) => trazar(medir(valor,limite,estilo),x,y,estilo);
   const caja = (x, y, w, h, color, radio = 18) => {
     ctx.fillStyle = color;
     ctx.beginPath();
@@ -100,35 +103,51 @@ function dibujarResumen(ctx, resumen) {
     return y + 44;
   };
 
-  const franja = ctx.createLinearGradient(0,0,ancho,0);
-  franja.addColorStop(0,azul);
-  franja.addColorStop(1,"#29496a");
-  const codigo = resumen.codigo || "Pedido";
-  ctx.font = `800 49px ${fuente}`;
-  const altoCodigo = partirTexto(ctx,codigo,interior - 64).length * 57;
-  ctx.font = `600 22px ${fuente}`;
-  const altoTipo = disponible(resumen.tipo) ? partirTexto(ctx,resumen.tipo,interior - 64).length * 30 : 0;
-  const altoFranja = Math.max(174,110 + altoCodigo + altoTipo);
-  caja(margen,36,interior,altoFranja,franja,24);
-  caja(margen + 32,68,48,5,acento,3);
-  escribir("RESUMEN DEL PEDIDO",margen + 32,86,interior - 64,{px:18,peso:800,color:acento});
-  escribir(codigo,margen + 32,114,interior - 64,{px:49,peso:800,color:"#fff"});
-  if (disponible(resumen.tipo))
-    escribir(resumen.tipo,margen + 34,120 + altoCodigo,interior - 64,{px:22,color:"#e1edf9"});
-
-  let y = 66 + altoFranja;
+  let y = 40;
   const datos = activos(resumen.datos);
-  if (datos.length) y = campos(datos,margen,encabezado("Datos del pedido",y),interior,2,{fondo:"#fff"}) + 18;
+  if (datos.length) y = campos(datos,margen,encabezado("Datos del pedido",y),interior,2,{fondo:"#fff"}) + 24;
 
   if (resumen.prendas.length) {
     y = encabezado("Prendas",y);
     for (const [indice, prenda] of resumen.prendas.entries()) {
-      const altoTitulo = escribir(disponible(prenda[0]) ? `${indice + 1}. ${prenda[0]}` : `Partida ${indice + 1}`,
-        margen + 14,y + 7,interior - 28,{px:22,peso:800});
-      const pares = activos(columnasPrenda.slice(1).map((col,i) => [col,prenda[i + 1]]));
-      y = campos(pares,margen,y + altoTitulo + 12,interior,3,{fondo:"#fff"}) + 12;
+      const [nombre,horma,talla,color,cantidad,personalizado,numero,etiqueta,unitario,subtotal] = prenda;
+      const montos = activos([["Precio unitario",unitario],["Subtotal",subtotal]]);
+      const anchoImporte = 140, separacion = 8, pad = 16;
+      const anchoDatos = interior - 2 * pad - montos.length * (anchoImporte + separacion);
+      const unir = pares => activos(pares).map(([clave,valor]) => `${clave}: ${valor}`).join(" · ");
+      const titulo = nombre ? `${indice + 1}. ${nombre}` : `Partida ${indice + 1}`;
+      const principal = unir([["Cantidad",cantidad],["Talla",talla],["Horma",horma],["Color",color]]);
+      const secundario = unir([["Nombre",personalizado],["Número",numero],["Etiqueta",etiqueta]]);
+      const filas = [
+        medir(titulo,anchoDatos,{px:23,peso:800}),
+        ...(principal ? [medir(principal,anchoDatos,{px:18,peso:700})] : []),
+        ...(secundario ? [medir(secundario,anchoDatos,{px:16,peso:500})] : [])
+      ];
+      const importes = montos.map(([clave,valor]) => {
+        const destacado = clave === "Subtotal";
+        return {destacado, rotulo:medir(clave,anchoImporte - 24,{px:14,peso:700}),
+          valor:medir(valor,anchoImporte - 24,{px:destacado ? 21 : 19,peso:700})};
+      });
+      const alto = Math.max(filas.reduce((total,f) => total + f.alto,0) + 24,
+        ...importes.map(({rotulo,valor}) => rotulo.alto + valor.alto + 32));
+      caja(margen,y,interior,alto,"#fff",12);
+
+      let filaY = y + 12;
+      filas.forEach((f,i) => {
+        trazar(f,margen + pad,filaY,{color:i === 0 ? tinta : suave});
+        filaY += f.alto;
+      });
+      importes.forEach(({destacado,rotulo,valor},i) => {
+        const x = margen + interior - pad - (importes.length - i) * (anchoImporte + separacion) + separacion;
+        const altoImporte = rotulo.alto + valor.alto + 16;
+        const top = y + (alto - altoImporte) / 2;
+        if (destacado) caja(x,top,anchoImporte,altoImporte,"#e7eff8",10);
+        trazar(rotulo,x + anchoImporte - 12,top + 8,{color:suave,alineado:"right"});
+        trazar(valor,x + anchoImporte - 12,top + 8 + rotulo.alto,{alineado:"right"});
+      });
+      y += alto + 8;
     }
-    y += 10;
+    y += 16;
   }
 
   const pago = activos(resumen.pago);
