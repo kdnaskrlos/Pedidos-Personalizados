@@ -8,10 +8,10 @@ export function fechasDelMes(anio, mes) {
   });
 }
 
-export function entregasPorFecha(pedidos) {
+export function entregasPorFecha(pedidos, tipo) {
   const entregas = new Map();
   for (const pedido of pedidos) {
-    if (!pedido.fechaEntrega) continue;
+    if (!pedido.fechaEntrega || (tipo && pedido.tipo !== tipo)) continue;
     const dia = entregas.get(pedido.fechaEntrega) || [];
     dia.push(pedido);
     entregas.set(pedido.fechaEntrega, dia);

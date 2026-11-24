@@ -59,6 +59,15 @@ const tinta = "#192a40";
 const suave = "#4c6078";
 const disponible = valor => valor !== undefined && valor !== null && String(valor).trim() !== "";
 
+const palabras = texto => String(texto).normalize("NFD").replace(/\p{M}/gu,"")
+  .toLocaleLowerCase("es").replace(/[^\p{L}\p{N}]+/gu," ").trim();
+
+function nombrePrenda(nombre, color) {
+  const base = nombre || "Prenda";
+  if (!disponible(color) || ` ${palabras(base)} `.includes(` ${palabras(color)} `)) return base;
+  return `${base} ${String(color).toLocaleLowerCase("es")}`;
+}
+
 function partirTexto(ctx, valor, limite) {
   const lineas = [];
   for (const parrafo of String(valor).split(/\r?\n/)) {
@@ -132,34 +141,39 @@ function dibujarResumen(ctx, resumen) {
   }
 
   if (resumen.prendas.length) {
-    for (const [indice, prenda] of resumen.prendas.entries()) {
+    for (const prenda of resumen.prendas) {
       const [nombre,horma,talla,color,cantidad,personalizado,numero,etiqueta,unitario,subtotal] = prenda;
       const montos = activos([["Precio unitario",unitario],["Subtotal",subtotal]]);
       const anchoImporte = 152, separacion = 8, pad = 16;
-      const anchoDatos = interior - 2 * pad - montos.length * (anchoImporte + separacion);
-      const unir = pares => activos(pares).map(([clave,valor]) => `${clave}: ${valor}`).join(" · ");
-      const titulo = nombre ? `${indice + 1}. ${nombre}` : `Partida ${indice + 1}`;
-      const principal = unir([["Cantidad",cantidad],["Talla",talla],["Horma",horma],["Color",color]]);
-      const secundario = unir([["Nombre",personalizado],["Número",numero],["Etiqueta",etiqueta]]);
-      const filas = [
-        medir(titulo,anchoDatos,{px:23,peso:800}),
-        ...(principal ? [medir(principal,anchoDatos,{px:18,peso:700})] : []),
-        ...(secundario ? [medir(secundario,anchoDatos,{px:16,peso:500})] : [])
-      ];
+      const ladoCantidad = 52, gap = 12;
+      const tieneCantidad = disponible(cantidad);
+      const desplazamiento = tieneCantidad ? ladoCantidad + gap : 0;
+      const anchoDatos = interior - 2 * pad - montos.length * (anchoImporte + separacion) - desplazamiento;
+      const titulo = medir(nombrePrenda(nombre,color),anchoDatos,{px:23,peso:800});
+      const atributos = [disponible(talla) && `Talla ${talla}`,horma,etiqueta,personalizado,disponible(numero) && `N° ${numero}`]
+        .filter(v => v !== false && disponible(v)).join(" · ");
+      const detalle = atributos ? medir(atributos,anchoDatos,{px:16,peso:500}) : null;
+      const altoTexto = titulo.alto + (detalle?.alto || 0);
       const importes = montos.map(([clave,valor]) => {
         const destacado = clave === "Subtotal";
         return {destacado, rotulo:medir(clave,anchoImporte - 24,{px:14,peso:700}),
           valor:medir(valor,anchoImporte - 24,{px:destacado ? 21 : 19,peso:700})};
       });
-      const alto = Math.max(filas.reduce((total,f) => total + f.alto,0) + 24,
+      const alto = Math.max(altoTexto + 24,tieneCantidad ? ladoCantidad + 24 : 0,
         ...importes.map(({rotulo,valor}) => rotulo.alto + valor.alto + 32));
       caja(margen,y,interior,alto,"#fff",12);
 
-      let filaY = y + 12;
-      filas.forEach((f,i) => {
-        trazar(f,margen + pad,filaY,{color:i === 0 ? tinta : suave});
-        filaY += f.alto;
-      });
+      if (tieneCantidad) {
+        const x = margen + pad, top = y + (alto - ladoCantidad) / 2;
+        caja(x,top,ladoCantidad,ladoCantidad,"#f0f2f5",8);
+        ctx.font = `800 28px ${fuente}`;
+        const px = Math.min(28, 28 * (ladoCantidad - 8) / ctx.measureText(String(cantidad)).width);
+        escribir(cantidad,x + ladoCantidad / 2,top + (ladoCantidad - px) / 2,ladoCantidad - 4,
+          {px,peso:800,alineado:"center"});
+      }
+      const textoX = margen + pad + desplazamiento, textoY = y + (alto - altoTexto) / 2;
+      trazar(titulo,textoX,textoY);
+      if (detalle) trazar(detalle,textoX,textoY + titulo.alto,{color:suave});
       importes.forEach(({destacado,rotulo,valor},i) => {
         const x = margen + interior - pad - (importes.length - i) * (anchoImporte + separacion) + separacion;
         const altoImporte = rotulo.alto + valor.alto + 16;
