@@ -3,8 +3,8 @@ import { readFile } from "node:fs/promises";
 import { test } from "node:test";
 import { fechasDelMes, entregasPorFecha } from "../calendario.mjs";
 import { esHeif } from "../heic.mjs";
-import { archivoPedido, archivoReferencia } from "../pedido-export.mjs";
-import { unzipSync } from "../vendor/fflate.mjs";
+import { archivoReferencia, codigoParaArchivo } from "../pedido-export.mjs";
+import { enlaceChatCliente } from "../whatsapp.mjs";
 
 test("calendario bisiesto y agrupación de las entregas recibidas", () => {
   const febrero = fechasDelMes(2028,1);
@@ -36,22 +36,19 @@ test("HEIC por MIME o extensión y decodificación local de EXIF real", async ()
   }
 });
 
-test("ZIP local conserva las fotos, escapa el resumen y omite los datos desconocidos", () => {
+test("las referencias conservan sus bytes y se generan nombres seguros", () => {
   const bytes = Uint8Array.of(255,216,255,217);
   const foto = archivoReferencia("data:image/jpeg;base64," + Buffer.from(bytes).toString("base64"),0);
   assert.throws(() => archivoReferencia("data:image/svg+xml;base64,PHN2Zz4=",0));
-  const zip = archivoPedido({
-    codigo:"../S-0011 <script>",tipo:"Sublimación",datos:[["Cliente","<script>"],["Fecha",""]],
-    prendas:[["Franela",null,"M"]], pago:[["Saldo",0]],seguimiento:[],nota:"línea 1\nlínea 2"
-  },[foto]);
-  assert.equal(zip.nombre,"pedido-S-0011-script.zip");
-  const entradas = unzipSync(zip.datos);
-  assert.deepEqual(Object.keys(entradas),["resumen-pedido-S-0011-script.html","imagenes/referencia-01.jpg"]);
-  assert.deepEqual(entradas["imagenes/referencia-01.jpg"],bytes);
-  const resumen = Buffer.from(entradas["resumen-pedido-S-0011-script.html"]).toString();
-  assert.match(resumen,/&lt;script&gt;/);
-  assert.match(resumen,/Saldo<\/dt><dd>0/);
-  assert.match(resumen,/href="imagenes\/referencia-01.jpg"/);
-  assert.match(resumen,/@media print/);
-  assert.doesNotMatch(resumen,/<script>|<img|data:image|>Horma<|>Fecha</);
+  assert.equal(foto.nombre,"referencia-01.jpg");
+  assert.deepEqual(foto.datos,bytes);
+  assert.equal(codigoParaArchivo("../S-0011 <script>"),"S-0011-script");
+});
+
+test("WhatsApp usa E.164, enlace web directo en escritorio y wa.me en móvil", () => {
+  assert.equal(enlaceChatCliente("+12025550142",true),"https://web.whatsapp.com/send/?phone=12025550142");
+  assert.equal(enlaceChatCliente("12025550142",false),"https://wa.me/12025550142");
+  assert.ok(enlaceChatCliente("123456789012345",true));
+  for (const invalido of [null,"","04120000000","12","1234567890123456","1 202 555 0142","12025550142?x=1","javascript:1"])
+    assert.equal(enlaceChatCliente(invalido,true),"");
 });

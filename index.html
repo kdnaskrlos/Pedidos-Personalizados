@@ -982,7 +982,7 @@ html,body{overscroll-behavior-y:none}
 .rfb:active{color:var(--accent)}
 .rfb.gira svg{animation:sp .7s linear infinite;color:var(--accent)}
 /* v3.39 tarjeta de sublimación en 2 columnas y N° en gris tenue como "Nombre" */
-.irow3.sub .r1{grid-template-columns:repeat(2,minmax(0,1fr))}
+.irow3.sub .r1,.irow3.sin-etiqueta .r1:first-child{grid-template-columns:repeat(2,minmax(0,1fr))}
 .irow3 .r3 .nu:not(.on){color:color-mix(in srgb,var(--muted) 45%,transparent)}
 /* v3.40 campo de cantidad con fondo blanco */
 .irow3 .qty .qin{background:var(--surface)}
@@ -1170,6 +1170,7 @@ html,body{overflow-x:clip}
 import { firebaseConfig } from "./config.js";
 import { entregasPorFecha, fechasDelMes } from "./calendario.mjs";
 import { esHeif, cargarHeif, FORMATOS_FOTO } from "./heic.mjs";
+import { enlaceChatCliente } from "./whatsapp.mjs";
 import { consecutivoDe, documentosFoto, registrarPedido } from "./pedidos-sync.mjs";
 import { guardarPendiente, leerPendientes, borrarPendiente, guardarFotoLocal, leerFotoLocal, borrarFotoLocal } from "./cola-local.mjs";
 import { MAX_PARTIDAS, centavos, centavosHistoricos, cantidad, clavePrecio, precioHistorico, valorPrecioHistorico, validarPago, validarPagoEnCentavos, actualizarPagoPendiente } from "./pagos.mjs";
@@ -2775,6 +2776,10 @@ function guardarBorrador(){
   if (!F || !F._nuevo) return;
   const x = {};
   for (const k of Object.keys(F)) if (!k.startsWith("_") && k !== "visto") x[k] = F[k];
+  if (!mostrarEtiqueta(F)) {
+    x.etiqueta = "";
+    x.items = F.items.map(i => ({...i,etiqueta:""}));
+  }
   x.imagenes = (F.imagenes || []).flatMap(im => {
     const i = im.id ? im : im.anterior;
     if (!i?.id) return [];
@@ -3169,6 +3174,7 @@ function openForm(id, tipo, cliente, borrador){
   if (!orig) F.envioId ||= crypto.randomUUID();
   F.abono = orig?.pagoVersion === 2 ? String(orig.abonoMenor / 100) : (F.abono ?? "");
   F.items = (F.items || []).map(i => Object.assign({etiqueta:F.etiqueta || "", cant:1}, i));
+  quitarEtiquetasNoAplicables(F);
   F.imagenes = (F.imagenes || []).map(im => typeof im === "string" ? {id:im} : {...im, subiendo:true});
   F.servicios = servsDe(F);
   const prBorr = borrador && !orig && borrador.pr ? Object.assign({}, borrador.pr) : null;
@@ -3325,7 +3331,14 @@ function openForm(id, tipo, cliente, borrador){
     const b = e.target.closest("[data-servicio],[data-prendade],[data-urg],[data-deny]"); if (!b) return;
     const d = b.dataset, single = () => b.parentNode.querySelectorAll(".opt").forEach(x => x.setAttribute("aria-pressed", x === b));
     if (d.servicio !== undefined) { const k = F.servicios.indexOf(d.servicio); k >= 0 ? F.servicios.splice(k, 1) : F.servicios.push(d.servicio); F.servicios.sort((a, b) => c.cat.servicios.indexOf(a) - c.cat.servicios.indexOf(b)); F.servicio = F.servicios.join(", "); b.setAttribute("aria-pressed", k < 0); clearErr("f-servicio"); }
-    if (d.prendade !== undefined) { F.prendaDe = d.prendade; single(); clearErr("f-prendade"); }
+    if (d.prendade !== undefined) {
+      F.prendaDe = d.prendade;
+      quitarEtiquetasNoAplicables(F);
+      single();
+      clearErr("f-prendade");
+      renderItems();
+      guardarBorrador();
+    }
     if (d.urg !== undefined) { F.urgente = d.urg === "1"; single(); }
     if (d.deny !== undefined) { const i = F.denegados.indexOf(d.deny); i >= 0 ? F.denegados.splice(i, 1) : F.denegados.push(d.deny); b.setAttribute("aria-pressed", i < 0); }
   });
@@ -3462,8 +3475,19 @@ function pickPopup({title, kind, options, sections, current, otro, onPick}){
 
 /* ---- Lista del pedido: cada fila con botones que abren la ventana de opciones ---- */
 const blankItem = prev => ({etiqueta: prev ? prev.etiqueta : "", prenda: prev ? prev.prenda : "", color: prev ? prev.color : "", horma: prev ? prev.horma : "", talla:"", cant:1, nombre:"", numero:""});
-const reqItem = () => F && F.tipo === "sublimacion" ? ["prenda", "talla", "horma"] : ["etiqueta", "prenda", "color", "talla", "horma"];
-const itemVacio = i => !i.etiqueta && !i.prenda && !i.color && !i.talla && !i.nombre;
+const mostrarEtiqueta = form => form.tipo === "personalizado" && form.prendaDe === "tienda";
+function quitarEtiquetasNoAplicables(form) {
+  if (mostrarEtiqueta(form)) return;
+  form.etiqueta = "";
+  for (const prenda of form.items) prenda.etiqueta = "";
+}
+const reqItem = () => {
+  if (F.tipo === "sublimacion") return ["prenda","talla","horma"];
+  const campos = ["prenda","color","talla","horma"];
+  if (mostrarEtiqueta(F)) campos.unshift("etiqueta");
+  return campos;
+};
+const itemVacio = i => (!mostrarEtiqueta(F) || !i.etiqueta) && !i.prenda && !i.color && !i.talla && !i.nombre;
 // Cambios en la lista de prendas con transición suave de altura (abrir, cerrar, compactar todas, agregar)
 function animarPrendas(cambio){
   const box = F._ov && $("#items", F._ov); if (!box) return cambio();
@@ -3505,11 +3529,11 @@ function renderItems(){
   const box = $("#items", ov), n = F.items.filter(i => !itemVacio(i)).reduce((s, i) => s + unidadesDe(i, F), 0);
   $("#itcount", ov).textContent = n ? `${n} pieza${n > 1 ? "s" : ""}` : "";
   const hexOf = name => (c.colores.find(x => x[0] === name) || [])[1] || "";
-  const isSub = F.tipo === "sublimacion";
+  const isSub = F.tipo === "sublimacion", conEtiqueta = mostrarEtiqueta(F);
   const pb = (f, val, ph, extra = "", off = false) => `<button type="button" class="pbtn ${val ? "on" : ""}${off ? " off" : ""}" ${off ? "disabled" : `data-pick="${f}"`} data-err="${f}">${extra}<span>${esc(val || ph)}</span></button>`;
   if (!F.items.length) {
     box.innerHTML = `<div class="iempty"><button type="button" class="addfirst" id="addItem">${I("plus")}Agregar prenda</button></div>`;
-  } else box.innerHTML = F.items.map((it, i) => swWrap(F.items.length > 3 && i !== F.iOpen ? itemMini(it, i, isSub) : isSub ? `<div class="irow3 sub${F.items.length > 3 ? " selc" : ""}" data-i="${i}">
+  } else box.innerHTML = F.items.map((it, i) => swWrap(F.items.length > 3 && i !== F.iOpen ? itemMini(it, i, isSub, conEtiqueta) : isSub ? `<div class="irow3 sub${F.items.length > 3 ? " selc" : ""}" data-i="${i}">
       <div class="r1">
         ${pb("prenda", it.prenda, "Prenda")}
         ${qtyHTML(it)}
@@ -3522,9 +3546,9 @@ function renderItems(){
         <input class="inp nm" data-fld="nombre" placeholder="Nombre" value="${esc(it.nombre || "")}">
         <button type="button" class="pbtn nu ${it.numero ? "on" : ""}" data-pick="numero"><span>${esc(it.numero ? "N° " + it.numero : "N°")}</span></button>
       </div>
-    </div>` : `<div class="irow3${F.items.length > 3 ? " selc" : ""}" data-i="${i}">
+    </div>` : `<div class="irow3${conEtiqueta ? "" : " sin-etiqueta"}${F.items.length > 3 ? " selc" : ""}" data-i="${i}">
       <div class="r1">
-        ${pb("etiqueta", isSub ? "" : it.etiqueta, "Etiqueta", "", isSub)}
+        ${conEtiqueta ? pb("etiqueta", it.etiqueta, "Etiqueta") : ""}
         ${pb("talla", it.talla, "Talla")}
         ${qtyHTML(it)}
       </div>
@@ -3547,7 +3571,7 @@ function renderItems(){
     const n = Number(row.dataset.i), it = F.items[n], t = e.target.closest("button"); if (!t) return;
     if (t.dataset.pick) return elegir(it, t.dataset.pick);
     if (t.dataset.q) { it.cant = Math.min(Number.MAX_SAFE_INTEGER, Math.max(1, (cantidad(it.cant) ?? 1) + Number(t.dataset.q))); renderItems(); renderTotals(); }
-    if (t.hasAttribute("data-del")) { const quitado = F.items[n]; quitarPrenda(n, row.closest(".iswipe") || row, false, () => toastUndo("Prenda eliminada", async () => { if (!F) return; animarPrendas(() => { F.items.splice(n, 0, quitado); renderItems(); }); renderTotals(); })); }
+    if (t.hasAttribute("data-del")) { const quitado = F.items[n]; quitarPrenda(n, row.closest(".iswipe") || row, false, () => toastUndo("Prenda eliminada", async () => { if (!F) return; if (!mostrarEtiqueta(F)) quitado.etiqueta = ""; animarPrendas(() => { F.items.splice(n, 0, quitado); renderItems(); }); renderTotals(); })); }
   };
   box.oninput = e => {
     const row = e.target.closest("[data-i]"); if (!row) return;
@@ -3595,16 +3619,16 @@ function deslizarBorrar(box){
     if (borrar) {
       r.style.transform = "translateX(-110%)";
       const n = Number(r.dataset.i), quitado = F.items[n];
-      setTimeout(() => quitarPrenda(n, w, true, () => toastUndo("Prenda eliminada", async () => { if (!F) return; animarPrendas(() => { F.items.splice(n, 0, quitado); renderItems(); }); renderTotals(); })), 170);
+      setTimeout(() => quitarPrenda(n, w, true, () => toastUndo("Prenda eliminada", async () => { if (!F) return; if (!mostrarEtiqueta(F)) quitado.etiqueta = ""; animarPrendas(() => { F.items.splice(n, 0, quitado); renderItems(); }); renderTotals(); })), 170);
     } else { r.style.transform = ""; r.style.opacity = ""; r.classList.remove("borrar"); if (w) { w.classList.remove("armed"); setTimeout(() => w.classList.remove("on"), 220); } }
   };
   box.addEventListener("touchend", soltar); box.addEventListener("touchcancel", soltar);
 }
 // Prenda resumida en una línea (cuando hay más de 3); al tocarla se despliega
-function itemMini(it, i, isSub){
+function itemMini(it, i, isSub, conEtiqueta){
   const falta = !itemVacio(it) && reqItem().some(f => !it[f]);
   const a = [it.prenda, !isSub && it.color ? it.color.toLowerCase() : ""].filter(Boolean).join(" ");
-  const b = [it.talla, it.horma, !isSub ? it.etiqueta : ""].filter(Boolean).join(" · ");
+  const b = [it.talla, it.horma, conEtiqueta ? it.etiqueta : ""].filter(Boolean).join(" · ");
   const c = [it.nombre ? "Nombre: " + it.nombre : "", it.numero ? "N° " + it.numero : ""].filter(Boolean).join(" · ");
   return `<div class="irow3 mini${falta ? " bad" : ""}" data-i="${i}" data-abrir role="button" tabindex="0"><span class="mq num">${Number(it.cant) || 1}</span><span class="mt"><span class="m1">${esc(a || "Prenda sin completar")}${b ? ` <small>· ${esc(b)}</small>` : ""}</span>${c ? `<span class="m2">${esc(c)}</span>` : ""}</span>${I("chev")}</div>`;
 }
@@ -3818,11 +3842,12 @@ async function saveForm(ov, orig){
     return;
   }
   const tel = F._checkTel(), isP = F.tipo === "personalizado", pago = pagoDelFormulario();
+  const conEtiqueta = mostrarEtiqueta(F);
   const now = new Date().toISOString(), nombre = F.cliente.nombre.trim().replace(/\s+/g, " "), pr = perm();
   const data = {
     cliente:{nombre, telefono:tel.e164}, tema:(F.tema || "").trim(), servicio:isP ? F.servicios.join(", ") : "", servicios:isP ? [...F.servicios] : [], prendaDe:isP ? F.prendaDe : "tienda",
-    etiqueta:isP ? [...new Set(F.items.filter(i => !itemVacio(i)).map(i => i.etiqueta).filter(Boolean))].join(", ") : "",
-    items:F.items.filter(i => !itemVacio(i)).map(i => ({etiqueta:isP ? (i.etiqueta || "") : "", prenda:i.prenda, color:isP ? i.color : "Fullprint", horma:i.horma || "", talla:i.talla, cant:cantidad(i.cant), precioMenor:precioUnitario(F, i), nombre:(i.nombre || "").trim(), numero:(i.numero || "").trim()})),
+    etiqueta:conEtiqueta ? [...new Set(F.items.filter(i => !itemVacio(i)).map(i => i.etiqueta).filter(Boolean))].join(", ") : "",
+    items:F.items.filter(i => !itemVacio(i)).map(i => ({etiqueta:conEtiqueta ? (i.etiqueta || "") : "", prenda:i.prenda, color:isP ? i.color : "Fullprint", horma:i.horma || "", talla:i.talla, cant:cantidad(i.cant), precioMenor:precioUnitario(F, i), nombre:(i.nombre || "").trim(), numero:(i.numero || "").trim()})),
     fechaEntrega:F.fechaEntrega, moneda:F.moneda, pagoVersion:2, totalMenor:pago.total, abonoMenor:pago.abono,
     motivoSinAbono:pago.abono > 0 ? "" : (F.motivoSinAbono || "").trim(), urgente:!!F.urgente,
     imagenes:F.imagenes.filter(i => i.id && !i.error).map(i => i.id), nota:(F.nota || "").trim(),
@@ -3933,7 +3958,7 @@ function modeloExportable(p){
   const abonoDisponible = p.pagoVersion === 2 ? Number.isSafeInteger(p.abonoMenor)
     : typeof p.abono === "number" ? Number.isFinite(p.abono) : centavos(p.abono) !== null;
   return {codigo:p.codigo,tipo:TIPOS[p.tipo]?.label,nota:p.nota,datos:[
-    ["Creación",fecha(p.creadoEn)],["Entrega",p.fechaEntrega],["Cliente",p.cliente?.nombre],
+    ["Creación",fecha(p.creadoEn)],["Entrega",p.fechaEntrega && Number.isFinite(Date.parse(p.fechaEntrega)) ? fmtDate(p.fechaEntrega) : p.fechaEntrega],["Cliente",p.cliente?.nombre],
     ["Teléfono",p.cliente?.telefono],["Tema",p.tema],["Servicio",servsDe(p).join(", ")],["Etiqueta",p.etiqueta],
     ["Prenda a cargo de",({cliente:"Cliente",tienda:"Tienda"})[p.prendaDe]],["Estado",p.estado ? estadoPedido(p) || p.estado : ""],
     ["Urgente",typeof p.urgente === "boolean" ? (p.urgente ? "Sí" : "No") : ""]
@@ -3975,7 +4000,6 @@ async function descargarPedido(id, uid, boton, estado){
   etiqueta.textContent = "Preparando…";
   boton.setAttribute("aria-busy","true");
   estado.textContent = "Preparando descarga…";
-  let referencia = 0;
   try {
     let pedido = exigirPedidoVisible(id, uid);
     if (S.online) {
@@ -3983,25 +4007,19 @@ async function descargarPedido(id, uid, boton, estado){
       catch(e) { if (e.code !== "unavailable") throw e; }
     }
     if (!pedido) throw new Error("El pedido no está disponible");
-    const {archivoReferencia,archivoPedido,descargarArchivo} = await import("./pedido-export.mjs");
-    const archivos = [];
-    for (const [indice,idFoto] of (pedido.imagenes || []).entries()) {
-      referencia = indice + 1;
-      exigirPedidoVisible(id, uid);
-      const foto = await leerFoto(doc(S.db,"fotos",idFoto));
-      archivos.push(archivoReferencia(foto.data()?.data,indice));
-    }
-    referencia = 0;
+    const {archivoResumenPng,descargarArchivo} = await import("./pedido-export.mjs");
+    const archivo = await archivoResumenPng(modeloExportable(pedido));
     exigirPedidoVisible(id, uid);
-    descargarArchivo(archivoPedido(modeloExportable(pedido),archivos));
+    descargarArchivo(archivo);
     estado.textContent = "";
   } catch {
-    estado.textContent = referencia ? `No se pudo leer la referencia ${referencia}. Reintenta la descarga.` : "No se pudo descargar el pedido.";
+    estado.textContent = "No se pudo descargar el resumen del pedido.";
     toast(estado.textContent,true);
   } finally {
     boton.disabled = false;
     etiqueta.textContent = "Descargar";
     boton.removeAttribute("aria-busy");
+    if (boton.isConnected && document.activeElement === document.body) boton.focus();
   }
 }
 function openDetail(id){
@@ -4012,6 +4030,9 @@ function openDetail(id){
   const due = dueShort(p);
   const estTxt = estadoPedido(p) || est;
   const ini = (p.cliente.nombre || "?").trim().split(/\s+/).slice(0, 2).map(w => w[0]).join("").toUpperCase();
+  const telefono = p.cliente.telefono;
+  const urlChat = () => enlaceChatCliente(telefono,matchMedia("(min-width: 761px) and (any-pointer: fine)").matches);
+  const chat = urlChat();
   const extra = [...servsDe(p), p.tipo === "personalizado" ? (p.prendaDe === "cliente" ? "Prenda del cliente" : p.prendaDe === "tienda" ? "Prenda de la tienda" : "") : ""].filter(Boolean);
   const ov = modal(`
     <div class="mh pdh" style="--c:${T.c}">
@@ -4026,7 +4047,8 @@ function openDetail(id){
       </div>
       <div class="pdcard pdcli">
         <div class="pdwho"><span class="pdav">${esc(ini)}</span><b>${esc(p.cliente.nombre)}</b></div>
-        <a class="pdwa" href="https://wa.me/${esc(p.cliente.telefono)}" target="_blank" rel="noopener">${I("msg")}${esc(prettyPhone(p.cliente.telefono))}</a>
+        ${chat ? `<a class="pdwa" href="${esc(chat)}" target="_blank" rel="noopener noreferrer">${I("msg")}${esc(prettyPhone(telefono))}</a>`
+          : `<span>${esc(telefono || "Sin teléfono")}</span>`}
       </div>
       <div class="pdcard">
         <div class="pdtema">${esc(p.tema || "Sin nombre de diseño")}</div>
@@ -4083,6 +4105,8 @@ function openDetail(id){
   });
   const upd = async (data, msg) => { if (await cambiar(id, data, msg)) ov.close(); };
   const on = (s, fn) => { const b = $(s, ov); if (b) b.onclick = fn; };
+  // Un enlace HTTPS normal permite que Chrome capture la navegación si la app instalada lo admite.
+  on(".pdwa", e => { e.currentTarget.href = urlChat(); });
   on("#d-edit", () => { ov.close(); openForm(id); });
   on("#d-download", e => descargarPedido(id,uid,e.currentTarget,$("#d-download-status",ov)));
   on("#d-listo", async () => {

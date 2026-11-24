@@ -1,9 +1,3 @@
-import { strToU8, zipSync } from "./vendor/fflate.mjs";
-
-const escapar = value => String(value ?? "").replace(/[&<>"']/g, char => ({
-  "&":"&amp;", "<":"&lt;", ">":"&gt;", '"':"&quot;", "'":"&#39;"
-})[char]);
-const disponible = valor => valor !== undefined && valor !== null && valor !== "";
 const extensiones = {jpeg:"jpg", webp:"webp", png:"png", gif:"gif", avif:"avif"};
 
 export function codigoParaArchivo(codigo) {
@@ -21,43 +15,6 @@ export function archivoReferencia(src, indice) {
   };
 }
 
-const fichas = pares => pares.filter(([, valor]) => disponible(valor))
-  .map(([etiqueta, valor]) => `<dt>${escapar(etiqueta)}</dt><dd>${escapar(valor)}</dd>`).join("");
-const seccion = (titulo, pares) => {
-  const detalle = fichas(pares);
-  return detalle ? `<section><h2>${escapar(titulo)}</h2><dl>${detalle}</dl></section>` : "";
-};
-
-export function htmlResumen({codigo, tipo, datos, prendas, pago, seguimiento, nota}, archivos=[]) {
-  const columnas = ["Prenda","Horma","Talla","Color","Cantidad","Nombre","Número","Etiqueta","Precio unitario","Subtotal"];
-  const activas = columnas.map((_, i) => i).filter(i => prendas.some(fila => disponible(fila[i])));
-  const tabla = prendas.length ? `<section><h2>Prendas</h2><table><thead><tr>${
-    activas.map(i => `<th scope="col">${columnas[i]}</th>`).join("")
-  }</tr></thead><tbody>${prendas.map(fila => `<tr>${
-    activas.map(i => `<td>${escapar(fila[i])}</td>`).join("")
-  }</tr>`).join("")}</tbody></table></section>` : "";
-  const referencias = archivos.length ? `<section><h2>Referencias</h2><ul>${archivos.map(a =>
-    `<li><a href="imagenes/${escapar(a.nombre)}">${escapar(a.nombre)}</a></li>`).join("")}</ul></section>` : "";
-  const titulo = codigo ? `Pedido ${codigo}` : "Pedido";
-  return `<!doctype html><html lang="es"><head><meta charset="utf-8"><meta name="viewport" content="width=device-width, initial-scale=1"><title>${escapar(titulo)}</title>
-<style>
-:root{font:15px/1.5 system-ui,sans-serif;color:#18212b}body{max-width:65rem;margin:2rem auto;padding:0 1.25rem}h1,h2,p{margin:0 0 .5em}
-h2{font-size:1.15rem}section{margin:1.25rem 0}dl{display:grid;grid-template-columns:max-content 1fr;gap:.35rem 1rem}dt{font-weight:650}dd{margin:0;overflow-wrap:anywhere}
-table{width:100%;border-collapse:collapse;font-size:.9rem}th,td{padding:.45rem;text-align:left;border-bottom:1px solid #ccd4dc;overflow-wrap:anywhere}th{background:#f0f3f6}
-.nota{white-space:pre-wrap;overflow-wrap:anywhere}a{color:#11477a}@media print{body{margin:0;padding:0}tr{break-inside:avoid}thead{display:table-header-group}}@media(max-width:580px){dl{display:block}dd{margin-bottom:.5rem}table{font-size:.82rem}}
-</style></head><body><h1>${escapar(titulo)}</h1>${tipo ? `<p>${escapar(tipo)}</p>` : ""}
-${seccion("Datos del pedido", datos)}${tabla}${seccion("Pago", pago)}
-${nota ? `<section><h2>Notas</h2><p class="nota">${escapar(nota)}</p></section>` : ""}
-${seccion("Seguimiento", seguimiento)}${referencias}</body></html>`;
-}
-
-export function archivoPedido(resumen, archivos) {
-  const codigo = codigoParaArchivo(resumen.codigo);
-  const entradas = {[`resumen-pedido-${codigo}.html`]:strToU8(htmlResumen(resumen, archivos))};
-  for (const archivo of archivos) entradas[`imagenes/${archivo.nombre}`] = archivo.datos;
-  return {nombre:`pedido-${codigo}.zip`, tipo:"application/zip", datos:zipSync(entradas,{level:0})};
-}
-
 export function descargarArchivo({nombre, tipo, datos}) {
   const url = URL.createObjectURL(new Blob([datos], {type:tipo}));
   const enlace = document.createElement("a");
@@ -67,4 +24,149 @@ export function descargarArchivo({nombre, tipo, datos}) {
   enlace.click();
   enlace.remove();
   setTimeout(() => URL.revokeObjectURL(url), 30000);
+}
+
+const ancho = 960;
+const margen = 48;
+const interior = ancho - margen * 2;
+const fuente = "system-ui, sans-serif";
+const azul = "#14233a";
+const tinta = "#192a40";
+const suave = "#4c6078";
+const acento = "#ffb379";
+const columnasPrenda = ["Prenda","Horma","Talla","Color","Cantidad","Nombre","Número","Etiqueta","Precio unitario","Subtotal"];
+const disponible = valor => valor !== undefined && valor !== null && String(valor).trim() !== "";
+
+function partirTexto(ctx, valor, limite) {
+  const lineas = [];
+  for (const parrafo of String(valor).split(/\r?\n/)) {
+    let linea = "";
+    for (const palabra of parrafo.trim().split(/\s+/)) {
+      const propuesta = linea ? linea + " " + palabra : palabra;
+      if (ctx.measureText(propuesta).width <= limite) { linea = propuesta; continue; }
+      if (linea) lineas.push(linea);
+      linea = "";
+      if (ctx.measureText(palabra).width <= limite) { linea = palabra; continue; }
+      for (const letra of palabra) {
+        if (linea && ctx.measureText(linea + letra).width > limite) {
+          lineas.push(linea);
+          linea = "";
+        }
+        linea += letra;
+      }
+    }
+    lineas.push(linea);
+  }
+  return lineas;
+}
+
+function dibujarResumen(ctx, resumen) {
+  ctx.textBaseline = "top";
+  const escribir = (valor, x, y, limite, {px = 22, peso = 600, color = tinta, paso = px + 8} = {}) => {
+    ctx.font = `${peso} ${px}px ${fuente}`;
+    ctx.fillStyle = color;
+    const lineas = partirTexto(ctx,valor,limite);
+    lineas.forEach((s,i) => ctx.fillText(s,x,y + i * paso));
+    return paso * lineas.length;
+  };
+  const caja = (x, y, w, h, color, radio = 18) => {
+    ctx.fillStyle = color;
+    ctx.beginPath();
+    ctx.roundRect(x,y,w,h,radio);
+    ctx.fill();
+  };
+  const campos = (pares, x, y, w, columnas, {fondo, destacado = false} = {}) => {
+    const gap = 16, celda = (w - gap * (columnas - 1)) / columnas;
+    const tam = destacado ? 28 : 21;
+    for (let i = 0; i < pares.length; i += columnas) {
+      const fila = pares.slice(i,i + columnas);
+      ctx.font = `700 ${tam}px ${fuente}`;
+      const lineas = Math.max(...fila.map(([,v]) => partirTexto(ctx,v,celda - 28).length));
+      const alto = 45 + lineas * (tam + 8);
+      fila.forEach(([clave,valor], j) => {
+        const pos = x + j * (celda + gap);
+        if (fondo) caja(pos,y,celda,alto,destacado && clave === "Saldo" ? "#e0f3e9" : fondo,12);
+        escribir(clave,pos + 14,y + 12,celda - 28,{px:14,peso:700,color:suave});
+        escribir(valor,pos + 14,y + 34,celda - 28,{px:tam,peso:700});
+      });
+      y += alto + 8;
+    }
+    return y;
+  };
+  const activos = pares => pares.filter(([,v]) => disponible(v));
+  const encabezado = (nombre,y) => {
+    caja(margen,y + 5,6,25,"#d2561c",3);
+    escribir(nombre,margen + 18,y,interior - 18,{px:25,peso:800});
+    return y + 44;
+  };
+
+  const franja = ctx.createLinearGradient(0,0,ancho,0);
+  franja.addColorStop(0,azul);
+  franja.addColorStop(1,"#29496a");
+  const codigo = resumen.codigo || "Pedido";
+  ctx.font = `800 49px ${fuente}`;
+  const altoCodigo = partirTexto(ctx,codigo,interior - 64).length * 57;
+  ctx.font = `600 22px ${fuente}`;
+  const altoTipo = disponible(resumen.tipo) ? partirTexto(ctx,resumen.tipo,interior - 64).length * 30 : 0;
+  const altoFranja = Math.max(174,110 + altoCodigo + altoTipo);
+  caja(margen,36,interior,altoFranja,franja,24);
+  caja(margen + 32,68,48,5,acento,3);
+  escribir("RESUMEN DEL PEDIDO",margen + 32,86,interior - 64,{px:18,peso:800,color:acento});
+  escribir(codigo,margen + 32,114,interior - 64,{px:49,peso:800,color:"#fff"});
+  if (disponible(resumen.tipo))
+    escribir(resumen.tipo,margen + 34,120 + altoCodigo,interior - 64,{px:22,color:"#e1edf9"});
+
+  let y = 66 + altoFranja;
+  const datos = activos(resumen.datos);
+  if (datos.length) y = campos(datos,margen,encabezado("Datos del pedido",y),interior,2,{fondo:"#fff"}) + 18;
+
+  if (resumen.prendas.length) {
+    y = encabezado("Prendas",y);
+    for (const [indice, prenda] of resumen.prendas.entries()) {
+      const altoTitulo = escribir(disponible(prenda[0]) ? `${indice + 1}. ${prenda[0]}` : `Partida ${indice + 1}`,
+        margen + 14,y + 7,interior - 28,{px:22,peso:800});
+      const pares = activos(columnasPrenda.slice(1).map((col,i) => [col,prenda[i + 1]]));
+      y = campos(pares,margen,y + altoTitulo + 12,interior,3,{fondo:"#fff"}) + 12;
+    }
+    y += 10;
+  }
+
+  const pago = activos(resumen.pago);
+  if (pago.length) {
+    y = encabezado("Pago",y);
+    const montos = pago.filter(([clave]) => ["Total","Abono","Saldo"].includes(clave));
+    y = campos(montos,margen,y,interior,3,{fondo:"#e7eff8",destacado:true});
+    y = campos(pago.filter(par => !montos.includes(par)),margen,y,interior,2,{fondo:"#fff"}) + 18;
+  }
+
+  if (disponible(resumen.nota)) {
+    y = encabezado("Notas",y);
+    ctx.font = `500 22px ${fuente}`;
+    const altoNota = partirTexto(ctx,resumen.nota,interior - 36).length * 32;
+    caja(margen,y,interior,altoNota + 36,"#fff1e5");
+    escribir(resumen.nota,margen + 18,y + 18,interior - 36,{px:22,peso:500,paso:32});
+    y += altoNota + 62;
+  }
+
+  const seguimiento = activos(resumen.seguimiento);
+  if (seguimiento.length)
+    y = campos(seguimiento,margen,encabezado("Seguimiento",y),interior,2,{fondo:"#fff"});
+  return y + 28;
+}
+
+export async function archivoResumenPng(resumen) {
+  const canvas = document.createElement("canvas");
+  const ctx = canvas.getContext("2d");
+  const alto = dibujarResumen(ctx,resumen);
+  // Mantiene la proporción en pedidos históricos con muchas partidas.
+  const escala = Math.min(1.5, 8192 / alto);
+  canvas.width = Math.ceil(ancho * escala);
+  canvas.height = Math.ceil(alto * escala);
+  ctx.scale(escala,escala);
+  ctx.fillStyle = "#f3f6fb";
+  ctx.fillRect(0,0,ancho,alto);
+  dibujarResumen(ctx,resumen);
+  const datos = await new Promise(resolve => canvas.toBlob(resolve,"image/png"));
+  if (!datos) throw new Error("No se pudo generar el PNG");
+  return {nombre:`resumen-pedido-${codigoParaArchivo(resumen.codigo)}.png`,tipo:"image/png",datos};
 }

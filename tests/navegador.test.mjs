@@ -7,8 +7,7 @@ import { promisify } from "node:util";
 import { test } from "node:test";
 import { chromium, devices } from "playwright-core";
 import { initializeTestEnvironment } from "@firebase/rules-unit-testing";
-import { doc, writeBatch } from "firebase/firestore";
-import { unzipSync } from "../vendor/fflate.mjs";
+import { doc, getDocFromServer, writeBatch } from "firebase/firestore";
 
 const projectId = "demo-pedidos-codex";
 const root = new URL("../", import.meta.url);
@@ -83,6 +82,45 @@ async function appDePrueba() {
 
 const visible = selector => selector.waitFor({state:"visible"});
 const oculto = selector => selector.waitFor({state:"hidden"});
+async function descargarResumen(page, prefijo) {
+  // Observa los textos dibujados sin alterar el PNG que genera el navegador.
+  await page.evaluate(() => {
+    const original = CanvasRenderingContext2D.prototype.fillText;
+    window.textosResumen = [];
+    CanvasRenderingContext2D.prototype.fillText = function(texto,...args) {
+      window.textosResumen.push(String(texto));
+      original.call(this,texto,...args);
+    };
+    window.restaurarCanvas = () => CanvasRenderingContext2D.prototype.fillText = original;
+  });
+  try {
+    const descarga = page.waitForEvent("download");
+    await page.locator("#d-download").click();
+    const archivo = await descarga;
+    assert.ok(prefijo.test(archivo.suggestedFilename()));
+    const contenido = await readFile(await archivo.path());
+    assert.deepEqual([...contenido.subarray(0,8)],[137,80,78,71,13,10,26,10]);
+    assert.equal(contenido.readUInt32BE(16),1440);
+    assert.ok(contenido.readUInt32BE(20) > 1000);
+    return page.evaluate(() => window.textosResumen.join("\n"));
+  } finally {
+    await page.evaluate(() => window.restaurarCanvas());
+  }
+}
+
+async function comprobarChat(page, destino) {
+  const enlace = page.locator(".pdwa"), contexto = page.context();
+  await contexto.route(destino, ruta => ruta.fulfill({contentType:"text/plain",body:"WhatsApp simulado"}));
+  assert.equal(await enlace.getAttribute("href"),destino);
+  const popup = contexto.waitForEvent("page");
+  await enlace.click();
+  const chat = await popup;
+  await chat.waitForURL(destino);
+  assert.equal(await chat.locator("body").innerText(),"WhatsApp simulado");
+  await chat.close();
+  await visible(page.locator(".pdmd"));
+}
+
 async function iniciar(page, url, usuario, pin) {
   if (url) await page.goto(url);
   await page.locator("#lu").fill(usuario);
@@ -166,6 +204,102 @@ async function crearSublimado(page, tema, opciones = {}) {
   }
   await page.locator("#save").click();
   await oculto(page.locator("#save"));
+}
+
+async function comprobarEtiquetas(page, env) {
+  const tienda = page.locator('[data-prendade="tienda"]');
+  const cliente = page.locator('[data-prendade="cliente"]');
+  const etiquetas = page.locator('[data-pick="etiqueta"]');
+  const abrir = () => page.locator('.side [data-act="nuevo"]').click();
+  const elegir = async (campo,valor) => {
+    await page.locator(`[data-pick="${campo}"]`).click();
+    await page.locator(".pkgrid [data-v]").filter({hasText:new RegExp("^" + valor + "$")}).click();
+  };
+  const continuar = async (mezclar = false) => {
+    await page.reload();
+    await visible(page.locator(".shell"));
+    if (mezclar) {
+      // Simula un borrador antiguo con una etiqueta que ya no corresponde.
+      await page.evaluate(() => {
+        const clave = Object.keys(localStorage).find(k => k.startsWith("cs-borrador-"));
+        const borrador = JSON.parse(localStorage.getItem(clave));
+        borrador.F.items[0].etiqueta = "Etiqueta antigua";
+        borrador.F.etiqueta = "Etiqueta antigua";
+        localStorage.setItem(clave,JSON.stringify(borrador));
+      });
+    }
+    await abrir();
+    await page.locator("#dok").click();
+    await visible(page.locator('.step[data-step="1"]'));
+  };
+  const comprobarGuardado = (id, origen, etiqueta) => env.withSecurityRulesDisabled(async contexto => {
+    const snap = await getDocFromServer(doc(contexto.firestore(),"pedidos",id));
+    assert.ok(snap.exists(), "El pedido debe estar confirmado en Firestore");
+    const pedido = snap.data();
+    assert.equal(pedido.prendaDe,origen);
+    assert.equal(pedido.etiqueta,etiqueta);
+    assert.equal(pedido.items[0].etiqueta,etiqueta);
+  });
+
+  await abrir();
+  await page.locator('[data-t="personalizado"]').click();
+  await page.locator("#in-nombre").fill("Cliente ficticio");
+  await page.locator("#in-tel").fill("04120000000");
+  await page.locator("#in-tema").fill("Etiqueta de prueba");
+  await page.locator('[data-servicio="DTF"]').click();
+  await tienda.click();
+  await page.locator("#next").click();
+  await page.locator("#addItem").click();
+  await elegir("etiqueta","Comic Shop");
+  await elegir("prenda","Franela");
+  await elegir("color","Negro");
+  await elegir("horma","Unisex");
+  await elegir("talla","M");
+  await page.waitForFunction(() => Object.entries(localStorage).some(([k,v]) => k.startsWith("cs-borrador-") && JSON.parse(v).F.items[0]?.talla === "M"));
+  await continuar();
+  assert.match(await etiquetas.innerText(),/Comic Shop/);
+
+  await page.locator('[data-go="0"]').click();
+  await cliente.click();
+  await page.locator("#next").click();
+  assert.equal(await etiquetas.count(),0);
+  await page.waitForFunction(() => Object.entries(localStorage).some(([k,v]) => {
+    if (!k.startsWith("cs-borrador-")) return false;
+    const f = JSON.parse(v).F;
+    return f.prendaDe === "cliente" && f.step === 1 && f.items[0]?.etiqueta === "";
+  }));
+  await continuar(true);
+  assert.equal(await etiquetas.count(),0);
+  await page.locator("#next").click();
+  await page.locator("#in-fecha").click();
+  await page.getByRole("button",{name:"Confirmar fecha"}).click();
+  await page.locator("#in-mon").selectOption("USD");
+  await page.locator("#prl input").fill("10");
+  await page.locator("#in-abono").fill("2");
+  await page.locator("#next").click();
+  await page.locator("#save").click();
+  await oculto(page.locator("#save"));
+  const tarjeta = page.locator(".oc2:visible").filter({hasText:/Etiqueta de Prueba/i});
+  await visible(tarjeta);
+  const id = await tarjeta.getAttribute("data-open");
+  await comprobarGuardado(id,"cliente","");
+
+  await tarjeta.click();
+  await page.locator("#d-edit").click();
+  await page.locator('[data-go="1"]').click();
+  assert.equal(await etiquetas.count(),0);
+  await page.locator('[data-go="0"]').click();
+  await tienda.click();
+  await page.locator("#next").click();
+  await visible(etiquetas);
+  await page.locator("#next").click();
+  assert.match(await page.locator("#f-items").innerText(),/Completa lo marcado en rojo/);
+  await elegir("etiqueta","Comic Shop");
+  await page.locator('[data-go="3"]').click();
+  await page.locator("#save").click();
+  await oculto(page.locator("#save"));
+  await visible(page.getByText("Cambio guardado",{exact:true}));
+  await comprobarGuardado(id,"tienda","Comic Shop");
 }
 
 test("escritorio y móvil: login, altas offline en varios clientes, recarga, sincronización y funciones del pedido", {timeout:150000}, async () => {
@@ -285,19 +419,16 @@ test("escritorio y móvil: login, altas offline en varios clientes, recarga, sin
     await page.setViewportSize({width:1440,height:900});
     await page.keyboard.press("Escape");
     await oculto(visor);
-    const archivoPedido = page.waitForEvent("download");
-    await detalle.getByRole("button",{name:"Descargar",exact:true}).click();
-    const zip = await archivoPedido;
-    assert.match(zip.suggestedFilename(),/^pedido-S-\d+\.zip$/);
-    const entradas = unzipSync(await readFile(await zip.path()));
-    const resumen = Buffer.from(entradas[Object.keys(entradas).find(n => n.endsWith(".html"))]).toString();
+    const resumen = await descargarResumen(page,/^resumen-pedido-S-\d+\.png$/);
+    for (const campo of ["Creación","Entrega","Cliente","Teléfono","Talla","Cantidad","Precio unitario","Total","Abono","Saldo","Notas"])
+      assert.ok(resumen.split("\n").includes(campo), campo);
     assert.match(resumen,/Nota Tema Escritorio/i);
     assert.match(resumen,/19\.97/);
-    assert.doesNotMatch(resumen,/<img|data:image/);
-    assert.deepEqual(Object.keys(entradas).filter(n => n.startsWith("imagenes/")).map(n => Buffer.from(entradas[n])),guardadas);
+    await comprobarChat(page,"https://web.whatsapp.com/send/?phone=584120000000");
 
     await cel.locator(".oc2:visible").filter({hasText:/Tema Escritorio/i}).click();
     await oculto(cel.locator("#d-download"));
+    await comprobarChat(cel,"https://wa.me/584120000000");
     await cel.getByRole("button",{name:"Abrir referencia 1"}).click();
     const visorMovil = cel.getByRole("dialog",{name:"Referencias"});
     await visible(visorMovil);
@@ -420,6 +551,7 @@ test("escritorio y móvil: login, altas offline en varios clientes, recarga, sin
     await visible(agendaRestringida.locator('.dpg:not([inert]) button[data-d="2026-12-04"][aria-label$="1 entrega"]'));
     assert.equal(await agendaRestringida.locator(".agrow").count(),1);
     assert.doesNotMatch(await agendaRestringida.innerText(),/Cuenta restringida|Pedido restringido/);
+    await comprobarEtiquetas(page,env);
     assert.deepEqual(errores,[]);
     assert.deepEqual(inesperadas,[]);
   } catch(e) {
@@ -432,7 +564,7 @@ test("escritorio y móvil: login, altas offline en varios clientes, recarga, sin
   }
 });
 
-test("demo HTML desde disco: agenda, HEIC y ZIP sin servicios externos", {timeout:30000}, async () => {
+test("demo independiente: agenda, HEIC, PNG, Etiqueta y WhatsApp sin servicios externos", {timeout:30000}, async () => {
   const executablePath = process.env.CHROMIUM_PATH || (existsSync("/usr/bin/chromium") ? "/usr/bin/chromium" : chromium.executablePath());
   const navegador = await chromium.launch({executablePath,args:["--no-sandbox"]});
   try {
@@ -451,13 +583,23 @@ test("demo HTML desde disco: agenda, HEIC y ZIP sin servicios externos", {timeou
       page = await context.newPage();
       await page.setContent(await readFile(archivo,"utf8"));
     }
-    await page.getByRole("button",{name:/S-0042/}).click();
+    await page.getByRole("button",{name:/P-0042/}).click();
+    await page.locator(".pdwa").click();
+    await visible(page.getByText("https://web.whatsapp.com/send/?phone=12025550142",{exact:true}));
+    await page.getByRole("button",{name:"Cerrar",exact:true}).click();
     const visor = page.getByRole("dialog",{name:"Referencias"});
     await page.getByRole("button",{name:"Abrir referencia 1"}).click();
     await visor.getByRole("button",{name:"Foto siguiente"}).click();
     assert.equal(await visor.locator('[role="status"]').textContent(),"Foto 2 de 2");
     await visor.getByRole("button",{name:"Cerrar"}).click();
     await page.getByRole("button",{name:"Editar",exact:true}).click();
+    await page.getByRole("button",{name:/Prendas/}).click();
+    assert.equal(await page.getByLabel("Etiqueta",{exact:true}).count(),2);
+    await page.getByRole("button",{name:/Cliente/}).click();
+    await page.getByRole("button",{name:"El cliente la trae"}).click();
+    await page.getByRole("button",{name:/Prendas/}).click();
+    assert.equal(await page.getByLabel("Etiqueta",{exact:true}).count(),0);
+    await page.getByRole("button",{name:/Entrega y fotos/}).click();
     await page.locator("#in-fecha").click();
     const calendario = page.getByRole("dialog",{name:"Fecha de entrega"});
     await visible(calendario.getByText("2 entregas",{exact:true}));
@@ -467,11 +609,10 @@ test("demo HTML desde disco: agenda, HEIC y ZIP sin servicios externos", {timeou
     await visible(page.getByText("Referencia lista para guardar."));
     await page.waitForFunction(() => [...document.querySelectorAll("#imgs img")].at(-1)?.naturalHeight === 96);
     await page.getByRole("button",{name:"Guardar",exact:true}).click();
-    const descarga = page.waitForEvent("download");
-    await page.getByRole("button",{name:"Descargar",exact:true}).click();
-    const zip = unzipSync(await readFile(await (await descarga).path()));
-    assert.equal(Object.keys(zip).length,4);
-    assert.match(Buffer.from(zip["resumen-pedido-S-0042.html"]).toString(),/Camisetas del club/);
+    const resumen = await descargarResumen(page,/^resumen-pedido-P-0042\.png$/);
+    assert.match(resumen,/Camisetas del club/);
+    assert.match(resumen,/\$ 38\.00/);
+    assert.match(resumen,/Prenda a cargo de\nCliente/);
     assert.deepEqual(errores,[]);
     assert.deepEqual(externas,[]);
   } finally {
