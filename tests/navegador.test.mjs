@@ -636,8 +636,8 @@ test("escritorio y móvil: login, altas offline en varios clientes, recarga, sin
     assert.ok(fotos.every(foto => foto.subarray(0,8).equals(Buffer.from([137,80,78,71,13,10,26,10]))));
     assert.match(resumen,/Nota Tema Escritorio\n• Separar prendas\n• Doblar\n• Revisar empaque\nLínea normal/i);
     assert.match(resumen,/19\.97/);
-    await visible(page.locator("#d-download-status"));
-    assert.match(await page.locator("#d-download-status").textContent(),/elige Permitir/);
+    await oculto(page.locator("#d-download-status"));
+    assert.equal(await page.locator("#d-download-status").textContent(),"");
     await comprobarChatsEscritorio(page);
 
     await cel.locator(".oc2:visible").filter({hasText:/Tema Escritorio/i}).click();
