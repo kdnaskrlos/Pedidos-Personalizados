@@ -46,7 +46,7 @@ test("las referencias conservan sus bytes y se generan nombres seguros", () => {
 });
 
 test("WhatsApp usa E.164, enlace web directo en escritorio y wa.me en móvil", () => {
-  assert.equal(enlaceChatCliente("+12025550142",true),"https://web.whatsapp.com/send/?phone=12025550142");
+  assert.equal(enlaceChatCliente("+12025550142",true),"https://web.whatsapp.com/send?phone=12025550142");
   assert.equal(enlaceChatCliente("12025550142",false),"https://wa.me/12025550142");
   assert.ok(enlaceChatCliente("123456789012345",true));
   for (const invalido of [null,"","04120000000","12","1234567890123456","1 202 555 0142","12025550142?x=1","javascript:1"])
