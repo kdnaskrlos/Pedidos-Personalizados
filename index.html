@@ -4103,7 +4103,7 @@ function openDetail(id){
       </div>
       <div class="pdcard pdcli">
         <div class="pdwho"><span class="pdav">${esc(ini)}</span><b>${esc(p.cliente.nombre)}</b></div>
-        ${chat ? `<a class="pdwa" href="${esc(chat)}" target="pedidos_whatsapp_chat">${I("msg")}${esc(prettyPhone(telefono))}</a>`
+        ${chat ? `<a class="pdwa" href="${esc(chat)}" target="_blank" rel="noopener noreferrer">${I("msg")}${esc(prettyPhone(telefono))}</a>`
           : `<span>${esc(telefono || "Sin teléfono")}</span>`}
       </div>
       <div class="pdcard">
