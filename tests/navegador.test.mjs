@@ -1121,13 +1121,17 @@ test("pedidos de 10, 30, 50 y 100 partidas en escritorio y móvil", {timeout:260
           await page.locator('[data-go="3"]').click();
           await page.locator("#in-nota").fill("Renglón de prueba\n".repeat(340) + "Último renglón de la nota");
         }
+        const id = await tarjeta.getAttribute("data-open");
         const inicioEdicion = performance.now();
+        if (offline) await context.setOffline(true);
         await page.locator("#save").click();
         await oculto(page.locator("#save"));
-        await tarjeta.click();
-        assert.equal(await page.locator(".pdit li").count(),n + 1);
-        assert.ok((await page.locator(".pdit li").last().innerText()).includes("30.33"));
-        const id = await tarjeta.getAttribute("data-open");
+        if (offline) {
+          await visible(page.locator('[data-act="cola"]'));
+          await page.reload();
+          await visible(page.locator('[data-act="cola"]'));
+          await context.setOffline(false);
+        }
         assert.ok(id);
         let guardado;
         const limite = performance.now() + 15000;
@@ -1139,6 +1143,11 @@ test("pedidos de 10, 30, 50 y 100 partidas en escritorio y móvil", {timeout:260
             await new Promise(r => setTimeout(r,100));
           } while (performance.now() < limite);
         });
+        await oculto(page.locator('[data-act="cola"]'));
+        await page.locator('[data-view="pedidos"]:visible').first().click();
+        await tarjeta.click();
+        assert.equal(await page.locator(".pdit li").count(),n + 1);
+        assert.ok((await page.locator(".pdit li").last().innerText()).includes("30.33"));
         assert.equal(guardado.totalMenor,n * 2022 + 3033);
         assert.equal(guardado.abonoMenor,25);
         assert.equal(guardado.items.at(-1).nombre,"EXTRA");
@@ -1210,6 +1219,65 @@ test("pedidos de 10, 30, 50 y 100 partidas en escritorio y móvil", {timeout:260
         t.diagnostic(`${perfil}, ${n} partidas: duplicar ${Math.round(mediciones[0])} ms, alta ${Math.round(alta)} ms, edición ${Math.round(editar)} ms, PNG ${Math.round(png)} ms`);
       }
     }
+
+    // Los dos dispositivos editan la misma versión. El segundo conserva su copia local.
+    const temaCompartido = "Pedido de 10 partidas PC";
+    let idCompartido;
+    for (const [page,nota] of [[pc,"Cambio de escritorio"],[cel,"Cambio del móvil conservado"]]) {
+      await page.locator('[data-view="pedidos"]:visible').first().click();
+      await page.locator('[data-filtro="avisar"]:visible').click();
+      const tarjeta = page.locator(".oc2:visible").filter({hasText:temaCompartido});
+      idCompartido = await tarjeta.getAttribute("data-open");
+      await tarjeta.click();
+      await page.locator("#d-edit").click();
+      await page.locator('[data-go="3"]').click();
+      await page.locator("#in-nota").fill(nota);
+    }
+    await pc.locator("#save").click();
+    await oculto(pc.locator('[data-act="cola"]'));
+    await env.withSecurityRulesDisabled(async contexto => {
+      const ref = doc(contexto.firestore(),"pedidos",idCompartido);
+      const fin = performance.now() + 15000;
+      while ((await getDocFromServer(ref)).data().nota !== "Cambio de escritorio" && performance.now() < fin)
+        await new Promise(r => setTimeout(r,100));
+      assert.equal((await getDocFromServer(ref)).data().nota,"Cambio de escritorio");
+    });
+    await cel.locator("#save").click();
+    await cel.locator('[data-act="cola"]').click();
+    await cel.locator(".mb details summary").click();
+    await visible(cel.getByText("Cambio del móvil conservado",{exact:false}));
+    const copia = cel.waitForEvent("download");
+    await cel.getByRole("button",{name:"Descargar edición pendiente"}).click();
+    const rescatado = JSON.parse(await readFile(await (await copia).path(),"utf8"));
+    assert.equal(rescatado.pedido.nota,"Cambio del móvil conservado");
+    assert.equal(rescatado.pedido.items.length,11);
+
+    // El mismo archivo contiene un pedido largo nuevo y una actualización de uno existente.
+    let respaldo;
+    await env.withSecurityRulesDisabled(async contexto => {
+      respaldo = (await getDocFromServer(doc(contexto.firestore(),"pedidos",idCompartido))).data();
+    });
+    const {consecutivo,creadorUid, ...sinIdentidad} = respaldo;
+    const idNuevo = "restaurado-largo-e2e";
+    const archivos = {app:"comicshop-pedidos",creado:"2090-01-01",colecciones:{pedidos:{
+      [idCompartido]:{...respaldo,nota:"Recuperado desde respaldo",editadoEn:"2090-01-01T00:00:00Z"},
+      [idNuevo]:{...sinIdentidad,tema:"Importado largo nuevo",codigo:"S-2000"}
+    }}};
+    await pc.locator('.side [data-view="ajustes"]:visible').click();
+    await pc.locator("#rFile").setInputFiles({name:"pedidos-grandes.json",mimeType:"application/json",
+      buffer:Buffer.from(JSON.stringify(archivos))});
+    await pc.locator("#okc").click();
+    await visible(pc.getByText("Restaurado: 1 recuperados, 1 actualizados",{exact:true}));
+    await env.withSecurityRulesDisabled(async contexto => {
+      const db = contexto.firestore();
+      for (const id of [idCompartido,idNuevo]) {
+        const efectivo = (await getDocFromServer(doc(db,"pedidos",id))).data();
+        assert.deepEqual(efectivo.items,respaldo.items);
+        assert.equal(efectivo.totalMenor,respaldo.totalMenor);
+        assert.equal(efectivo.abonoMenor,respaldo.abonoMenor);
+        assert.equal(efectivo.autorAviso,undefined);
+      }
+    });
   } finally {
     await env?.cleanup();
     await browser?.close();

@@ -1202,7 +1202,7 @@ import { enlaceChatCliente, dividirMensaje } from "./whatsapp.mjs";
 import { crearNotificaciones } from "./notificaciones.mjs";
 import { montarPanelNotificaciones } from "./notificaciones-ui.mjs";
 import { conectarListasNota } from "./notas.mjs";
-import { consecutivoDe, documentosFoto, registrarPedido, necesitaValidacionPago, prepararValidacionPago, encolarValidacionPago, pedidoCabe } from "./pedidos-sync.mjs";
+import { consecutivoDe, documentosFoto, registrarPedido, necesitaValidacionPago, confirmarEdicionGrande, versionPedido, pedidoCabe } from "./pedidos-sync.mjs";
 import { guardarPendiente, leerPendientes, borrarPendiente, guardarFotoLocal, leerFotoLocal, borrarFotoLocal } from "./cola-local.mjs";
 import { centavos, centavosHistoricos, cantidad, clavePrecio, precioHistorico, valorPrecioHistorico, validarPago, validarPagoEnCentavos, actualizarPagoPendiente } from "./pagos.mjs";
 import { initializeApp, deleteApp } from "https://www.gstatic.com/firebasejs/10.12.2/firebase-app.js";
@@ -2128,13 +2128,10 @@ async function restaurarArchivo(f){
       const {autorAviso, revisionPago, ...datos} = v;
       const pedido = {...datos, restaurado:true};
       pedidos.set(id, pedido);
-      if (necesitaValidacionPago(pedido)) {
+      if (necesitaValidacionPago(pedido) || (anterior && necesitaValidacionPago(anterior))) {
         const revision = crypto.randomUUID(), identidad = identidadCola(S.me, S.uid);
-        const {ref} = await prepararValidacionPago(S.db, SDK_PEDIDOS, identidad, id, revision, pedido);
-        const lote = fsWriteBatch(S.db);
-        lote.set(doc(S.db, "pedidos", id), {...pedido, revisionPago:revision});
-        lote.delete(ref);
-        await lote.commit();
+        await confirmarEdicionGrande(S.db,SDK_PEDIDOS,identidad,
+          {id:revision,pedidoId:id,base:versionPedido(anterior),pedido,fotos:[],restauracion:true});
       } else ops.push([`pedidos/${id}`, pedido]);
     }
     const vinculos = vinculosFotos(pedidos);
@@ -2304,9 +2301,13 @@ function dueShort(p){
   const n = daysUntil(p.fechaEntrega), d = cfg().dias;
   return {t: n < 0 ? `Vencido ${-n} d` : n === 0 ? "Hoy" : n === 1 ? "Mañana" : `En ${n} días`, c: n < 0 ? "err" : n <= d ? "warn" : ""};
 }
-const SDK_PEDIDOS = {doc, getDocFromServer, runTransaction};
+const SDK_PEDIDOS = {doc,getDocFromServer,runTransaction,serverTimestamp,deleteDoc:fsDeleteDoc};
 const identidadCola = (perfil, uid) => perfil?.identidadCola ?? uid;
 const ownerLocal = () => firebaseConfig.projectId + ":" + identidadCola(S.me, S.uid);
+// Una instalación 3.70.4 sigue leyendo solo las altas de su espacio original.
+const ownerEdiciones = owner => owner + ":ediciones";
+const colaPedidos = async owner => (await Promise.all([leerPendientes(owner),leerPendientes(ownerEdiciones(owner))])).flat();
+const fechaPendiente = ({pedido}) => pedido.editadoEn || pedido.creadoEn;
 let sincronizando = false;
 const problemaEnvio = new Map();
 const avisoCola = typeof BroadcastChannel !== "undefined" ? new BroadcastChannel("pedidos-cola-local") : null;
@@ -2316,9 +2317,9 @@ async function actualizarPendientes(){
   if (!S.uid || !S.me?.activo) return;
   const uid = S.uid, owner = ownerLocal();
   try {
-    const pedidos = await leerPendientes(owner);
+    const pedidos = await colaPedidos(owner);
     if (uid !== S.uid || owner !== ownerLocal() || !S.me?.activo) return;
-    S.pendientes = pedidos.sort((a, b) => a.pedido.creadoEn.localeCompare(b.pedido.creadoEn));
+    S.pendientes = pedidos.sort((a, b) => fechaPendiente(a).localeCompare(fechaPendiente(b)));
     S.errorCola = false;
   } catch(e) {
     if (uid !== S.uid || owner !== ownerLocal() || !S.me?.activo) return;
@@ -2332,14 +2333,15 @@ async function sincronizarPendientes(forzar = false){
   const uid = S.uid, owner = ownerLocal(), identidad = identidadCola(S.me, uid);
   sincronizando = true;
   try {
-    const pendientes = await leerPendientes(owner);
+    const pendientes = (await colaPedidos(owner)).sort((a,b) => fechaPendiente(a).localeCompare(fechaPendiente(b)));
     for (const entrada of pendientes) {
       if (uid !== S.uid || !S.me?.activo || !S.online) break;
-      if (!forzar && ["permission-denied","contador-agotado","pago-pendiente"].includes(problemaEnvio.get(entrada.id))) continue;
+      if (!forzar && ["permission-denied","contador-agotado","pago-pendiente","conflicto-pedido"].includes(problemaEnvio.get(entrada.id))) continue;
       try {
-        await registrarPedido(S.db, SDK_PEDIDOS, uid, entrada, identidad,
+        if (entrada.pedidoId) await confirmarEdicionGrande(S.db,SDK_PEDIDOS,identidad,{...entrada,uid});
+        else await registrarPedido(S.db, SDK_PEDIDOS, uid, entrada, identidad,
           p => actualizarPagoPendiente(p, i => claveBase(i, p)));
-        await borrarPendiente(owner, entrada.id);
+        await borrarPendiente(entrada.owner, entrada.id);
         problemaEnvio.delete(entrada.id);
         avisoCola?.postMessage("actualizar");
       } catch(e) {
@@ -2360,21 +2362,31 @@ function pendientesHTML(){
   return n ? `<button class="revbar" data-act="cola">${I("clock")}<span>${n} pedido${n === 1 ? "" : "s"} pendiente${n === 1 ? "" : "s"} de envío</span><em>Ver</em></button>` : "";
 }
 function abrirPendientes(){
-  const filas = (S.pendientes || []).map(({id, pedido:p, fotos}) => {
+  const filas = (S.pendientes || []).map(({id, pedidoId, pedido:p, fotos}) => {
     const error = problemaEnvio.get(id);
     const estado = error === "permission-denied" ? "El servidor rechazó el envío. Revisa tu acceso con el administrador."
+      : error === "conflicto-pedido" ? "Otro dispositivo guardó cambios. Revisa el pedido actual y descarga tu edición para recuperarla."
       : error === "contador-pendiente" ? "Un administrador debe conectar la app para alinear la numeración."
       : error === "contador-agotado" ? "La numeración alcanzó su límite."
       : error === "pago-pendiente" ? "El pago anterior requiere revisión. Los datos siguen guardados aquí."
       : error ? "Sin confirmación del servidor. Puedes reintentar." : "Guardado en este dispositivo";
-    return `<details class="card"><summary><b>${esc(p.cliente.nombre)}</b> · ${esc(TIPOS[p.tipo].label)}</summary>
+    return `<details class="card"><summary><b>${esc(p.cliente.nombre)}</b> · ${esc(TIPOS[p.tipo].label)}${pedidoId ? " · Edición" : ""}</summary>
       <p class="note">${estado} · ${esc(id)}</p><div class="pdnote">${esc(resumenTexto({...p, codigo:"Pendiente de envío"}))}</div>
+      ${pedidoId ? `<button class="btn sm" data-rescatar-edicion="${esc(id)}">Descargar edición pendiente</button>` : ""}
       ${fotos.length ? `<div class="imgs">${fotos.map(f => `<div class="imgbox"><img alt="Referencia local" src="${esc(f.mini)}"></div>`).join("")}</div>` : ""}
       </details>`;
   });
   const ov = modal(`<div class="mh"><h2>Pendientes de envío</h2><button class="ib" data-close aria-label="Cerrar">${I("x")}</button></div>
     <div class="mb">${filas.join("") || '<p class="note">No quedan pedidos locales pendientes.</p>'}</div>
     <div class="mf"><button class="btn" data-close>Cerrar</button><button class="btn primary" id="reintentar-cola">Reintentar envío</button></div>`);
+  ov.querySelectorAll("[data-rescatar-edicion]").forEach(b => b.onclick = async () => {
+    const entrada = S.pendientes.find(e => e.id === b.dataset.rescatarEdicion);
+    if (!entrada) return;
+    const uid = S.uid, {descargarArchivo} = await import("./pedido-export.mjs");
+    if (S.uid !== uid || S.auth.currentUser?.uid !== uid) return;
+    descargarArchivo({nombre:"edicion-pendiente-" + entrada.pedidoId + ".json",tipo:"application/json",
+      datos:JSON.stringify({pedidoId:entrada.pedidoId,pedido:entrada.pedido,fotos:entrada.fotos},null,2)});
+  });
   $("#reintentar-cola", ov).onclick = async e => {
     if (!S.online) return toast("Sin conexión. Los pedidos siguen guardados aquí.", true);
     e.currentTarget.disabled = true;
@@ -4117,22 +4129,20 @@ async function saveForm(ov, orig){
   let envioLocal = false;
   try {
     if (orig) {
-      const batch = fsWriteBatch(S.db);
-      let preparacion;
-      if (necesitaValidacionPago(data)) {
-        const revision = crypto.randomUUID(), identidad = identidadCola(S.me, uid);
-        preparacion = encolarValidacionPago(S.db, {doc, setDoc:fsSetDoc}, identidad, orig._id, revision, data);
-        data.revisionPago = revision;
-        batch.delete(preparacion.ref);
+      if (necesitaValidacionPago(data) || necesitaValidacionPago(orig)) {
+        await guardarPendiente({owner:ownerEdiciones(form._owner),id:crypto.randomUUID(),
+          pedidoId:orig._id,base:versionPedido(orig),pedido:{...data,tipo:orig.tipo},fotos});
+        avisoCola?.postMessage("actualizar");
+        envioLocal = true;
+        actualizarPendientes();
+        sincronizarPendientes();
+      } else {
+        const batch = writeBatch(S.db);
+        batch.update(doc(S.db,"pedidos",orig._id),{...data,autorAviso:autorAviso()});
+        for (const [id,foto] of documentosFoto(orig._id,fotos,S.me.usuario,now))
+          batch.set(doc(S.db,"fotos",id),foto);
+        envioLocal = (await batch.commit()) === "local";
       }
-      batch.update(doc(S.db, "pedidos", orig._id), {...data,autorAviso:autorAviso()});
-      for (const [id, foto] of documentosFoto(orig._id, fotos, S.me.usuario, now))
-        batch.set(doc(S.db, "fotos", id), foto);
-      const guardar = Promise.all([...(preparacion?.escrituras || []), batch.commit()]);
-      if (preparacion) guardar.catch(() => {
-        if (S.uid === uid) fsDeleteDoc(preparacion.ref).catch(() => {});
-      });
-      envioLocal = (await sinEsperar(guardar)) === "local";
     } else {
       if (data.lectores === undefined) Object.assign(data, {asignados:[], denegados:[], publico:true, lectores:[creador]});
       Object.assign(data, {tipo:form.tipo, creadoEn:now, creadoPor:creador, estado:"pendiente", avisado:false});

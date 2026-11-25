@@ -168,7 +168,7 @@ service cloud.firestore {
         && !exists(pedidoPath(id))
         && p.creadorUid == request.auth.uid && p.tipo == d.tipo && p.codigo == d.codigo && p.consecutivo == d.n
         && c.ultimoId == id && c.n == d.n
-        && pagoValidoPara(id, p, true);
+        && pagoValidoPara(id, p, true, false);
     }
     function reservaNueva(id, p) {
       let c = getAfter(contadorPath(p.tipo)).data;
@@ -212,13 +212,13 @@ service cloud.firestore {
       return comprobante.pedidoId == id && comprobante.alta == alta
         && comprobante.totalMenor == p.totalMenor && comprobante.items == p.items;
     }
-    function pagoValidoPara(id, p, alta) {
+    function pagoValidoPara(id, p, alta, comprobanteObligatorio) {
       return p.pagoVersion == 2 && p.moneda in ['COP', 'USD', 'Bs']
         && enteroSeguro(p.totalMenor) && p.totalMenor > 0 && p.totalMenor <= 1000000000000
         && enteroSeguro(p.abonoMenor) && p.abonoMenor <= p.totalMenor
         && p.items is list && p.items.size() > 0
-        && ((p.items.size() <= 8 && !p.items.hasAny([null]) && p.totalMenor == sumaPartidas(p.items))
-          || (p.items.size() > 8 && idValido(p.get('revisionPago', '')) && pagoPreparado(id, p, alta)));
+        && ((p.items.size() <= 8 && !comprobanteObligatorio && !p.items.hasAny([null]) && p.totalMenor == sumaPartidas(p.items))
+          || ((p.items.size() > 8 || comprobanteObligatorio) && idValido(p.get('revisionPago', '')) && pagoPreparado(id, p, alta)));
     }
     function importePartida(p) {
       return p == null ? 0 : importeEntero(p.cant, p.precioMenor);
@@ -243,7 +243,7 @@ service cloud.firestore {
     }
     function pagoCompatible(id, p, delta, esAdmin) {
       return !delta.hasAny(['pagoVersion', 'totalMenor', 'abonoMenor', 'moneda', 'precio', 'precios', 'abono', 'items', 'revisionPago'])
-        || (!delta.hasAny(['precio', 'precios', 'abono']) && pagoValidoPara(id, p, false))
+        || (!delta.hasAny(['precio', 'precios', 'abono']) && pagoValidoPara(id, p, false, resource.data.get('items', []).size() > 8))
         || (esAdmin && p.get('restaurado', false) == true
           && resource.data.get('pagoVersion', 0) in [0, 1] && p.get('pagoVersion', 0) in [0, 1]);
     }
@@ -306,7 +306,7 @@ service cloud.firestore {
     function altaAdministrativa(id, p) {
       return admin() && tipoValido(p.tipo) && !p.keys().hasAny(['autorAviso'])
         && ((p.get('demo', false) == true && p.codigo.matches('^[PS]-T[0-9]+$'))
-          || (p.get('restaurado', false) == true && (p.get('pagoVersion', 0) in [0, 1] || pagoValidoPara(id, p, false))));
+          || (p.get('restaurado', false) == true && (p.get('pagoVersion', 0) in [0, 1] || pagoValidoPara(id, p, false, false))));
     }
     match /pedidos/{id} {
       allow get, list: if puedeVer(resource.data);

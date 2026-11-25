@@ -71,6 +71,22 @@ test("notifica los dos dispositivos autorizados del admin con el actor real, ded
     assert.doesNotMatch(JSON.stringify(x),/Cliente simulado|000123456789|Nota nueva|persona ajena/);
   }
 });
+test("una edición de cien partidas solicita un solo aviso por dispositivo y no incluye el pedido en el mensaje",async () => {
+  const e = entorno();
+  const items = Array.from({length:100},(_,i) => ({cant:1,precioMenor:100,nombre:`Cliente de partida ${i}`}));
+  const antes = {...pedido,items,totalMenor:10000};
+  const despues = {...evento.despues,revisionPago:"revision-100",totalMenor:10100,
+    items:[...items.slice(0,-1),{...items.at(-1),cant:2}]};
+  e.pedido(despues);
+  e.prefs.set("equipo-uid",{ediciones:false});
+  await notificarCambio({...evento,antes,despues},e.deps);
+  await notificarCambio({...evento,antes,despues},e.deps);
+  assert.deepEqual(e.mensajes.map(m => m.dispositivo).sort(),["celular","pc"]);
+  for (const m of e.mensajes) {
+    assert.equal(m.pedidoId,evento.pedidoId);
+    assert.doesNotMatch(JSON.stringify(m),/Cliente de partida|revision-100|10100/);
+  }
+});
 test("avisa a un lector de un pedido privado asignado a otra persona",async () => {
   const e = entorno();
   e.pedido({...pedido,publico:false,lectores:["ana","luis"],asignados:["ana"]});

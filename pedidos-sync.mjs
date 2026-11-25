@@ -78,16 +78,47 @@ export async function prepararValidacionPago(db, {doc, getDocFromServer, runTran
   }
 }
 
-// Las ediciones encolan los bloques antes del lote final en el mismo cliente de Firestore.
-export function encolarValidacionPago(db, {doc, setDoc}, identidad, pedidoId, revision, pedido) {
-  const ref = rutaPago(doc, db, identidad, revision);
-  const escrituras = [];
-  let parcial;
-  while (!parcial || parcial.items.length < pedido.items.length) {
-    parcial = bloqueDePago(pedidoId, false, pedido.items, parcial);
-    escrituras.push(setDoc(ref, parcial));
+// Marca de la versión leída. Conserva la precisión del Timestamp al pasar por IndexedDB.
+export function versionPedido(p) {
+  const sello = p?.autorAviso?.en;
+  return p ? JSON.stringify([p.revisionPago ?? null,p.editadoEn ?? null,p.restaurado ?? false,
+    sello?.seconds ?? null,sello?.nanoseconds ?? null]) : null;
+}
+
+const conflicto = () => Object.assign(new Error("El pedido cambió en otro dispositivo"), {code:"conflicto-pedido"});
+
+export async function confirmarEdicionGrande(db, sdk, identidad, entrada) {
+  const {doc,getDocFromServer,runTransaction,serverTimestamp,deleteDoc} = sdk;
+  const {id,pedidoId,base,pedido,fotos,restauracion = false} = entrada;
+  const destino = doc(db,"pedidos",pedidoId);
+  const vigente = actual => {
+    if (actual?.revisionPago === id) return false; // Confirmado antes de que el cliente recibiera la respuesta.
+    if (versionPedido(actual) !== base) throw conflicto();
+    return true;
+  };
+  if (!vigente((await getDocFromServer(destino)).data())) return;
+  const ref = rutaPago(doc,db,identidad,id);
+  try {
+    await prepararValidacionPago(db,sdk,identidad,pedidoId,id,pedido);
+    await runTransaction(db,async tx => {
+      if (!vigente((await tx.get(destino)).data())) return;
+      const datos = {...pedido,revisionPago:id};
+      if (restauracion) tx.set(destino,datos);
+      else tx.update(destino,{...datos,autorAviso:{uid:entrada.uid,en:serverTimestamp()}});
+      for (const [fotoId,foto] of documentosFoto(pedidoId,fotos,pedido.editadoPor,pedido.editadoEn))
+        tx.set(doc(db,"fotos",fotoId),foto);
+      tx.delete(ref);
+    });
+  } catch (error) {
+    if (error.code === "conflicto-pedido" || error.code === "permission-denied") {
+      // Una segunda pestaña puede haber consumido el comprobante al confirmar.
+      const actual = (await getDocFromServer(destino).catch(() => null))?.data();
+      if (actual?.revisionPago === id) return;
+      deleteDoc(ref).catch(() => {});
+      if (actual && versionPedido(actual) !== base) throw conflicto();
+    }
+    throw error;
   }
-  return {ref, escrituras};
 }
 
 export async function registrarPedido(db, {doc, getDocFromServer, runTransaction}, uid, {id, pedido, fotos}, identidad = uid, normalizar = p => p) {
