@@ -50,10 +50,12 @@ git merge-base --is-ancestor "$base" "$head"
 git checkout -q --detach refs/deploy/pr-12
 npm ci --no-audit --no-fund
 fb() {
-  CI=true NO_COLOR=1 XDG_CONFIG_HOME="$work/firebase-cli"     ./node_modules/.bin/firebase "$@" --project "$project" --non-interactive
+  CI=true NO_COLOR=1 XDG_CONFIG_HOME="$work/firebase-cli" \
+    ./node_modules/.bin/firebase "$@" --project "$project" --non-interactive
 }
 rules_api() {
-  curl -fsS --max-time 30 -H "Authorization: Bearer $(gcloud auth application-default print-access-token)"     "https://firebaserules.googleapis.com/v1/$1"
+  curl -fsS --max-time 30 -H "Authorization: Bearer $(gcloud auth application-default print-access-token)" \
+    "https://firebaserules.googleapis.com/v1/$1"
 }
 rules_active() {
   local release
@@ -97,8 +99,15 @@ for attempt in $(seq 1 12); do
          . as $grupo | any($db.fieldOverrides[];
            .collectionGroup == $grupo and .fieldPath == "items" and .indexes == [] and .ttl != true))
      ' "$work/firestore-indices-publicados.json" >/dev/null &&
-     jq -en --slurpfile antes "$work/firestore-indices-anteriores.json"        --slurpfile despues "$work/firestore-indices-publicados.json"        '($antes[0].indexes - $despues[0].indexes | length) == 0 and
-        ($antes[0].fieldOverrides - $despues[0].fieldOverrides | length) == 0' >/dev/null; then
+     jq -en --slurpfile antes "$work/firestore-indices-anteriores.json" \
+       --slurpfile despues "$work/firestore-indices-publicados.json" \
+       '($antes[0].indexes - $despues[0].indexes | length) == 0 and
+        ($antes[0].fieldOverrides - $despues[0].fieldOverrides | length) == 0' >/dev/null &&
+     gcloud firestore indexes composite list --project="$project" --database='(default)' --format=json |
+       jq -e 'any(.[]; (.name | contains("/collectionGroups/pedidos/indexes/")) and
+         .state == "READY" and .queryScope == "COLLECTION" and
+         any(.fields[]; .fieldPath == "tipo" and .order == "ASCENDING") and
+         any(.fields[]; .fieldPath == "lectores" and .arrayConfig == "CONTAINS"))' >/dev/null; then
     indexes_ok=true
     break
   fi

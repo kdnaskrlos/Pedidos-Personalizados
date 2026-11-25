@@ -1500,7 +1500,11 @@ function boot(){
     S.view = "resumen"; S.viewPushed = false; S.q = ""; S.filtro = "pendientes";
     if (uid && cop?.uid === uid) {
       Object.assign(S, {sistema:cop.sistema, me:cop.me, cfgRaw:cop.cfgRaw || null, usuarios:cop.usuarios || {}, anuncios:cop.anuncios || {}, pedidos:cop.pedidos || {}, resp:cop.resp || null, cache:true});
-      if (S.me.activo) { migrarBorradorLocal(); startData(true); }
+      if (S.me.activo) {
+        migrarBorradorLocal();
+        startData(true);
+        actualizarPendientes();
+      }
     } else borrarArranque();
     if (uid) startMe();
     route();
@@ -2383,7 +2387,7 @@ function abrirPendientes(){
     const entrada = S.pendientes.find(e => e.id === b.dataset.rescatarEdicion);
     if (!entrada) return;
     const uid = S.uid, {descargarArchivo} = await import("./pedido-export.mjs");
-    if (S.uid !== uid || S.auth.currentUser?.uid !== uid) return;
+    if (!S.me?.activo || S.uid !== uid || S.auth.currentUser?.uid !== uid) return;
     descargarArchivo({nombre:"edicion-pendiente-" + entrada.pedidoId + ".json",tipo:"application/json",
       datos:JSON.stringify({pedidoId:entrada.pedidoId,pedido:entrada.pedido,fotos:entrada.fotos},null,2)});
   });
