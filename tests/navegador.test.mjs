@@ -1161,6 +1161,7 @@ test("pedidos de 10, 30, 50 y 100 partidas en escritorio y móvil", {timeout:260
         });
         await oculto(page.locator('[data-act="cola"]'));
         await page.locator('[data-view="pedidos"]:visible').first().click();
+        if (await page.locator('[data-tab="sublimacion"]').isVisible()) await page.locator('[data-tab="sublimacion"]').click();
         await tarjeta.click();
         assert.equal(await page.locator(".pdit li").count(),n + 1);
         assert.ok((await page.locator(".pdit li").last().innerText()).includes("30.33"));
@@ -1242,6 +1243,7 @@ test("pedidos de 10, 30, 50 y 100 partidas en escritorio y móvil", {timeout:260
     for (const [page,nota] of [[pc,"Cambio de escritorio"],[cel,"Cambio del móvil conservado"]]) {
       await page.locator('[data-view="pedidos"]:visible').first().click();
       await page.locator('[data-filtro="avisar"]:visible').click();
+      if (await page.locator('[data-tab="sublimacion"]').isVisible()) await page.locator('[data-tab="sublimacion"]').click();
       const tarjeta = page.locator(".oc2:visible").filter({hasText:temaCompartido});
       idCompartido = await tarjeta.getAttribute("data-open");
       await tarjeta.click();
@@ -1273,6 +1275,7 @@ test("pedidos de 10, 30, 50 y 100 partidas en escritorio y móvil", {timeout:260
     await env.withSecurityRulesDisabled(async contexto => {
       respaldo = (await getDocFromServer(doc(contexto.firestore(),"pedidos",idCompartido))).data();
     });
+    assert.equal(respaldo.nota,"Cambio de escritorio");
     const {consecutivo,creadorUid, ...sinIdentidad} = respaldo;
     const idNuevo = "restaurado-largo-e2e";
     const archivos = {app:"comicshop-pedidos",creado:"2090-01-01",colecciones:{pedidos:{
