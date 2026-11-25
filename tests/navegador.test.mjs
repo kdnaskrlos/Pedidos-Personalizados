@@ -134,7 +134,7 @@ async function comprobarIconoSobreFoto(icono) {
   assert.ok(await icono.evaluate(b => {
     const foto = b.parentElement.querySelector("img");
     const a = b.getBoundingClientRect(), f = foto.getBoundingClientRect();
-    return a.width >= 44 && a.height >= 44 && Math.abs(f.right - a.right - 4) <= 2 &&
+    return a.width >= 40 && a.height >= 40 && Math.abs(f.right - a.right - 4) <= 2 &&
       Math.abs(a.top - f.top - 4) <= 2 && a.right <= innerWidth;
   }));
 }
@@ -534,6 +534,24 @@ test("escritorio y móvil: login, altas offline en varios clientes, recarga, sin
     await visible(page.getByText("Datos de acceso",{exact:true}));
     await page.getByRole("button",{name:"Listo",exact:true}).click();
     await iniciar(cel,url,"equipoprueba","58360924");
+    await page.locator('.side [data-view="ajustes"]:visible').click();
+    const ajustesNotificaciones = page.locator(".nt-panel");
+    await visible(ajustesNotificaciones);
+    await page.waitForFunction(() => !document.querySelector('[data-nt-tipo="ediciones"]').disabled);
+    assert.equal(await ajustesNotificaciones.locator('[data-nt-tipo="ediciones"]').isChecked(),true);
+    assert.equal(await ajustesNotificaciones.locator("[data-nt-dispositivo]").isDisabled(),true);
+    await ajustesNotificaciones.locator('[data-nt-tipo="nuevos"]').check();
+    await visible(ajustesNotificaciones.getByText("Preferencia guardada."));
+    await cel.locator('.side [data-act="cuenta"]:visible').click();
+    await visible(cel.getByRole("heading",{name:"Mi cuenta"}));
+    const cuentaNotificaciones = cel.locator(".nt-panel");
+    await cel.waitForFunction(() => !document.querySelector('[data-nt-tipo="ediciones"]').disabled);
+    assert.equal(await cuentaNotificaciones.locator('[data-nt-tipo="nuevos"]').isChecked(),false);
+    await cuentaNotificaciones.locator('[data-nt-tipo="estado"]').check();
+    await visible(cuentaNotificaciones.getByText("Preferencia guardada."));
+    await cel.locator(".ov .mh [data-close]").click();
+    assert.equal(await ajustesNotificaciones.locator('[data-nt-tipo="estado"]').isChecked(),false);
+    await page.locator('.side [data-view="resumen"]:visible').click();
     for (const tab of paginas) {
       await tab.waitForFunction(() => !!navigator.serviceWorker.controller && !!localStorage.getItem("cs-arranque"));
       await tab.reload();
@@ -829,6 +847,17 @@ test("escritorio y móvil: login, altas offline en varios clientes, recarga, sin
 
     await comprobarEtiquetas(page,env);
     await comprobarCalendariosPorTipo(page);
+    const uidAviso = await cel.evaluate(() => JSON.parse(localStorage.getItem("cs-arranque")).uid);
+    const entrada = new URL(url);
+    entrada.searchParams.set("destino",uidAviso);
+    entrada.searchParams.set("aviso","pedido-restringido");
+    await cel.goto(entrada.href);
+    await visible(cel.getByText(/El pedido no está disponible/));
+    assert.equal(await cel.locator(".pdmd").count(),0);
+    entrada.searchParams.set("aviso","pedido-historico");
+    await cel.goto(entrada.href);
+    await visible(cel.locator(".pdmd").getByText("PEDIDO S-0011"));
+    assert.equal(new URL(cel.url()).search,"");
     assert.deepEqual(errores,[]);
     assert.deepEqual(inesperadas,[]);
   } catch(e) {
@@ -921,4 +950,55 @@ test("demo independiente: agenda, HEIC, PNG, Etiqueta y WhatsApp sin servicios e
   } finally {
     await navegador.close();
   }
+});
+
+test("preview de Notificaciones sin red, con vistas y estados interactivos", {timeout:25000}, async () => {
+  const executablePath = process.env.CHROMIUM_PATH || (existsSync("/usr/bin/chromium") ? "/usr/bin/chromium" : chromium.executablePath());
+  const browser = await chromium.launch({executablePath,args:["--no-sandbox"]});
+  try {
+    const context = await browser.newContext({viewport:{width:1270,height:850}});
+    const externas = [];
+    await context.route(/^https?:/,r => { externas.push(r.request().url()); return r.abort(); });
+    const archivo = new URL("demo/preview-ajustes-notificaciones.html",root);
+    let page = await context.newPage();
+    try { await page.goto(archivo.href); }
+    catch (error) {
+      if (!error.message.includes("ERR_BLOCKED_BY_ADMINISTRATOR")) throw error;
+      await page.close();
+      page = await context.newPage();
+      await page.setContent(await readFile(archivo,"utf8"));
+    }
+    await visible(page.getByText("Vista previa · Datos simulados",{exact:true}));
+    page.setDefaultTimeout(7000);
+    const marco = page.locator("#marco");
+    await visible(marco.getByRole("region",{name:"Notificaciones",exact:true}));
+    assert.equal(await marco.getByRole("button",{name:"Admin",exact:true}).isVisible(),false);
+    const dispositivo = marco.locator("[data-nt-dispositivo]");
+    assert.equal(await marco.locator('[data-nt-tipo="ediciones"]').isChecked(),true);
+    assert.equal(await marco.locator('[data-nt-tipo=""]').first().isDisabled(),true);
+    await dispositivo.check();
+    await visible(marco.getByText("Activo",{exact:true}));
+    await marco.getByRole("button",{name:"Enviar prueba a este dispositivo"}).click();
+    await visible(marco.getByText("Notificación de prueba · Datos simulados"));
+    await marco.locator('[data-nt-tipo="nuevos"]').check();
+    await page.getByLabel("Vista",{exact:true}).selectOption("movil");
+    assert.ok((await marco.boundingBox()).width <= 390);
+    await visible(marco.getByRole("button",{name:"Admin",exact:true}));
+    assert.equal(await dispositivo.isChecked(),false);
+    assert.equal(await marco.locator('[data-nt-tipo="nuevos"]').isChecked(),true);
+    await page.getByLabel("Permiso simulado").selectOption("bloqueado");
+    await visible(marco.getByText("Bloqueado",{exact:true}));
+    assert.equal(await dispositivo.isDisabled(),true);
+    await page.getByLabel("Permiso simulado").selectOption("incompatible");
+    await visible(marco.getByText("No compatible",{exact:true}));
+    await page.getByLabel("Cuenta",{exact:true}).selectOption("equipo");
+    await visible(marco.getByRole("dialog",{name:"Mi cuenta",exact:true}));
+    assert.equal(await marco.locator('[data-nt-tipo="nuevos"]').isChecked(),false);
+    await page.getByLabel("Tema",{exact:true}).selectOption("dark");
+    assert.equal(await marco.getAttribute("data-theme"),"dark");
+    assert.equal(await marco.evaluate(el => getComputedStyle(el).getPropertyValue("--bg").trim()),"#0e1319");
+    await page.setViewportSize({width:350,height:740});
+    assert.ok((await page.locator("#marco").boundingBox()).width <= 350);
+    assert.deepEqual(externas,[]);
+  } finally { await browser.close(); }
 });

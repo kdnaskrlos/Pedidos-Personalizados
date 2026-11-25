@@ -4,7 +4,7 @@ import { randomUUID } from "node:crypto";
 import { after, before, beforeEach, test } from "node:test";
 import { initializeTestEnvironment, assertFails, assertSucceeds } from "@firebase/rules-unit-testing";
 import {
-  collection, deleteDoc, doc, getDoc, getDocFromServer, getDocs, query, runTransaction, setDoc, setLogLevel, updateDoc, where, writeBatch
+  collection, deleteDoc, doc, getDoc, getDocFromServer, getDocs, query, runTransaction, setDoc, setLogLevel, serverTimestamp, updateDoc, where, writeBatch
 } from "firebase/firestore";
 import { MAX_PARTIDAS } from "../pagos.mjs";
 import { registrarPedido } from "../pedidos-sync.mjs";
@@ -297,4 +297,43 @@ test("conserva las operaciones administrativas de demostración y respaldo hist�
   await assertSucceeds(guardar(admin,"pedidos/demo",{...pedido("admin"),demo:true,codigo:"P-T001"}));
   await assertFails(guardar(ana,"pedidos/falso",{...pedido("ana"),demo:true,codigo:"P-T002"}));
   await assertSucceeds(borrar(admin,"pedidos/demo"));
+});
+
+test("las preferencias y tokens de avisos pertenecen exclusivamente al usuario activo", async () => {
+  const preferencias = "usuarios/ana/preferencias/notificaciones";
+  const dispositivo = "usuarios/ana/dispositivos/" + randomUUID();
+  const valores = {ediciones:true,nuevos:false,estado:true};
+  const token = "fcm-demo-" + "x".repeat(40);
+  await assertSucceeds(guardar(ana,preferencias,valores));
+  await assertSucceeds(guardar(ana,dispositivo,{token,renovadoEn:serverTimestamp()}));
+  assert.deepEqual(await assertSucceeds(leer(ana,preferencias)),valores);
+  assert.equal((await assertSucceeds(leer(ana,dispositivo))).token,token);
+  for (const otro of [luis,admin,anon,inactivo]) {
+    await assertFails(leer(otro,preferencias));
+    await assertFails(leer(otro,dispositivo));
+    await assertFails(guardar(otro,preferencias,valores));
+    await assertFails(borrar(otro,dispositivo));
+  }
+  await assertFails(guardar(ana,preferencias,{...valores,nuevos:"sí"}));
+  await assertFails(guardar(ana,preferencias,{...valores,vence:true}));
+  await assertFails(guardar(ana,dispositivo,{token,renovadoEn:new Date(0)}));
+  await assertFails(guardar(ana,dispositivo,{token:"corto",renovadoEn:serverTimestamp()}));
+  await assertFails(getDocs(collection(admin,"usuarios/ana/dispositivos")));
+  await assertSucceeds(cambiar(admin,"usuarios/ana",{activo:false}));
+  await assertFails(leer(ana,dispositivo));
+  await assertFails(guardar(ana,preferencias,valores));
+  await assertSucceeds(borrar(ana,dispositivo));
+  await assertFails(guardar(admin,"notificacionesEventos/evento",{expiraEn:serverTimestamp()}));
+});
+
+test("Firestore atestigua UID y hora para los avisos de edición", async () => {
+  const ruta = "pedidos/publico";
+  await assertFails(cambiar(ana,ruta,{autorAviso:{uid:"admin",en:serverTimestamp()},nota:"Suplantación"}));
+  await assertFails(cambiar(admin,ruta,{autorAviso:{uid:"ana",en:serverTimestamp()},nota:"Suplantación por admin"}));
+  await assertFails(cambiar(ana,ruta,{autorAviso:{uid:"ana",en:new Date(0)},nota:"Hora antigua"}));
+  await assertFails(cambiar(ana,ruta,{autorAviso:{uid:"ana",en:serverTimestamp(),token:"otro"}}));
+  await assertSucceeds(cambiar(ana,ruta,{autorAviso:{uid:"ana",en:serverTimestamp()},nota:"Edición real"}));
+  assert.equal((await leer(ana,ruta)).autorAviso.uid,"ana");
+  await assertSucceeds(cambiar(luis,ruta,{nota:"Cliente anterior"}));
+  assert.equal((await leer(ana,ruta)).autorAviso.uid,"ana");
 });

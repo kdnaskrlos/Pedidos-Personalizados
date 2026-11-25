@@ -82,6 +82,24 @@ service cloud.firestore {
         && !request.resource.data.diff(resource.data).affectedKeys().hasAny(['identidadCola']);
       allow delete: if admin();
 
+      match /preferencias/{id} {
+        allow get: if activo() && request.auth.uid == uid && id == 'notificaciones';
+        allow create, update: if activo() && request.auth.uid == uid && id == 'notificaciones'
+          && request.resource.data.keys().hasOnly(['ediciones', 'nuevos', 'estado'])
+          && request.resource.data.ediciones is bool && request.resource.data.nuevos is bool
+          && request.resource.data.estado is bool;
+      }
+      match /dispositivos/{id} {
+        allow get: if activo() && request.auth.uid == uid;
+        allow create, update: if activo() && request.auth.uid == uid
+          && id.matches('^[a-f0-9-]{36}$')
+          && request.resource.data.keys().hasOnly(['token', 'renovadoEn'])
+          && request.resource.data.token is string && request.resource.data.token.size() >= 32
+          && request.resource.data.token.size() <= 4096
+          && request.resource.data.renovadoEn == request.time;
+        allow delete: if signed() && request.auth.uid == uid;
+      }
+
       // El recibo sobrevive a la eliminación del pedido para que un reintento nunca lo recree.
       match /envios/{id} {
         allow get: if activo() && propietarioEnvio() == uid;
@@ -203,7 +221,7 @@ service cloud.firestore {
         'moneda', 'pagoVersion', 'totalMenor', 'abonoMenor', 'motivoSinAbono',
         'urgente', 'imagenes', 'nota', 'editadoEn', 'editadoPor', 'revisar', 'revisarCambios', 'revisarPor',
         'revisarEn', 'estado', 'listoEn', 'listoPor', 'avisado', 'avisadoPor', 'avisadoEn',
-        'recordadoEn', 'entregadoEn', 'posponerHasta', 'lectores', 'publico', 'denegados', 'asignados'
+        'recordadoEn', 'entregadoEn', 'posponerHasta', 'lectores', 'publico', 'denegados', 'asignados', 'autorAviso'
       ]) && esAutor(p, delta, 'editadoPor') && esAutor(p, delta, 'listoPor') && esAutor(p, delta, 'avisadoPor')
         && (!delta.hasAny(['revisar', 'revisarCambios', 'revisarPor', 'revisarEn'])
           || (p.revisar == true && p.revisarPor == me().usuario))
@@ -211,6 +229,12 @@ service cloud.firestore {
         && (!delta.hasAny(['lectores', 'publico', 'denegados', 'asignados'])
           || (me().get('bloquear', false) == true && resource.data.creadoPor == me().usuario
             && accesoCoherente(p) && me().usuario in p.lectores));
+    }
+    function avisoAtestiguado(p, delta, restauracion) {
+      return !delta.hasAny(['autorAviso'])
+        || (restauracion && !p.keys().hasAny(['autorAviso']))
+        || (p.autorAviso is map && p.autorAviso.keys().hasOnly(['uid', 'en'])
+          && p.autorAviso.uid == request.auth.uid && p.autorAviso.en == request.time);
     }
     function pedidoEditable(p) {
       let delta = p.diff(resource.data).affectedKeys();
@@ -222,6 +246,7 @@ service cloud.firestore {
         && (esAdmin
           ? (!delta.hasAny(['lectores', 'publico', 'denegados', 'asignados']) || accesoCoherente(p) || esRestauracion)
           : edicionEmpleado(p, delta))
+        && avisoAtestiguado(p, delta, esRestauracion)
         && pagoCompatible(p, delta, esAdmin);
     }
     function altaNormal(id, p) {
@@ -240,7 +265,7 @@ service cloud.firestore {
         && datosPedidoValidos(p) && reservaNueva(id, p);
     }
     function altaAdministrativa(p) {
-      return admin() && tipoValido(p.tipo)
+      return admin() && tipoValido(p.tipo) && !p.keys().hasAny(['autorAviso'])
         && ((p.get('demo', false) == true && p.codigo.matches('^[PS]-T[0-9]+$'))
           || (p.get('restaurado', false) == true && (p.get('pagoVersion', 0) in [0, 1] || pagoValido(p))));
     }
