@@ -248,6 +248,12 @@ async function comprobarCalendariosPorTipo(page) {
     await visible(page.locator(".shell"));
   }
 
+  // Tras recargar, espera a que la lista incluya ambos tipos antes de abrir la agenda.
+  await navPedidos.click();
+  await page.locator('[data-filtro="pendientes"]:visible').click();
+  for (const tema of [/Etiqueta de Prueba/i,/Tema Adicional/i]) {
+    await visible(page.locator(".oc2:visible").filter({hasText:tema}));
+  }
   await page.locator('[data-act="agenda"]').click();
   const agenda = page.locator(".agov");
   const dia = agenda.locator(`.dpg:not([inert]) button[data-d="${fecha}"]`);
