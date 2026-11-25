@@ -22,8 +22,11 @@ export function puedeNotificar(perfil, pedido) {
   const tipo = pedido.tipo === "personalizado" ? "verPersonalizado" : pedido.tipo === "sublimacion" ? "verSublimacion" : null;
   if (!tipo || perfil[tipo] !== true) return false;
   // Mantener la misma visibilidad de pedidos que puedeVerEmpleado en firestore.rules.
-  return (pedido.publico === true && perfil.soloAsignados !== true)
-    || (Array.isArray(pedido.lectores) && pedido.lectores.includes(perfil.usuario));
+  if (pedido.publico === true && perfil.soloAsignados !== true) return true;
+  const {lectores} = pedido;
+  if (Array.isArray(lectores)) return lectores.includes(perfil.usuario);
+  // En un pedido restaurado, Firestore también acepta el nombre como clave de un mapa.
+  return !!lectores && Object.getPrototypeOf(lectores) === Object.prototype && Object.hasOwn(lectores,perfil.usuario);
 }
 
 const uidValido = uid => typeof uid === "string" && /^[A-Za-z0-9_-]{1,128}$/.test(uid);

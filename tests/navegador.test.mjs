@@ -84,11 +84,14 @@ const visible = selector => selector.waitFor({state:"visible"});
 async function comprobarAlcanceDeAjustes(vista) {
   const personales = vista.getByRole("region",{name:"Ajustes personales",exact:true});
   const equipo = vista.getByRole("region",{name:"Ajustes de todo el equipo",exact:true});
+  const notificaciones = personales.getByRole("region",{name:"Notificaciones",exact:true});
   await visible(personales.getByRole("heading",{name:"Ajustes personales",exact:true}));
-  await visible(personales.getByRole("region",{name:"Notificaciones",exact:true}));
+  for (const nombre of ["Notificaciones en este dispositivo","Ediciones de pedidos por otros miembros","Nuevos pedidos","Pedido listo / cambio de estado"])
+    await visible(notificaciones.getByRole("switch",{name:nombre,exact:true}));
   await visible(equipo.getByRole("heading",{name:"Ajustes de todo el equipo",exact:true}));
   await visible(equipo.getByText("Avisar entregas con anticipación de",{exact:true}));
   assert.equal(await equipo.locator(".nt-panel").count(),0);
+  assert.equal(await notificaciones.locator(".note").count(),0);
   assert.equal(await vista.getByText("Se aplican a todo el equipo",{exact:true}).count(),0);
 }
 const oculto = selector => selector.waitFor({state:"hidden"});
@@ -1010,6 +1013,7 @@ test("preview de Notificaciones sin red, con vistas y estados interactivos", {ti
     assert.equal(await marco.locator('[data-nt-tipo="nuevos"]').isChecked(),true);
     await page.getByLabel("Permiso simulado").selectOption("bloqueado");
     await visible(marco.getByText("Bloqueado",{exact:true}));
+    await visible(marco.getByText(/Permite las notificaciones en la configuración del navegador/));
     assert.equal(await dispositivo.isDisabled(),true);
     await page.getByLabel("Permiso simulado").selectOption("incompatible");
     await visible(marco.getByText("No compatible",{exact:true}));

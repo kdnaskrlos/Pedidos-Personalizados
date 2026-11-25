@@ -111,10 +111,10 @@ test("las consultas por tipo, lectores y público respetan el alcance real", asy
 test("los destinatarios de avisos coinciden con la lectura de Firestore al asignar y revocar acceso", async () => {
   const path = "pedidos/privado";
   await assertSucceeds(cambiar(admin,path,{publico:false,lectores:["ana","luis","asignado"],asignados:["ana"],denegados:[]}));
-  const comparar = async (db, usuario, permitido) => {
-    const [datos, miembro] = await Promise.all([leer(admin,path),leer(admin,`usuarios/${usuario}`)]);
+  const comparar = async (db, usuario, permitido, documento = path) => {
+    const [datos, miembro] = await Promise.all([leer(admin,documento),leer(admin,`usuarios/${usuario}`)]);
     assert.equal(puedeNotificar(miembro,datos),permitido);
-    const lecturaServidor = getDocFromServer(ruta(db,path));
+    const lecturaServidor = getDocFromServer(ruta(db,documento));
     if (permitido) assert.equal((await assertSucceeds(lecturaServidor)).exists(),true);
     else await assertFails(lecturaServidor);
   };
@@ -128,6 +128,10 @@ test("los destinatarios de avisos coinciden con la lectura de Firestore al asign
   await comparar(asignado,"asignado",false);
   await assertSucceeds(cambiar(admin,"usuarios/luis",{verPersonalizado:false}));
   await comparar(luis,"luis",false);
+  const restaurado = "pedidos/aviso-restaurado";
+  await assertSucceeds(guardar(admin,restaurado,pedido("ana",{restaurado:true,codigo:"P-0051",pagoVersion:1,publico:false,lectores:{asignado:false}})));
+  await comparar(asignado,"asignado",true,restaurado);
+  await comparar(ana,"ana",false,restaurado);
 });
 
 test("al editar conserva identidad, autoría y controles de acceso", async () => {
