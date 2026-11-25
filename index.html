@@ -1013,6 +1013,9 @@ html,body{overflow-x:clip}
 .lbx-x{position:absolute;top:max(14px,env(safe-area-inset-top));right:14px;z-index:2;width:40px;height:40px;border-radius:99px;border:0;background:#ffffff26;color:#fff;display:grid;place-items:center;cursor:pointer}
 .lbx-x svg.i{width:20px;height:20px}
 .lbx-nav,.descarga-foto,#d-download,#d-download-status{display:none}
+.pdmd #d-download.grande{display:inline-flex}
+#d-download-status:not(:empty){display:block;max-height:6em;overflow:auto;align-self:stretch;margin:0;padding:8px 10px;border-radius:8px;background:var(--surface-2);white-space:pre-line}
+#d-download-status.bad{color:var(--err)}
 .lb-foto{display:grid;position:relative;width:min(100cqw,calc(100cqh * var(--proporcion, 1)));height:min(100cqh,calc(100cqw / var(--proporcion, 1)))}
 .lbindicador{position:absolute;width:1px;height:1px;overflow:hidden;clip-path:inset(50%)}
 .ref-btn{display:block;width:100%;height:100%;padding:0;border:0;background:none;cursor:zoom-in}
@@ -1031,8 +1034,6 @@ html,body{overflow-x:clip}
   .descarga-foto:disabled{opacity:.65;cursor:wait}
   .descarga-foto svg.i{width:20px;height:20px}
   .lb-foto:not([data-lista]) .descarga-foto{visibility:hidden}
-  #d-download-status:not(:empty){display:block;max-height:6em;overflow:auto;align-self:stretch;margin:0;padding:8px 10px;border-radius:8px;background:var(--surface-2);white-space:pre-line}
-  #d-download-status.bad{color:var(--err)}
   .lbx-nav{display:grid;top:50%;transform:translateY(-50%)}
   .lbx-prev{right:auto;left:14px}
   .lbx-nav:disabled{opacity:.35;cursor:default}
@@ -4292,7 +4293,8 @@ async function descargarPedido(id, uid, boton, estado){
   etiqueta.textContent = "Preparando…";
   boton.setAttribute("aria-busy","true");
   estado.classList.remove("bad");
-  estado.textContent = "Preparando resumen y referencias…";
+  const descargarReferencias = matchMedia("(min-width: 761px)").matches;
+  estado.textContent = descargarReferencias ? "Preparando resumen y referencias…" : "Preparando resumen…";
   try {
     let pedido = exigirPedidoVisible(id, uid);
     if (S.online) {
@@ -4301,7 +4303,7 @@ async function descargarPedido(id, uid, boton, estado){
     }
     if (!pedido) throw new Error("El pedido no está disponible");
     const exportador = await import("./pedido-export.mjs");
-    const ids = pedido.imagenes || [];
+    const ids = descargarReferencias ? pedido.imagenes || [] : [];
     const [resumen,...referencias] = await Promise.allSettled([
       exportador.archivosResumenPng(modeloExportable(pedido)),
       ...ids.map((idFoto,i) => prepararArchivoReferencia(pedido.codigo,idFoto,i,exportador))
@@ -4320,12 +4322,12 @@ async function descargarPedido(id, uid, boton, estado){
     if (faltan.length) mensajes.push(`No se pudieron descargar las referencias ${faltan.join(", ")}.`);
     estado.classList.toggle("bad",!resumenSolicitado || faltan.length > 0);
     estado.textContent = mensajes.join("\n");
-    if (resumen.status === "fulfilled" && resumen.value.length > 1) {
+    if (resumen.status === "fulfilled" && (resumen.value.length > 1 || matchMedia("(pointer: coarse)").matches)) {
       for (const [i,pagina] of resumen.value.entries()) {
         const parte = document.createElement("button");
         parte.type = "button";
         parte.className = "btn sm";
-        parte.textContent = `PNG ${i+1} de ${resumen.value.length}`;
+        parte.textContent = resumen.value.length === 1 ? "Descargar PNG" : `PNG ${i+1} de ${resumen.value.length}`;
         parte.onclick = () => {
           try { exigirPedidoVisible(id,uid); exportador.descargarArchivo(pagina); }
           catch { toast("No se pudo descargar esa parte del resumen.",true); }
@@ -4396,7 +4398,7 @@ function openDetail(id){
         ${est !== "pendiente" ? `<button class="btn" id="d-reab">${I("undo")}Reabrir</button>` : ""}
         ${pr.eliminar ? `<button class="btn danger ico" id="d-del" title="Eliminar pedido" aria-label="Eliminar pedido">${I("trash")}</button>` : ""}
         <button class="btn" id="d-edit">${I("edit")}Editar</button>
-        <button class="btn" id="d-download" type="button">${I("download")}<span>Descargar</span></button>
+        <button class="btn${necesitaValidacionPago(p) ? " grande" : ""}" id="d-download" type="button">${I("download")}<span>Descargar</span></button>
       </div>
       <span class="msg" id="d-download-status" role="status"></span>
       ${est === "pendiente" ? `<button class="btn pdlisto" id="d-listo">${I("check")}Marcar pedido listo</button>` : ""}

@@ -17,7 +17,7 @@ export function documentosFoto(pedidoId, fotos, por, creadoEn) {
 }
 
 const PARTIDAS_POR_BLOQUE = 8;
-export const necesitaValidacionPago = p => p.pagoVersion === 2 && p.items.length > PARTIDAS_POR_BLOQUE;
+export const necesitaValidacionPago = p => p.pagoVersion === 2 && p.items?.length > PARTIDAS_POR_BLOQUE;
 
 // Margen para el documento de Firestore y el evento con ambas versiones del pedido.
 export function pedidoCabe(pedido) {

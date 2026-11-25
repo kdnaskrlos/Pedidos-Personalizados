@@ -1160,14 +1160,20 @@ test("pedidos de 10, 30, 50 y 100 partidas en escritorio y móvil", {timeout:260
           window.restaurarPNG = () => { CanvasRenderingContext2D.prototype.fillText = original; };
         });
         page.on("download",registrar);
-        await Promise.all([page.waitForEvent("download"),page.locator("#d-download").click()]);
+        if (perfil === "PC") await Promise.all([page.waitForEvent("download"),page.locator("#d-download").click()]);
+        else await page.locator("#d-download").click();
         await page.waitForFunction(() => !document.querySelector("#d-download").disabled);
         const estado = page.locator("#d-download-status");
         assert.doesNotMatch(await estado.innerText(),/No se pudo/);
         if (n === 100) {
-          const pagina2 = estado.getByRole("button",{name:/PNG 2 de/});
-          assert.equal(await pagina2.count(),1);
-          await Promise.all([page.waitForEvent("download",{predicate:d => /-parte-2\.png$/.test(d.suggestedFilename())}),pagina2.click()]);
+          const botones = estado.getByRole("button",{name:/^PNG \d+ de \d+$/});
+          assert.ok(await botones.count() >= 2);
+          for (let i = 0; i < await botones.count(); i++) await Promise.all([
+            page.waitForEvent("download",{predicate:d => d.suggestedFilename().endsWith(`-parte-${i+1}.png`)}),
+            botones.nth(i).click()
+          ]);
+        } else if (perfil === "Móvil") {
+          await Promise.all([page.waitForEvent("download"),estado.getByRole("button",{name:"Descargar PNG",exact:true}).click()]);
         }
         for (const archivo of descargas) {
           const png = await readFile(await archivo.path());
