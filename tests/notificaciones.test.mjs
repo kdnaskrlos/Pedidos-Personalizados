@@ -71,7 +71,13 @@ test("notifica los dos dispositivos autorizados del admin con el actor real, ded
     assert.doesNotMatch(JSON.stringify(x),/Cliente simulado|000123456789|Nota nueva|persona ajena/);
   }
 });
-test("respeta la preferencia, la baja de un dispositivo y el acceso revocado antes de enviar",async () => {
+test("avisa a un lector de un pedido privado asignado a otra persona",async () => {
+  const e = entorno();
+  e.pedido({...pedido,publico:false,lectores:["ana","luis"],asignados:["ana"]});
+  await notificarCambio(evento,e.deps);
+  assert.deepEqual(e.mensajes.filter(x => x.uid === "equipo-uid").map(x => x.dispositivo),["equipo"]);
+});
+test("respeta la preferencia y la baja de un dispositivo",async () => {
   const e = entorno();
   e.dispositivos.set("admin-uid",[{id:"celular"}]);
   e.prefs.set("equipo-uid",{ediciones:false});
@@ -80,13 +86,18 @@ test("respeta la preferencia, la baja de un dispositivo y el acceso revocado ant
   e.prefs.set("admin-uid",{ediciones:false,estado:false,nuevos:false});
   await notificarCambio({...evento,id:"evento-2"},e.deps);
   assert.equal(e.mensajes.length,1);
-  e.prefs.set("equipo-uid",{ediciones:true});
-  e.deps.dispositivos = async uid => {
-    if (uid === "equipo-uid") e.pedido({...pedido,publico:false,lectores:["ana"],denegados:["luis"]});
-    return [{id:"prueba"}];
+});
+test("una asignación no habilita el aviso si se revoca la lectura antes de enviar",async () => {
+  const e = entorno();
+  const compartido = {...pedido,publico:false,lectores:["ana","luis"],asignados:["luis"]};
+  e.pedido(compartido);
+  const leerDispositivos = e.deps.dispositivos;
+  e.deps.dispositivos = uid => {
+    if (uid === "equipo-uid") e.pedido({...compartido,lectores:["ana"]});
+    return leerDispositivos(uid);
   };
-  await notificarCambio({...evento,id:"evento-3"},e.deps);
-  assert.equal(e.mensajes.length,1);
+  await notificarCambio(evento,e.deps);
+  assert.deepEqual(e.mensajes.map(x => x.uid),["admin-uid","admin-uid"]);
 });
 test("envía altas y cambios de estado solo a quienes activaron cada categoría",async () => {
   const e = entorno();

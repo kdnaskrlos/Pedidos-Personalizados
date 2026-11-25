@@ -1277,6 +1277,7 @@ table.mx{border-collapse:collapse;width:100%;font-size:13px}
 .pdcal small{color:#a16207}
 .pddate.err .pdcal small,.pddate.err .pdrel{color:var(--err)}
 /* Preferencias personales en Ajustes y Mi cuenta. */
+.ajustes-grupo{display:flex;flex-direction:column;gap:inherit}
 .nt-panel{gap:12px}
 .nt-panel p{margin:0}
 .nt-panel .swr.nt-fila{display:flex;justify-content:space-between;align-items:center;gap:12px;padding:10px 0;flex-wrap:nowrap}
@@ -1475,14 +1476,24 @@ function interfaz() {
       <div class="mb"><dl class="kv"><dt>Usuario</dt><dd>@equipoprueba</dd><dt>Rol</dt><dd>Equipo</dd><dt>Versión</dt><dd>v3.70.4</dd><dt>Puede ver</dt><dd>Personalizado y Sublimación completa</dd></dl>
        <div id="panel"></div><div style="display:flex;gap:8px;flex-wrap:wrap;justify-content:flex-end"><button type="button" class="btn" id="cTema">${I("moon")}Cambiar tema</button><button type="button" class="btn">${I("key")}Cambiar mi PIN</button></div></div>
        <div class="mf"><button type="button" class="btn danger">${I("logout")}Cerrar sesión</button></div></div></div>`;
-  const ajustes = `<div class="hello"><h1>Ajustes</h1><span class="date">${I("sliders")}Se aplican a todo el equipo</span></div>
+  const ajustes = `<div class="hello"><h1>Ajustes</h1></div>
     <div class="seg m-tabs"><button type="button" aria-pressed="true">Ajustes</button><button type="button" aria-pressed="false">Equipo</button></div>
-    <div class="card temacard"><label class="swr"><span>${I("moon")}Modo oscuro</span><input type="checkbox" class="swi" id="cTema" ${oscuro?"checked":""}></label></div>
-    <div id="panel"></div>
-    <div class="card"><div class="sec">${I("sliders")}General</div><div class="g3">
-    <div class="f"><label>Avisar entregas con anticipación de</label><select class="inp"><option>2 días</option></select></div>
-    <div class="f"><label>Avisar si un pedido avisado no se retira en</label><select class="inp"><option>3 días</option></select></div>
-    </div><button class="btn primary" type="button" style="align-self:flex-end">${I("check")}Guardar</button></div>`;
+    <section class="ajustes-grupo" aria-labelledby="ajustesPersonales">
+      <h2 class="sec" id="ajustesPersonales">Ajustes personales</h2>
+      <div class="card temacard"><label class="swr"><span>${I("moon")}Modo oscuro</span><input type="checkbox" class="swi" id="cTema" ${oscuro?"checked":""}></label></div>
+      <div id="panel"></div>
+    </section>
+    <section class="ajustes-grupo" aria-labelledby="ajustesEquipo">
+      <h2 class="sec" id="ajustesEquipo">Ajustes de todo el equipo</h2>
+      <div class="card">
+        <div class="sec">${I("sliders")}General</div>
+        <div class="g3">
+          <div class="f"><label>Avisar entregas con anticipación de</label><select class="inp"><option>2 días</option></select></div>
+          <div class="f"><label>Avisar si un pedido avisado no se retira en</label><select class="inp"><option>3 días</option></select></div>
+        </div>
+        <button class="btn primary" type="button" style="align-self:flex-end">${I("check")}Guardar</button>
+      </div>
+    </section>`;
   return `<style>${estilos}</style><div class="preview-app"><div id="app">${barra}
     <div class="shell"><div class="topbar"><span class="pill st ok"><i></i>En línea</span><span class="sp"></span><button type="button" class="rfb" title="Actualizar">${I("refresh")}</button><button type="button" class="pill tdate">${I("cal")}Mar 24 nov</button></div>
     <main class="main">${admin ? ajustes : '<div class="hello"><h1>Resumen</h1></div>'}</main></div>

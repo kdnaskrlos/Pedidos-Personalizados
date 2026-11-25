@@ -20,9 +20,10 @@ export function puedeNotificar(perfil, pedido) {
   if (perfil.rol === "admin") return true;
   if (perfil.rol !== "empleado" || !perfil.usuario) return false;
   const tipo = pedido.tipo === "personalizado" ? "verPersonalizado" : pedido.tipo === "sublimacion" ? "verSublimacion" : null;
-  if (!tipo || perfil[tipo] !== true || pedido.denegados?.includes(perfil.usuario)) return false;
-  if (pedido.asignados?.length && !pedido.asignados.includes(perfil.usuario)) return false;
-  return pedido.lectores?.includes(perfil.usuario) === true || (pedido.publico === true && perfil.soloAsignados !== true);
+  if (!tipo || perfil[tipo] !== true) return false;
+  // Mantener la misma visibilidad de pedidos que puedeVerEmpleado en firestore.rules.
+  return (pedido.publico === true && perfil.soloAsignados !== true)
+    || (Array.isArray(pedido.lectores) && pedido.lectores.includes(perfil.usuario));
 }
 
 const uidValido = uid => typeof uid === "string" && /^[A-Za-z0-9_-]{1,128}$/.test(uid);

@@ -1172,6 +1172,7 @@ html,body{overflow-x:clip}
 .pdcal small{color:#a16207}
 .pddate.err .pdcal small,.pddate.err .pdrel{color:var(--err)}
 /* Preferencias personales en Ajustes y Mi cuenta. */
+.ajustes-grupo{display:flex;flex-direction:column;gap:inherit}
 .nt-panel{gap:12px}
 .nt-panel p{margin:0}
 .nt-panel .swr.nt-fila{display:flex;justify-content:space-between;align-items:center;gap:12px;padding:10px 0;flex-wrap:nowrap}
@@ -2580,29 +2581,35 @@ async function guardarListas(cat){
 function viewAjustes(){
   const c = Object.assign({}, cfg(), S.cdraft || {});
   const oscuro = document.documentElement.dataset.theme === "dark";
-  return `<div class="hello"><h1>Ajustes</h1><span class="date">${I("sliders")}Se aplican a todo el equipo</span></div>${adminTabs()}
-    <div class="card temacard"><label class="swr"><span>${I("moon")}Modo oscuro</span><input type="checkbox" class="swi" id="cTema" ${oscuro ? "checked" : ""}></label></div>
-    <div data-panel-notificaciones></div>
-    <div class="card">
-      <div class="sec">${I("sliders")}General</div>
-      <div class="g3">
-        <div class="f"><label>Avisar entregas con anticipación de</label><select class="inp" id="cDias">${[0,1,2,3,4,5,7,10,14].map(n => `<option value="${n}" ${n == c.dias ? "selected" : ""}>${n === 0 ? "Solo el mismo día" : n + " día" + (n > 1 ? "s" : "")}</option>`).join("")}</select></div>
-        <div class="f"><label>Avisar si un pedido avisado no se retira en</label><select class="inp" id="cDiasRet">${[1,2,3,4,5,7,10,15,30].map(n => `<option value="${n}" ${n == c.diasRetiro ? "selected" : ""}>${n} día${n > 1 ? "s" : ""}</option>`).join("")}</select></div>
+  return `<div class="hello"><h1>Ajustes</h1></div>${adminTabs()}
+    <section class="ajustes-grupo" aria-labelledby="ajustesPersonales">
+      <h2 class="sec" id="ajustesPersonales">Ajustes personales</h2>
+      <div class="card temacard"><label class="swr"><span>${I("moon")}Modo oscuro</span><input type="checkbox" class="swi" id="cTema" ${oscuro ? "checked" : ""}></label></div>
+      <div data-panel-notificaciones></div>
+    </section>
+    <section class="ajustes-grupo" aria-labelledby="ajustesEquipo">
+      <h2 class="sec" id="ajustesEquipo">Ajustes de todo el equipo</h2>
+      <div class="card">
+        <div class="sec">${I("sliders")}General</div>
+        <div class="g3">
+          <div class="f"><label>Avisar entregas con anticipación de</label><select class="inp" id="cDias">${[0,1,2,3,4,5,7,10,14].map(n => `<option value="${n}" ${n == c.dias ? "selected" : ""}>${n === 0 ? "Solo el mismo día" : n + " día" + (n > 1 ? "s" : "")}</option>`).join("")}</select></div>
+          <div class="f"><label>Avisar si un pedido avisado no se retira en</label><select class="inp" id="cDiasRet">${[1,2,3,4,5,7,10,15,30].map(n => `<option value="${n}" ${n == c.diasRetiro ? "selected" : ""}>${n} día${n > 1 ? "s" : ""}</option>`).join("")}</select></div>
+        </div>
+        <button class="btn primary" id="cSave" style="align-self:flex-end">${I("check")}Guardar</button>
       </div>
-      <button class="btn primary" id="cSave" style="align-self:flex-end">${I("check")}Guardar</button>
-    </div>
-    <div class="sec">${I("list")}Opciones de los pedidos</div>
-    <div class="lists2">${LISTAS.map(listaHTML).join("")}
-      <button class="btn listo crema" id="cReset">${I("undo")}Restaurar opciones originales</button>
-    </div>
-    <div class="card">
-      <div class="sec">${I("msg")}Mensajes de WhatsApp</div>
-      <div class="f"><label>Mensaje de saludo al registrar al cliente</label><textarea class="inp" id="cPlS" rows="3">${esc(c.plantillaSaludo)}</textarea><span class="msg mut">Puedes usar: {cliente} {negocio} {tema}</span></div>
-      <div class="f"><label>Mensaje de WhatsApp cuando el pedido está listo</label><textarea class="inp" id="cPl" rows="4">${esc(c.plantilla)}</textarea></div>
-      <div class="f"><label>Mensaje de WhatsApp para recordar el retiro</label><textarea class="inp" id="cPlR" rows="3">${esc(c.plantillaRetiro)}</textarea><span class="msg mut">Puedes usar: {cliente} {negocio} {codigo} {resumen} {saldo} {total} {fecha}</span></div>
-      <button class="btn primary" id="cSave2" style="align-self:flex-end">${I("check")}Guardar</button>
-    </div>
-    ${respaldoCard()}`;
+      <div class="sec">${I("list")}Opciones de los pedidos</div>
+      <div class="lists2">${LISTAS.map(listaHTML).join("")}
+        <button class="btn listo crema" id="cReset">${I("undo")}Restaurar opciones originales</button>
+      </div>
+      <div class="card">
+        <div class="sec">${I("msg")}Mensajes de WhatsApp</div>
+        <div class="f"><label>Mensaje de saludo al registrar al cliente</label><textarea class="inp" id="cPlS" rows="3">${esc(c.plantillaSaludo)}</textarea><span class="msg mut">Puedes usar: {cliente} {negocio} {tema}</span></div>
+        <div class="f"><label>Mensaje de WhatsApp cuando el pedido está listo</label><textarea class="inp" id="cPl" rows="4">${esc(c.plantilla)}</textarea></div>
+        <div class="f"><label>Mensaje de WhatsApp para recordar el retiro</label><textarea class="inp" id="cPlR" rows="3">${esc(c.plantillaRetiro)}</textarea><span class="msg mut">Puedes usar: {cliente} {negocio} {codigo} {resumen} {saldo} {total} {fecha}</span></div>
+        <button class="btn primary" id="cSave2" style="align-self:flex-end">${I("check")}Guardar</button>
+      </div>
+      ${respaldoCard()}
+    </section>`;
 }
 
 /* ---------- Eventos ---------- */

@@ -8,6 +8,7 @@ import {
 } from "firebase/firestore";
 import { MAX_PARTIDAS } from "../pagos.mjs";
 import { registrarPedido } from "../pedidos-sync.mjs";
+import { puedeNotificar } from "../functions/notificaciones.mjs";
 
 const PROJECT = "demo-pedidos-codex";
 const FIRESTORE = process.env.FIRESTORE_EMULATOR_HOST;
@@ -105,6 +106,28 @@ test("las consultas por tipo, lectores y público respetan el alcance real", asy
   await assertFails(leer(luis,"pedidos/otro-tipo"));
   await assertFails(leer(ana,"pedidos/otro-tipo"));
   assert.deepEqual(ids(await assertSucceeds(lista(admin))),["otro-tipo","privado","publico"]);
+});
+
+test("los destinatarios de avisos coinciden con la lectura de Firestore al asignar y revocar acceso", async () => {
+  const path = "pedidos/privado";
+  await assertSucceeds(cambiar(admin,path,{publico:false,lectores:["ana","luis","asignado"],asignados:["ana"],denegados:[]}));
+  const comparar = async (db, usuario, permitido) => {
+    const [datos, miembro] = await Promise.all([leer(admin,path),leer(admin,`usuarios/${usuario}`)]);
+    assert.equal(puedeNotificar(miembro,datos),permitido);
+    const lecturaServidor = getDocFromServer(ruta(db,path));
+    if (permitido) assert.equal((await assertSucceeds(lecturaServidor)).exists(),true);
+    else await assertFails(lecturaServidor);
+  };
+  await comparar(luis,"luis",true);
+  await comparar(asignado,"asignado",true);
+  await assertSucceeds(cambiar(admin,path,{lectores:["ana"],asignados:["luis"]}));
+  await comparar(luis,"luis",false);
+  await comparar(asignado,"asignado",false);
+  await assertSucceeds(cambiar(admin,path,{publico:true,asignados:["ana"]}));
+  await comparar(luis,"luis",true);
+  await comparar(asignado,"asignado",false);
+  await assertSucceeds(cambiar(admin,"usuarios/luis",{verPersonalizado:false}));
+  await comparar(luis,"luis",false);
 });
 
 test("al editar conserva identidad, autoría y controles de acceso", async () => {
