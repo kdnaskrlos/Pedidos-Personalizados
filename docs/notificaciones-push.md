@@ -6,12 +6,28 @@ Los avisos de ediciones, altas y cambios de estado los solicita una Cloud Functi
 
 1. Descarga `demo/preview-ajustes-notificaciones.html` y ábrelo con doble clic. Usa **Vista** para alternar escritorio y móvil, **Cuenta** para ver Ajustes de administrador o Mi cuenta del equipo y **Permiso simulado** para recorrer los estados. Todas las interacciones de ese HTML usan datos simulados.
 2. Confirma que el proyecto existente `pedidos-personalizados-6610e` tiene plan **Blaze**, una cuenta de facturación con presupuesto y alertas y acceso a la base Firestore `(default)`. Confirma la ubicación de Firestore y la disponibilidad de Cloud Functions/Eventarc. Este PR fija `us-central1` tanto para la función invocable como para su cliente. Si el proyecto requiere otra región compatible, cambia ambos valores antes de desplegar.
-3. En **Firebase Console → Configuración del proyecto → Cloud Messaging → Configuración web → Certificados web**, genera o recupera el par VAPID de este proyecto. Copia solo la clave **pública** en `claveVapid` de `push-config.mjs`. El archivo vacío bloquea la activación del dispositivo mientras permite revisar las preferencias. Si rotas la clave, pide a quien ya tenía avisos que los desactive y reactive en su dispositivo.
+3. En **Firebase Console → Configuración del proyecto → Cloud Messaging → Configuración web → Certificados web**, copia la clave **pública** del par VAPID existente en `claveVapid` de `push-config.mjs`. Si la sección está vacía, solicita autorización para generar el par en ese proyecto. El archivo vacío bloquea la activación del dispositivo mientras permite revisar las preferencias.
 4. Verifica las APIs y la identidad con la que se desplegará. El operador necesita permisos de despliegue de Firebase Functions y Firestore Rules y permiso `iam.serviceAccounts.actAs` sobre la identidad de ejecución. La identidad de ejecución de Functions 2.ª gen necesita `roles/datastore.user` y `roles/firebasecloudmessaging.admin` en el proyecto. Comprueba que el agente de Eventarc tenga su rol de agente administrado, y que la cuenta del disparador pueda recibir eventos y llamar al servicio de Cloud Run (`roles/eventarc.eventReceiver` y `roles/run.invoker` según corresponda). Usa identidades gestionadas, sin archivos JSON de cuentas de servicio.
+
+## Comprobaciones de solo lectura
+
+Desde una sesión de Google Cloud autorizada, consulta solo el proyecto de Pedidos. Confirma el plan en Firebase Console. El comando de facturación comprueba la vinculación, mientras que la consola confirma el plan. Revisa en IAM y en el Solucionador de problemas de políticas los permisos del operador, de la identidad de ejecución y del disparador. Una cuenta con acceso de consulta puede devolver permisos insuficientes para ver alguno de estos datos.
+
+```sh
+gcloud billing projects describe pedidos-personalizados-6610e --format='value(billingEnabled)'
+gcloud firestore databases describe --database='(default)' --project pedidos-personalizados-6610e \
+  --format='value(locationId)'
+gcloud services list --enabled --project pedidos-personalizados-6610e --format='value(config.name)'
+gcloud functions list --gen2 --project pedidos-personalizados-6610e \
+  --format='table(name,serviceConfig.serviceAccountEmail,eventTrigger.serviceAccountEmail)'
+gcloud projects get-iam-policy pedidos-personalizados-6610e --format=json
+```
+
+Si ya existen las funciones, identifica su región y sus cuentas antes de desplegar. Si todavía no existen, verifica la identidad prevista y la compatibilidad de la ubicación de Firestore con el disparador de Eventarc. El cliente y la función invocable deben usar la misma región. Para comunicar el resultado, basta indicar la ubicación, qué APIs faltan y si los permisos están confirmados. Comparte únicamente la clave VAPID pública.
 
 ## Comandos después de la aprobación explícita
 
-Desde un checkout limpio de la versión aprobada y con Firebase CLI conectado a la cuenta autorizada, confirma el identificador del proyecto en cada comando. Habilitar APIs, desplegar y agregar IAM son operaciones de producción.
+Desde un checkout limpio de la versión aprobada y con Firebase CLI conectado a la cuenta autorizada, confirma el identificador del proyecto en cada comando. Guarda una copia de las reglas activas desde Firebase Console y anota el commit que está publicado en GitHub Pages. Si las reglas activas difieren de la base del PR, revisa las diferencias antes de reemplazarlas. La habilitación de APIs y las altas de IAM requieren aprobación específica. Ejecuta únicamente las operaciones correspondientes a las carencias confirmadas.
 
 ```sh
 gcloud services enable cloudfunctions.googleapis.com run.googleapis.com eventarc.googleapis.com \
@@ -31,19 +47,23 @@ for rol_pedidos in roles/datastore.user roles/firebasecloudmessaging.admin roles
 done
 ```
 
-Con las APIs habilitadas, la clave pública en la versión aprobada y los permisos verificados, ejecuta las pruebas de emulador y despliega únicamente los componentes de esta tarea.
+Con las APIs habilitadas, la clave pública en la versión aprobada y los permisos verificados, comprueba que CI esté en verde para ese commit. Despliega las reglas primero y después las dos funciones. La edición de un cliente antiguo sigue permitida sin `autorAviso`, incluso cuando el pedido ya lleva un sello anterior. Esas ediciones no generan push. Usa el cliente nuevo para restaurar respaldos que ya contengan `autorAviso`. Ese cliente retira el sello al importar.
 
 ```sh
 npm ci
 npm ci --prefix functions
-npm test
-npm run test:emuladores
-npm run test:navegador
-npx --no-install firebase deploy --only firestore:rules,functions:avisosDePedidos,functions:probarNotificacion \
+npx --no-install firebase deploy --only firestore:rules --project pedidos-personalizados-6610e
+npx --no-install firebase deploy --only functions:avisosDePedidos,functions:probarNotificacion \
   --project pedidos-personalizados-6610e
 ```
 
 Tras desplegar las reglas y funciones, publica en GitHub Pages por el flujo existente de la rama aprobada con la clave pública configurada. Comprueba el registro de `sw.js` del mismo origen. Recarga después de instalar el worker para activar el dispositivo. En Windows y Android, comprueba en Chrome o Edge compatible. En iPhone, agrega la PWA a Inicio, ábrela desde su icono y activa los avisos desde allí con iOS compatible y permisos del sistema.
+
+### Reversión tras autorización
+
+1. Para detener nuevos envíos, restaura la versión anterior de ambas funciones si ya existían, o retira únicamente `avisosDePedidos` y `probarNotificacion` si fueron creadas en esta publicación. Conserva los pedidos, fotografías y preferencias. Los avisos ya entregados pueden permanecer en el sistema.
+2. Si hay que revertir el cliente, vuelve a publicar la versión anterior de GitHub Pages con un identificador de caché nuevo en `sw.js` para que las instalaciones recojan la reversión. Comprueba que una instalación existente recarga y que un empleado puede seguir guardando cambios.
+3. Conserva las reglas compatibles mientras existan clientes nuevos abiertos o pendientes de actualizar. Restaurar antes las reglas anteriores puede rechazar las ediciones de empleados que incluyan `autorAviso`. Solo vuelve a las reglas guardadas cuando los clientes que envían ese campo se hayan retirado. Una reversión de este PR no requiere tocar índices ni borrar colecciones.
 
 La colección de deduplicación lleva `expiraEn` a siete días. Para que se limpie de forma automática, habilita esta política TTL con aprobación para su coste:
 
