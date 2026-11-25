@@ -1171,6 +1171,23 @@ html,body{overflow-x:clip}
 :root[data-theme="dark"] .pdpay .sa.ok b{color:#86efac}
 .pdcal small{color:#a16207}
 .pddate.err .pdcal small,.pddate.err .pdrel{color:var(--err)}
+/* Preferencias personales en Ajustes y Mi cuenta. */
+.ajustes-grupo{display:flex;flex-direction:column;gap:inherit}
+.nt-panel{gap:12px}
+.nt-panel p{margin:0}
+.nt-panel .swr.nt-fila{display:flex;justify-content:space-between;align-items:center;gap:12px;padding:10px 0;flex-wrap:nowrap}
+.nt-fila>span{display:grid;gap:3px;min-width:0}
+.nt-fila b{font-size:14px;line-height:1.35}
+.nt-fila small{font-size:12px;color:var(--muted);font-weight:400}
+.nt-panel .swi{flex:none}
+.nt-panel .swi:disabled{opacity:.55;cursor:default}
+.nt-tipos .nt-fila+.nt-fila{border-top:1px solid var(--line)}
+.nt-dispositivo{background:var(--surface-2);border:1px solid var(--line);border-radius:12px;padding:0 12px 10px}
+.nt-dispositivo .nt-ayuda{margin-top:6px;font-size:12px;color:var(--muted)}
+.nt-acciones{display:flex;align-items:center;justify-content:space-between;flex-wrap:wrap;gap:8px}
+.nt-estado{font-size:12px;font-weight:700;color:var(--muted)}
+.nt-estado[data-estado="activo"]{color:var(--accent)}
+.nt-panel [data-nt-mensaje]:empty{display:none}
 </style>
 </head>
 <body>
@@ -1181,13 +1198,15 @@ import { firebaseConfig } from "./config.js";
 import { entregasPorFecha, fechasDelMes } from "./calendario.mjs";
 import { esHeif, cargarHeif, FORMATOS_FOTO } from "./heic.mjs";
 import { enlaceChatCliente } from "./whatsapp.mjs";
+import { crearNotificaciones } from "./notificaciones.mjs";
+import { montarPanelNotificaciones } from "./notificaciones-ui.mjs";
 import { conectarListasNota } from "./notas.mjs";
 import { consecutivoDe, documentosFoto, registrarPedido } from "./pedidos-sync.mjs";
 import { guardarPendiente, leerPendientes, borrarPendiente, guardarFotoLocal, leerFotoLocal, borrarFotoLocal } from "./cola-local.mjs";
 import { MAX_PARTIDAS, centavos, centavosHistoricos, cantidad, clavePrecio, precioHistorico, valorPrecioHistorico, validarPago, validarPagoEnCentavos, actualizarPagoPendiente } from "./pagos.mjs";
 import { initializeApp, deleteApp } from "https://www.gstatic.com/firebasejs/10.12.2/firebase-app.js";
 import { getAuth, onAuthStateChanged, signInWithEmailAndPassword, createUserWithEmailAndPassword, signOut, updatePassword, reauthenticateWithCredential, EmailAuthProvider } from "https://www.gstatic.com/firebasejs/10.12.2/firebase-auth.js";
-import { initializeFirestore, getFirestore, persistentLocalCache, persistentMultipleTabManager, doc, collection, query, where, onSnapshot, getDoc, getDocFromCache, getDocFromServer, getDocsFromServer, setDoc as fsSetDoc, updateDoc as fsUpdateDoc, deleteDoc as fsDeleteDoc, writeBatch as fsWriteBatch, runTransaction } from "https://www.gstatic.com/firebasejs/10.12.2/firebase-firestore.js";
+import { initializeFirestore, getFirestore, persistentLocalCache, persistentMultipleTabManager, doc, collection, query, where, onSnapshot, getDoc, getDocFromCache, getDocFromServer, getDocsFromServer, setDoc as fsSetDoc, updateDoc as fsUpdateDoc, deleteDoc as fsDeleteDoc, writeBatch as fsWriteBatch, runTransaction, serverTimestamp } from "https://www.gstatic.com/firebasejs/10.12.2/firebase-firestore.js";
 // Guardado sin esperar a internet: Firebase guarda el cambio en el teléfono al instante y lo sube
 // cuando hay conexión. La app sigue en cuanto el cambio quedó guardado localmente.
 const sinEsperar = p => {
@@ -1200,7 +1219,7 @@ const updateDoc = (...a) => sinEsperar(fsUpdateDoc(...a));
 const deleteDoc = (...a) => sinEsperar(fsDeleteDoc(...a));
 const writeBatch = db => { const b = fsWriteBatch(db), c = b.commit.bind(b); b.commit = () => sinEsperar(c()); return b; };
 
-const VERSION = "v3.70.3";
+const VERSION = "v3.70.4";
 /* ================= Utilidades ================= */
 const $ = (s, r = document) => r.querySelector(s);
 const esc = s => String(s ?? "").replace(/[&<>"']/g, c => ({"&":"&amp;","<":"&lt;",">":"&gt;",'"':"&quot;","'":"&#39;"}[c]));
@@ -1404,6 +1423,64 @@ function nameOf(usuario){
 }
 const pedidosList = () => Object.values(S.pedidos);
 
+/* ================= Notificaciones personales ================= */
+const preferenciaAvisos = uid => doc(S.db,"usuarios",uid,"preferencias","notificaciones");
+const dispositivoAvisos = (uid,id) => doc(S.db,"usuarios",uid,"dispositivos",id);
+const pushPedidos = crearNotificaciones({
+  sesion:() => S.me?.activo && S.auth?.currentUser?.uid === S.uid ? {uid:S.uid} : null,
+  app:() => S.app,
+  datos:{
+    leerPreferencias:async uid => (await getDocFromServer(preferenciaAvisos(uid))).data(),
+    guardarPreferencia:(uid,key,val,base) => runTransaction(S.db,async tx => {
+      const ref = preferenciaAvisos(uid), actual = (await tx.get(ref)).data();
+      const preferencias = {...base,...actual,[key]:val};
+      tx.set(ref,preferencias);
+      return preferencias;
+    }),
+    guardarDispositivo:(uid,id,token) => runTransaction(S.db,async tx => {
+      tx.set(dispositivoAvisos(uid,id),{token,renovadoEn:serverTimestamp()});
+    }),
+    borrarDispositivo:(uid,id) => runTransaction(S.db,async tx => { tx.delete(dispositivoAvisos(uid,id)); }),
+    existeDispositivo:async (uid,id) => (await getDocFromServer(dispositivoAvisos(uid,id))).exists()
+  },
+  actualizar:() => document.querySelectorAll("[data-panel-notificaciones]").forEach(panel => panel.dibujarAvisos?.())
+});
+function conectarNotificaciones(panel) {
+  if (!panel) return;
+  panel.dibujarAvisos = montarPanelNotificaciones(panel,pushPedidos,I("bell"));
+  pushPedidos.abrirPanel();
+}
+
+const patronAviso = /^[A-Za-z0-9_-]{1,128}$/;
+const urlAviso = new URL(location.href);
+let avisoPedido = {id:urlAviso.searchParams.get("aviso"),uid:urlAviso.searchParams.get("destino")};
+if (urlAviso.searchParams.has("aviso")) {
+  urlAviso.searchParams.delete("aviso");
+  urlAviso.searchParams.delete("destino");
+  history.replaceState(history.state,"",urlAviso);
+}
+async function atenderAvisoPedido() {
+  if (!avisoPedido || !S.me?.activo) return;
+  const {id,uid} = avisoPedido;
+  avisoPedido = null;
+  if (!id || !patronAviso.test(id)) return;
+  if (uid !== S.uid) { toast("El pedido no está disponible para esta cuenta.",true); return; }
+  try {
+    const actual = await getDocFromServer(doc(S.db,"pedidos",id));
+    if (uid !== S.uid || uid !== S.auth.currentUser?.uid || !S.me?.activo) return;
+    if (!actual.exists()) throw new Error("Pedido no disponible");
+    S.pedidos[id] = {...actual.data(),_id:id};
+    openDetail(id);
+  } catch {
+    if (uid === S.uid) toast("El pedido no está disponible. Comprueba tu acceso y conexión.",true);
+  }
+}
+async function cerrarCuenta() {
+  await pushPedidos.cerrarSesion();
+  await signOut(S.auth);
+}
+const autorAviso = () => ({uid:S.uid,en:serverTimestamp()});
+
 /* ================= Arranque ================= */
 // Evita saltos al abrir: siempre empieza arriba y no se restaura un desplazamiento viejo
 try { history.scrollRestoration = "manual"; } catch(e) {}
@@ -1418,6 +1495,7 @@ function boot(){
     const cop = leerArranque(), uid = u?.uid || null;
     stopSubs();
     S.authReady = true; S.uid = uid; S.me = null;
+    pushPedidos.cambiarSesion(uid,cop?.uid === uid && cop.me.rol === "admin");
     S.view = "resumen"; S.viewPushed = false; S.q = ""; S.filtro = "pendientes";
     if (uid && cop?.uid === uid) {
       Object.assign(S, {sistema:cop.sistema, me:cop.me, cfgRaw:cop.cfgRaw || null, usuarios:cop.usuarios || {}, anuncios:cop.anuncios || {}, pedidos:cop.pedidos || {}, resp:cop.resp || null, cache:true});
@@ -1426,14 +1504,23 @@ function boot(){
     if (uid) startMe();
     route();
   });
-  addEventListener("online", () => { S.online = true; render(); sincronizarPendientes(); });
+  addEventListener("online", () => { S.online = true; render(); sincronizarPendientes(); pushPedidos.renovar(); });
   document.addEventListener("visibilitychange", () => {
-    if (document.visibilityState === "visible") { actualizarPendientes(); sincronizarPendientes(); }
+    if (document.visibilityState === "visible") { actualizarPendientes(); sincronizarPendientes(); pushPedidos.renovar(); }
   });
   setInterval(() => sincronizarPendientes(), 30000);
   addEventListener("offline", () => { S.online = false; render(); });
   addEventListener("beforeinstallprompt", e => { e.preventDefault(); S.installEvt = e; render(); });
-  if ("serviceWorker" in navigator && location.protocol === "https:") actualizacionSilenciosa();
+  if ("serviceWorker" in navigator && location.protocol === "https:") {
+    actualizacionSilenciosa();
+    navigator.serviceWorker.addEventListener("message",e => {
+      if (e.source?.scriptURL !== new URL("./sw.js",location.href).href) return;
+      if (e.data?.tipo === "pedidos-renovar-avisos") pushPedidos.renovar(true);
+      if (e.data?.tipo !== "pedidos-aviso" || !patronAviso.test(e.data.id) || !patronAviso.test(e.data.uid)) return;
+      avisoPedido = {id:e.data.id,uid:e.data.uid};
+      atenderAvisoPedido();
+    });
+  }
   setInterval(() => { const d = ymd(new Date()); if (d !== S._day) { S._day = d; render(); } }, 60000); S._day = ymd(new Date());
 }
 // Si hay una versión nueva, se instala sola y la app se recarga sin avisar cuando no estás en medio de algo
@@ -1460,6 +1547,7 @@ function route(){
   if (S.me === null) { $("#app").innerHTML = `<div class="gate"><div class="spin"></div></div>`; return; }
   if (S.me === false || !S.me.activo) return gateMsg("lock", "Acceso desactivado", "Tu usuario no está activo. Pide al administrador que lo active.", true);
   render();
+  atenderAvisoPedido();
 }
 function limpiarDatos(){
   (S.dataUnsubs || []).forEach(u => u());
@@ -1481,12 +1569,13 @@ function stopSubs(){
 }
 function startMe(){
   const uid = S.uid;
-  const desactivar = () => { S.me = false; limpiarDatos(); borrarArranque(); route(); };
+  const desactivar = () => { pushPedidos.cambiarSesion(null,false); S.me = false; limpiarDatos(); borrarArranque(); route(); };
   const un = onSnapshot(doc(S.db, "usuarios/" + uid), { includeMetadataChanges: true }, s => {
     if (uid !== S.uid || s.metadata.hasPendingWrites || (s.metadata.fromCache && !S.me)) return;
     const was = S.me, perfil = s.exists() ? s.data() : null;
     if (!perfil?.activo) return desactivar();
     S.me = perfil;
+    pushPedidos.cambiarSesion(uid,perfil.rol === "admin").then(() => pushPedidos.renovar());
     if (!was || ["rol","soloAsignados","verPersonalizado","verSublimacion","bloquear","eliminar"].some(k => was[k] !== perfil[k])) {
       limpiarDatos();
       startData();
@@ -1551,7 +1640,7 @@ function startData(keep){
 /* ================= Pantallas de acceso ================= */
 function gateMsg(icon, title, text, withLogout){
   $("#app").innerHTML = `<div class="gate"><div class="card"><div class="logo">${I(icon)}</div><h1>${esc(title)}</h1><p class="note">${esc(text)}</p>${withLogout ? `<button class="btn" id="lo">${I("logout")}Salir</button>` : ""}</div></div>`;
-  if (withLogout) $("#lo").onclick = () => signOut(S.auth);
+  if (withLogout) $("#lo").onclick = cerrarCuenta;
 }
 function renderLogin(){
   if ($("#loginForm")) return;
@@ -2035,7 +2124,8 @@ async function restaurarArchivo(f){
       const anterior = pedidos.get(id);
       if (anterior && fechaRespaldo(v) <= fechaRespaldo(anterior)) continue;
       if (anterior) reemplazados++; else nuevos++;
-      const pedido = {...v, restaurado:true};
+      const {autorAviso, ...datos} = v;
+      const pedido = {...datos, restaurado:true};
       pedidos.set(id, pedido);
       ops.push([`pedidos/${id}`, pedido]);
     }
@@ -2492,28 +2582,35 @@ async function guardarListas(cat){
 function viewAjustes(){
   const c = Object.assign({}, cfg(), S.cdraft || {});
   const oscuro = document.documentElement.dataset.theme === "dark";
-  return `<div class="hello"><h1>Ajustes</h1><span class="date">${I("sliders")}Se aplican a todo el equipo</span></div>${adminTabs()}
-    <div class="card temacard"><label class="swr"><span>${I("moon")}Modo oscuro</span><input type="checkbox" class="swi" id="cTema" ${oscuro ? "checked" : ""}></label></div>
-    <div class="card">
-      <div class="sec">${I("sliders")}General</div>
-      <div class="g3">
-        <div class="f"><label>Avisar entregas con anticipación de</label><select class="inp" id="cDias">${[0,1,2,3,4,5,7,10,14].map(n => `<option value="${n}" ${n == c.dias ? "selected" : ""}>${n === 0 ? "Solo el mismo día" : n + " día" + (n > 1 ? "s" : "")}</option>`).join("")}</select></div>
-        <div class="f"><label>Avisar si un pedido avisado no se retira en</label><select class="inp" id="cDiasRet">${[1,2,3,4,5,7,10,15,30].map(n => `<option value="${n}" ${n == c.diasRetiro ? "selected" : ""}>${n} día${n > 1 ? "s" : ""}</option>`).join("")}</select></div>
+  return `<div class="hello"><h1>Ajustes</h1></div>${adminTabs()}
+    <section class="ajustes-grupo" aria-labelledby="ajustesPersonales">
+      <h2 class="sec" id="ajustesPersonales">Ajustes personales</h2>
+      <div class="card temacard"><label class="swr"><span>${I("moon")}Modo oscuro</span><input type="checkbox" class="swi" id="cTema" ${oscuro ? "checked" : ""}></label></div>
+      <div data-panel-notificaciones></div>
+    </section>
+    <section class="ajustes-grupo" aria-labelledby="ajustesEquipo">
+      <h2 class="sec" id="ajustesEquipo">Ajustes de todo el equipo</h2>
+      <div class="card">
+        <div class="sec">${I("sliders")}General</div>
+        <div class="g3">
+          <div class="f"><label>Avisar entregas con anticipación de</label><select class="inp" id="cDias">${[0,1,2,3,4,5,7,10,14].map(n => `<option value="${n}" ${n == c.dias ? "selected" : ""}>${n === 0 ? "Solo el mismo día" : n + " día" + (n > 1 ? "s" : "")}</option>`).join("")}</select></div>
+          <div class="f"><label>Avisar si un pedido avisado no se retira en</label><select class="inp" id="cDiasRet">${[1,2,3,4,5,7,10,15,30].map(n => `<option value="${n}" ${n == c.diasRetiro ? "selected" : ""}>${n} día${n > 1 ? "s" : ""}</option>`).join("")}</select></div>
+        </div>
+        <button class="btn primary" id="cSave" style="align-self:flex-end">${I("check")}Guardar</button>
       </div>
-      <button class="btn primary" id="cSave" style="align-self:flex-end">${I("check")}Guardar</button>
-    </div>
-    <div class="sec">${I("list")}Opciones de los pedidos</div>
-    <div class="lists2">${LISTAS.map(listaHTML).join("")}
-      <button class="btn listo crema" id="cReset">${I("undo")}Restaurar opciones originales</button>
-    </div>
-    <div class="card">
-      <div class="sec">${I("msg")}Mensajes de WhatsApp</div>
-      <div class="f"><label>Mensaje de saludo al registrar al cliente</label><textarea class="inp" id="cPlS" rows="3">${esc(c.plantillaSaludo)}</textarea><span class="msg mut">Puedes usar: {cliente} {negocio} {tema}</span></div>
-      <div class="f"><label>Mensaje de WhatsApp cuando el pedido está listo</label><textarea class="inp" id="cPl" rows="4">${esc(c.plantilla)}</textarea></div>
-      <div class="f"><label>Mensaje de WhatsApp para recordar el retiro</label><textarea class="inp" id="cPlR" rows="3">${esc(c.plantillaRetiro)}</textarea><span class="msg mut">Puedes usar: {cliente} {negocio} {codigo} {resumen} {saldo} {total} {fecha}</span></div>
-      <button class="btn primary" id="cSave2" style="align-self:flex-end">${I("check")}Guardar</button>
-    </div>
-    ${respaldoCard()}`;
+      <div class="sec">${I("list")}Opciones de los pedidos</div>
+      <div class="lists2">${LISTAS.map(listaHTML).join("")}
+        <button class="btn listo crema" id="cReset">${I("undo")}Restaurar opciones originales</button>
+      </div>
+      <div class="card">
+        <div class="sec">${I("msg")}Mensajes de WhatsApp</div>
+        <div class="f"><label>Mensaje de saludo al registrar al cliente</label><textarea class="inp" id="cPlS" rows="3">${esc(c.plantillaSaludo)}</textarea><span class="msg mut">Puedes usar: {cliente} {negocio} {tema}</span></div>
+        <div class="f"><label>Mensaje de WhatsApp cuando el pedido está listo</label><textarea class="inp" id="cPl" rows="4">${esc(c.plantilla)}</textarea></div>
+        <div class="f"><label>Mensaje de WhatsApp para recordar el retiro</label><textarea class="inp" id="cPlR" rows="3">${esc(c.plantillaRetiro)}</textarea><span class="msg mut">Puedes usar: {cliente} {negocio} {codigo} {resumen} {saldo} {total} {fecha}</span></div>
+        <button class="btn primary" id="cSave2" style="align-self:flex-end">${I("check")}Guardar</button>
+      </div>
+      ${respaldoCard()}
+    </section>`;
 }
 
 /* ---------- Eventos ---------- */
@@ -2544,7 +2641,7 @@ function bindMain(){
     if (d.anon) return alternarAnuncio(d.anon);
     if (d.act === "respaldo") return openRespaldo();
     if (d.act === "mipin") return cambiarMiPin();
-    if (d.act === "salir") return confirmar("¿Cerrar sesión?", "", "Cerrar sesión", async () => signOut(S.auth));
+    if (d.act === "salir") return confirmar("¿Cerrar sesión?", "", "Cerrar sesión", cerrarCuenta);
     if (d.act === "cuenta") return openCuenta();
     if (d.avisar) { marcarAvisado(d.avisar); return; }
     if (d.ya) return marcarAvisado(d.ya);
@@ -2559,6 +2656,7 @@ function bindMain(){
     if (d.reset) return resetPin(d.reset);
     if (d.deluser) { const u = S.usuarios[d.deluser]; return confirmar(`¿Eliminar a ${u.nombre}?`, "No podrá entrar más. Sus pedidos se conservan.", "Eliminar", async () => { const bt = fsWriteBatch(S.db); bt.delete(doc(S.db, "usuarios/" + d.deluser)); bt.delete(doc(S.db, "logins/" + u.usuario)); await bt.commit(); toast("Usuario eliminado"); }); }
   };
+  conectarNotificaciones(app.querySelector("[data-panel-notificaciones]"));
   const q = $("#q");
   if (q) q.oninput = () => { S.q = q.value; clearTimeout(q._t); q._t = setTimeout(() => { if (S.q) autoTab(); render(); }, 160); };
   $("#themeBtn").onclick = () => { const t = document.documentElement.dataset.theme === "dark" ? "light" : "dark"; document.documentElement.dataset.theme = t; try { localStorage.setItem("cs-tema", t); } catch(e) {} };
@@ -2706,13 +2804,15 @@ function cambiarMiPin(){
 }
 function openCuenta(){
   const pr = perm();
-  const ov = modal(`<div class="mh"><h2>${esc(S.me.nombre)}</h2><button class="ib" data-close>${I("x")}</button></div>
+  const ov = modal(`<div class="mh"><h2>Mi cuenta</h2><button class="ib" data-close>${I("x")}</button></div>
     <div class="mb"><dl class="kv"><dt>Usuario</dt><dd>@${esc(S.me.usuario)}</dd><dt>Rol</dt><dd>${pr.admin ? "Administrador" : "Equipo"}</dd><dt>Versión</dt><dd>${VERSION}</dd><dt>Puede ver</dt><dd>${[pr.ver.personalizado && "Personalizado", pr.ver.sublimacion && "Sublimación completa"].filter(Boolean).join(" y ") || "—"}${pr.soloAsignados ? " (solo asignados)" : ""}</dd></dl>
+    <div data-panel-notificaciones></div>
     <div style="display:flex;gap:8px;flex-wrap:wrap;justify-content:flex-end"><button class="btn" id="tm">${I("moon")}Cambiar tema</button><button class="btn" id="cp">${I("key")}Cambiar mi PIN</button></div></div>
     <div class="mf"><button class="btn danger" id="lo">${I("logout")}Cerrar sesión</button></div>`, "sm");
   $("#tm", ov).onclick = () => $("#themeBtn").click();
   $("#cp", ov).onclick = () => { ov.close(); cambiarMiPin(); };
-  $("#lo", ov).onclick = () => { ov.close(); signOut(S.auth); };
+  conectarNotificaciones(ov.querySelector("[data-panel-notificaciones]"));
+  $("#lo", ov).onclick = () => { ov.close(); cerrarCuenta(); };
 }
 
 /* ================= Navegación con el botón Atrás ================= */
@@ -4008,7 +4108,7 @@ async function saveForm(ov, orig){
   try {
     if (orig) {
       const batch = writeBatch(S.db);
-      batch.update(doc(S.db, "pedidos", orig._id), data);
+      batch.update(doc(S.db, "pedidos", orig._id), {...data,autorAviso:autorAviso()});
       for (const [id, foto] of documentosFoto(orig._id, fotos, S.me.usuario, now))
         batch.set(doc(S.db, "fotos", id), foto);
       envioLocal = (await batch.commit()) === "local";
@@ -4345,9 +4445,9 @@ async function cambiar(id, data, msg, errMsg = "Error al guardar"){
     const anterior = p[k] ?? null;
     prev[k] = !perm().admin && ["listoPor","avisadoPor","editadoPor"].includes(k) && anterior ? S.me.usuario : anterior;
   });
-  try { await updateDoc(doc(S.db, "pedidos/" + id), data); }
+  try { await updateDoc(doc(S.db, "pedidos/" + id), {...data,autorAviso:autorAviso()}); }
   catch(e) { toast(errMsg, true); return false; }
-  toastUndo(msg, () => updateDoc(doc(S.db, "pedidos/" + id), prev));
+  toastUndo(msg, () => updateDoc(doc(S.db, "pedidos/" + id), {...prev,autorAviso:autorAviso()}));
   return true;
 }
 // Eliminar con deshacer: el pedido se oculta y se borra de verdad al terminar el aviso

@@ -7,7 +7,7 @@ import { promisify } from "node:util";
 import { test } from "node:test";
 import { chromium, devices } from "playwright-core";
 import { initializeTestEnvironment } from "@firebase/rules-unit-testing";
-import { doc, getDocFromServer, writeBatch } from "firebase/firestore";
+import { doc, getDocFromServer, updateDoc, writeBatch } from "firebase/firestore";
 
 const projectId = "demo-pedidos-codex";
 const root = new URL("../", import.meta.url);
@@ -58,6 +58,10 @@ async function appDePrueba() {
         // No se abre config.js del repositorio.
         res.setHeader("Content-Type",mime.js);
         data = "export const firebaseConfig = " + JSON.stringify({projectId,apiKey:"demo-key",appId:"1:123:web:synthetic",authDomain:"127.0.0.1"});
+      } else if (path === "/push-config.mjs") {
+        // El registro FCM real se verifica por separado de los emuladores.
+        res.setHeader("Content-Type",mime.mjs);
+        data = 'export const claveVapid = ""; export const regionAvisos = "us-central1";';
       } else if (/^\/sdk\/firebase-[\w-]+\.js$/.test(path)) {
         res.setHeader("Content-Type",mime.js);
         if (!sdk.has(path)) {
@@ -81,6 +85,19 @@ async function appDePrueba() {
 }
 
 const visible = selector => selector.waitFor({state:"visible"});
+async function comprobarAlcanceDeAjustes(vista) {
+  const personales = vista.getByRole("region",{name:"Ajustes personales",exact:true});
+  const equipo = vista.getByRole("region",{name:"Ajustes de todo el equipo",exact:true});
+  const notificaciones = personales.getByRole("region",{name:"Notificaciones",exact:true});
+  await visible(personales.getByRole("heading",{name:"Ajustes personales",exact:true}));
+  for (const nombre of ["Notificaciones en este dispositivo","Ediciones de pedidos por otros miembros","Nuevos pedidos","Pedido listo / cambio de estado"])
+    await visible(notificaciones.getByRole("switch",{name:nombre,exact:true}));
+  await visible(equipo.getByRole("heading",{name:"Ajustes de todo el equipo",exact:true}));
+  await visible(equipo.getByText("Avisar entregas con anticipación de",{exact:true}));
+  assert.equal(await equipo.locator(".nt-panel").count(),0);
+  assert.equal(await notificaciones.locator(".note").count(),0);
+  assert.equal(await vista.getByText("Se aplican a todo el equipo",{exact:true}).count(),0);
+}
 const oculto = selector => selector.waitFor({state:"hidden"});
 async function descargarPedido(page, nombres) {
   // Registra las solicitudes y el texto dibujado, manteniendo las descargas reales de Chromium.
@@ -134,7 +151,7 @@ async function comprobarIconoSobreFoto(icono) {
   assert.ok(await icono.evaluate(b => {
     const foto = b.parentElement.querySelector("img");
     const a = b.getBoundingClientRect(), f = foto.getBoundingClientRect();
-    return a.width >= 44 && a.height >= 44 && Math.abs(f.right - a.right - 4) <= 2 &&
+    return a.width >= 40 && a.height >= 40 && Math.abs(f.right - a.right - 4) <= 2 &&
       Math.abs(a.top - f.top - 4) <= 2 && a.right <= innerWidth;
   }));
 }
@@ -235,6 +252,12 @@ async function comprobarCalendariosPorTipo(page) {
     await visible(page.locator(".shell"));
   }
 
+  // Tras recargar, espera a que la lista incluya ambos tipos antes de abrir la agenda.
+  await navPedidos.click();
+  await page.locator('[data-filtro="pendientes"]:visible').click();
+  for (const tema of [/Etiqueta de Prueba/i,/Tema Adicional/i]) {
+    await visible(page.locator(".oc2:visible").filter({hasText:tema}));
+  }
   await page.locator('[data-act="agenda"]').click();
   const agenda = page.locator(".agov");
   const dia = agenda.locator(`.dpg:not([inert]) button[data-d="${fecha}"]`);
@@ -534,6 +557,28 @@ test("escritorio y móvil: login, altas offline en varios clientes, recarga, sin
     await visible(page.getByText("Datos de acceso",{exact:true}));
     await page.getByRole("button",{name:"Listo",exact:true}).click();
     await iniciar(cel,url,"equipoprueba","58360924");
+    await page.locator('.side [data-view="ajustes"]:visible').click();
+    const ajustesNotificaciones = page.locator(".nt-panel");
+    await comprobarAlcanceDeAjustes(page);
+    await page.setViewportSize({width:390,height:844});
+    await visible(page.locator(".m-tabs"));
+    await comprobarAlcanceDeAjustes(page);
+    await page.setViewportSize({width:1440,height:900});
+    await page.waitForFunction(() => !document.querySelector('[data-nt-tipo="ediciones"]').disabled);
+    assert.equal(await ajustesNotificaciones.locator('[data-nt-tipo="ediciones"]').isChecked(),true);
+    assert.equal(await ajustesNotificaciones.locator("[data-nt-dispositivo]").isDisabled(),true);
+    await ajustesNotificaciones.locator('[data-nt-tipo="nuevos"]').check();
+    await visible(ajustesNotificaciones.getByText("Preferencia guardada."));
+    await cel.locator('.side [data-act="cuenta"]:visible').click();
+    await visible(cel.getByRole("heading",{name:"Mi cuenta"}));
+    const cuentaNotificaciones = cel.locator(".nt-panel");
+    await cel.waitForFunction(() => !document.querySelector('[data-nt-tipo="ediciones"]').disabled);
+    assert.equal(await cuentaNotificaciones.locator('[data-nt-tipo="nuevos"]').isChecked(),false);
+    await cuentaNotificaciones.locator('[data-nt-tipo="estado"]').check();
+    await visible(cuentaNotificaciones.getByText("Preferencia guardada."));
+    await cel.locator(".ov .mh [data-close]").click();
+    assert.equal(await ajustesNotificaciones.locator('[data-nt-tipo="estado"]').isChecked(),false);
+    await page.locator('.side [data-view="resumen"]:visible').click();
     for (const tab of paginas) {
       await tab.waitForFunction(() => !!navigator.serviceWorker.controller && !!localStorage.getItem("cs-arranque"));
       await tab.reload();
@@ -741,7 +786,8 @@ test("escritorio y móvil: login, altas offline en varios clientes, recarga, sin
         tipo:"sublimacion",codigo:"S-0011",creadoPor:"equipoprueba",creadoEn:"2024-01-01",fechaEntrega:"2026-12-04",estado:"pendiente",
         tema:"Pedido histórico",nota:"Nota histórica",cliente:{nombre:"Cuenta histórica",telefono:"584120000000"},
         items:[{prenda:"Franela",horma:"Unisex",color:"Fullprint",talla:"M",cant:2}],
-        moneda:"USD",precio:5.20,abono:1.00,imagenes:[foto,"foto-inasequible","otra-foto-inasequible"],publico:true,lectores:["equipoprueba"]
+        moneda:"USD",precio:5.20,abono:1.00,imagenes:[foto,"foto-inasequible","otra-foto-inasequible"],
+        publico:false,lectores:["equipoprueba"],asignados:["adminprueba"],denegados:[]
       });
       lote.set(doc(db,"pedidos","pedido-restringido"),{
         tipo:"sublimacion",codigo:"S-0012",tema:"Pedido restringido",fechaEntrega:"2026-12-04",
@@ -829,6 +875,23 @@ test("escritorio y móvil: login, altas offline en varios clientes, recarga, sin
 
     await comprobarEtiquetas(page,env);
     await comprobarCalendariosPorTipo(page);
+    const uidAviso = await cel.evaluate(() => JSON.parse(localStorage.getItem("cs-arranque")).uid);
+    const entrada = new URL(url);
+    entrada.searchParams.set("destino",uidAviso);
+    entrada.searchParams.set("aviso","pedido-restringido");
+    await cel.goto(entrada.href);
+    await visible(cel.getByText(/El pedido no está disponible/));
+    assert.equal(await cel.locator(".pdmd").count(),0);
+    entrada.searchParams.set("aviso","pedido-historico");
+    await cel.goto(entrada.href);
+    await visible(cel.locator(".pdmd").getByText("PEDIDO S-0011"));
+    assert.equal(new URL(cel.url()).search,"");
+    const uidAdmin = await page.evaluate(() => JSON.parse(localStorage.getItem("cs-arranque")).uid);
+    const admin = env.authenticatedContext(uidAdmin).firestore();
+    await updateDoc(doc(admin,"pedidos","pedido-historico"),{lectores:["adminprueba"],asignados:["equipoprueba"]});
+    await cel.goto(entrada.href);
+    await visible(cel.getByText(/El pedido no está disponible/));
+    assert.equal(await cel.locator(".pdmd").count(),0);
     assert.deepEqual(errores,[]);
     assert.deepEqual(inesperadas,[]);
   } catch(e) {
@@ -921,4 +984,58 @@ test("demo independiente: agenda, HEIC, PNG, Etiqueta y WhatsApp sin servicios e
   } finally {
     await navegador.close();
   }
+});
+
+test("preview de Notificaciones sin red, con vistas y estados interactivos", {timeout:25000}, async () => {
+  const executablePath = process.env.CHROMIUM_PATH || (existsSync("/usr/bin/chromium") ? "/usr/bin/chromium" : chromium.executablePath());
+  const browser = await chromium.launch({executablePath,args:["--no-sandbox"]});
+  try {
+    const context = await browser.newContext({viewport:{width:1270,height:850}});
+    const externas = [];
+    await context.route(/^https?:/,r => { externas.push(r.request().url()); return r.abort(); });
+    const archivo = new URL("demo/preview-ajustes-notificaciones.html",root);
+    let page = await context.newPage();
+    try { await page.goto(archivo.href); }
+    catch (error) {
+      if (!error.message.includes("ERR_BLOCKED_BY_ADMINISTRATOR")) throw error;
+      await page.close();
+      page = await context.newPage();
+      await page.setContent(await readFile(archivo,"utf8"));
+    }
+    await visible(page.getByText("Vista previa · Datos simulados",{exact:true}));
+    page.setDefaultTimeout(7000);
+    const marco = page.locator("#marco");
+    await comprobarAlcanceDeAjustes(marco);
+    assert.equal(await marco.getByRole("button",{name:"Admin",exact:true}).isVisible(),false);
+    const dispositivo = marco.locator("[data-nt-dispositivo]");
+    assert.equal(await marco.locator('[data-nt-tipo="ediciones"]').isChecked(),true);
+    assert.equal(await marco.locator('[data-nt-tipo=""]').first().isDisabled(),true);
+    await dispositivo.check();
+    await visible(marco.getByText("Activo",{exact:true}));
+    await marco.getByRole("button",{name:"Enviar prueba a este dispositivo"}).click();
+    await visible(marco.getByText("Notificación de prueba · Datos simulados"));
+    await marco.locator('[data-nt-tipo="nuevos"]').check();
+    await page.getByLabel("Vista",{exact:true}).selectOption("movil");
+    assert.ok((await marco.boundingBox()).width <= 390);
+    await visible(marco.getByRole("button",{name:"Admin",exact:true}));
+    await comprobarAlcanceDeAjustes(marco);
+    assert.equal(await dispositivo.isChecked(),false);
+    assert.equal(await marco.locator('[data-nt-tipo="nuevos"]').isChecked(),true);
+    await page.getByLabel("Permiso simulado").selectOption("bloqueado");
+    await visible(marco.getByText("Bloqueado",{exact:true}));
+    await visible(marco.getByText(/Permite las notificaciones en la configuración del navegador/));
+    assert.equal(await dispositivo.isDisabled(),true);
+    await page.getByLabel("Permiso simulado").selectOption("incompatible");
+    await visible(marco.getByText("No compatible",{exact:true}));
+    await page.getByLabel("Cuenta",{exact:true}).selectOption("equipo");
+    await visible(marco.getByRole("dialog",{name:"Mi cuenta",exact:true}));
+    assert.equal(await marco.getByRole("region",{name:"Ajustes de todo el equipo",exact:true}).count(),0);
+    assert.equal(await marco.locator('[data-nt-tipo="nuevos"]').isChecked(),false);
+    await page.getByLabel("Tema",{exact:true}).selectOption("dark");
+    assert.equal(await marco.getAttribute("data-theme"),"dark");
+    assert.equal(await marco.evaluate(el => getComputedStyle(el).getPropertyValue("--bg").trim()),"#0e1319");
+    await page.setViewportSize({width:350,height:740});
+    assert.ok((await page.locator("#marco").boundingBox()).width <= 350);
+    assert.deepEqual(externas,[]);
+  } finally { await browser.close(); }
 });

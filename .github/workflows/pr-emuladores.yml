@@ -27,6 +27,18 @@ jobs:
           java-version: 25
       - run: npm ci --omit=optional --no-audit --no-fund
       - run: npm test
+      - run: npm ci --prefix functions --no-audit --no-fund
+      - name: Verificar las funciones sin conectarse a Firebase
+        env:
+          GCLOUD_PROJECT: demo-pedidos-codex
+          FIREBASE_CONFIG: '{"projectId":"demo-pedidos-codex"}'
+        run: |
+          node --input-type=module <<'JS'
+          import assert from "node:assert/strict";
+          import {avisosDePedidos,probarNotificacion} from "./functions/index.mjs";
+          assert.equal(avisosDePedidos.__endpoint.eventTrigger.eventType,"google.cloud.firestore.document.v1.written.withAuthContext");
+          assert.ok(probarNotificacion.__endpoint.callableTrigger);
+          JS
       - run: npm run test:emuladores
       - run: npx --no-install playwright-core install --with-deps chromium
       - run: npm run test:navegador

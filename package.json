@@ -2,7 +2,7 @@
   "name": "pedidos-personalizados",
   "private": true,
   "scripts": {
-    "test": "node --test tests/pagos.test.mjs tests/mejoras.test.mjs",
+    "test": "node --test tests/pagos.test.mjs tests/mejoras.test.mjs tests/notificaciones.test.mjs",
     "test:emuladores": "firebase emulators:exec --project demo-pedidos-codex --only auth,firestore 'node --test tests/firestore.test.mjs'",
     "test:navegador": "firebase emulators:exec --project demo-pedidos-codex --only auth,firestore 'node --test tests/navegador.test.mjs'"
   },
