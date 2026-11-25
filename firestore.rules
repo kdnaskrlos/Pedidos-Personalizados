@@ -15,6 +15,7 @@ service cloud.firestore {
     function pedidoPath(id) { return /databases/$(database)/documents/pedidos/$(id); }
     function contadorPath(tipo) { return /databases/$(database)/documents/contadores/$(tipo); }
     function envioPath(uid, id) { return /databases/$(database)/documents/usuarios/$(uid)/envios/$(id); }
+    function pagoPath(uid, id) { return /databases/$(database)/documents/usuarios/$(uid)/validacionesPago/$(id); }
     function usuarioValido(u) { return u is string && u.matches('^[a-z0-9._-]{3,20}$'); }
     function tipoValido(t) { return t in ['personalizado', 'sublimacion']; }
     function verTipo(t) {
@@ -22,7 +23,10 @@ service cloud.firestore {
           || (t == 'sublimacion' && me().get('verSublimacion', false) == true);
     }
     function puedeVerEmpleado(p) {
-      return activo() && verTipo(p.tipo)
+      return activo() && visibilidadEmpleado(p);
+    }
+    function visibilidadEmpleado(p) {
+      return verTipo(p.tipo)
         && ((p.publico == true && me().get('soloAsignados', false) != true) || me().usuario in p.lectores);
     }
     function puedeVer(p) { return admin() || puedeVerEmpleado(p); }
@@ -100,6 +104,16 @@ service cloud.firestore {
         allow delete: if signed() && request.auth.uid == uid;
       }
 
+      match /validacionesPago/{revision} {
+        allow get, delete: if activo() && propietarioEnvio() == uid;
+        allow create: if activo() && propietarioEnvio() == uid && idValido(revision)
+          && puedePrepararPago(uid, revision, request.resource.data)
+          && avancePago(request.resource.data, [], 0);
+        allow update: if activo() && propietarioEnvio() == uid
+          && request.resource.data.diff(resource.data).affectedKeys().hasOnly(['items', 'totalMenor'])
+          && avancePago(request.resource.data, resource.data.items, resource.data.totalMenor);
+      }
+
       // El recibo sobrevive a la eliminación del pedido para que un reintento nunca lo recree.
       match /envios/{id} {
         allow get: if activo() && propietarioEnvio() == uid;
@@ -154,7 +168,7 @@ service cloud.firestore {
         && !exists(pedidoPath(id))
         && p.creadorUid == request.auth.uid && p.tipo == d.tipo && p.codigo == d.codigo && p.consecutivo == d.n
         && c.ultimoId == id && c.n == d.n
-        && pagoValido(p);
+        && pagoValidoPara(id, p, true);
     }
     function reservaNueva(id, p) {
       let c = getAfter(contadorPath(p.tipo)).data;
@@ -174,12 +188,37 @@ service cloud.firestore {
           || incremento(tipo, request.resource.data));
     }
 
-    function pagoValido(p) {
+    function puedePrepararPago(uid, revision, p) {
+      return p.keys().hasOnly(['pedidoId', 'alta', 'items', 'totalMenor'])
+        && p.pedidoId is string && p.pedidoId.matches('^[^/]+$') && p.alta is bool
+        && ((p.alta == true && p.pedidoId == revision && !exists(envioPath(uid, p.pedidoId)))
+          || (p.alta == false && (admin() || puedeVerEmpleado(get(pedidoPath(p.pedidoId)).data))));
+    }
+    function montoValido(n) { return enteroSeguro(n) && n > 0 && n <= 1000000000000; }
+    function avancePago(p, anteriores, subtotal) {
+      let inicio = anteriores.size();
+      let fin = p.items.size();
+      let bloque = p.items[inicio:fin];
+      return p.items is list && fin > inicio && fin <= inicio + 8
+        && (inicio == 0 || p.items[0:inicio] == anteriores)
+        && montoValido(p.totalMenor) && !bloque.hasAny([null])
+        && p.totalMenor == subtotal + sumaPartidas(bloque);
+    }
+    function pagoPreparado(id, p, alta) {
+      let ruta = pagoPath(propietarioEnvio(), p.revisionPago);
+      return exists(ruta) && !existsAfter(ruta) && coincidePago(get(ruta).data, id, p, alta);
+    }
+    function coincidePago(comprobante, id, p, alta) {
+      return comprobante.pedidoId == id && comprobante.alta == alta
+        && comprobante.totalMenor == p.totalMenor && comprobante.items == p.items;
+    }
+    function pagoValidoPara(id, p, alta) {
       return p.pagoVersion == 2 && p.moneda in ['COP', 'USD', 'Bs']
         && enteroSeguro(p.totalMenor) && p.totalMenor > 0 && p.totalMenor <= 1000000000000
         && enteroSeguro(p.abonoMenor) && p.abonoMenor <= p.totalMenor
-        && p.items is list && p.items.size() > 0 && p.items.size() <= 8 && !p.items.hasAny([null])
-        && p.totalMenor == sumaPartidas(p.items);
+        && p.items is list && p.items.size() > 0
+        && ((p.items.size() <= 8 && !p.items.hasAny([null]) && p.totalMenor == sumaPartidas(p.items))
+          || (p.items.size() > 8 && idValido(p.get('revisionPago', '')) && pagoPreparado(id, p, alta)));
     }
     function importePartida(p) {
       return p == null ? 0 : importeEntero(p.cant, p.precioMenor);
@@ -202,9 +241,9 @@ service cloud.firestore {
         && p.cliente.nombre.size() <= 500 && p.cliente.telefono.matches('^[0-9]{6,15}$')
         && p.imagenes is list && p.imagenes.size() <= 200 && p.nota is string && p.tema is string;
     }
-    function pagoCompatible(p, delta, esAdmin) {
-      return !delta.hasAny(['pagoVersion', 'totalMenor', 'abonoMenor', 'moneda', 'precio', 'precios', 'abono', 'items'])
-        || (!delta.hasAny(['precio', 'precios', 'abono']) && pagoValido(p))
+    function pagoCompatible(id, p, delta, esAdmin) {
+      return !delta.hasAny(['pagoVersion', 'totalMenor', 'abonoMenor', 'moneda', 'precio', 'precios', 'abono', 'items', 'revisionPago'])
+        || (!delta.hasAny(['precio', 'precios', 'abono']) && pagoValidoPara(id, p, false))
         || (esAdmin && p.get('restaurado', false) == true
           && resource.data.get('pagoVersion', 0) in [0, 1] && p.get('pagoVersion', 0) in [0, 1]);
     }
@@ -218,7 +257,7 @@ service cloud.firestore {
     function edicionEmpleado(p, delta) {
       return delta.hasOnly([
         'cliente', 'tema', 'servicio', 'servicios', 'prendaDe', 'etiqueta', 'items', 'fechaEntrega',
-        'moneda', 'pagoVersion', 'totalMenor', 'abonoMenor', 'motivoSinAbono',
+        'moneda', 'pagoVersion', 'totalMenor', 'abonoMenor', 'motivoSinAbono', 'revisionPago',
         'urgente', 'imagenes', 'nota', 'editadoEn', 'editadoPor', 'revisar', 'revisarCambios', 'revisarPor',
         'revisarEn', 'estado', 'listoEn', 'listoPor', 'avisado', 'avisadoPor', 'avisadoEn',
         'recordadoEn', 'entregadoEn', 'posponerHasta', 'lectores', 'publico', 'denegados', 'asignados', 'autorAviso'
@@ -236,18 +275,18 @@ service cloud.firestore {
         || (p.autorAviso is map && p.autorAviso.keys().hasOnly(['uid', 'en'])
           && p.autorAviso.uid == request.auth.uid && p.autorAviso.en == request.time);
     }
-    function pedidoEditable(p) {
+    function pedidoEditable(id, p) {
       let delta = p.diff(resource.data).affectedKeys();
-      let esAdmin = admin();
+      let esAdmin = me().rol == 'admin';
       let esRestauracion = esAdmin && p.get('restaurado', false) == true;
-      return (esAdmin || puedeVerEmpleado(resource.data))
+      return activo() && (esAdmin || visibilidadEmpleado(resource.data))
         && !delta.hasAny(['tipo', 'codigo', 'creadoPor', 'creadoEn', 'creadorUid', 'consecutivo', 'demo'])
         && (!delta.hasAny(['cliente', 'imagenes', 'nota', 'tema']) || datosPedidoValidos(p) || esRestauracion)
         && (esAdmin
           ? (!delta.hasAny(['lectores', 'publico', 'denegados', 'asignados']) || accesoCoherente(p) || esRestauracion)
           : edicionEmpleado(p, delta))
         && avisoAtestiguado(p, delta, esRestauracion)
-        && pagoCompatible(p, delta, esAdmin);
+        && pagoCompatible(id, p, delta, esAdmin);
     }
     function altaNormal(id, p) {
       return tipoValido(p.tipo) && (admin() || verTipo(p.tipo))
@@ -255,7 +294,7 @@ service cloud.firestore {
         && p.keys().hasOnly([
           'tipo', 'codigo', 'consecutivo', 'creadorUid', 'creadoPor', 'creadoEn', 'estado', 'avisado',
           'cliente', 'tema', 'servicio', 'servicios', 'prendaDe', 'etiqueta', 'items', 'fechaEntrega',
-          'moneda', 'pagoVersion', 'totalMenor', 'abonoMenor', 'motivoSinAbono',
+          'moneda', 'pagoVersion', 'totalMenor', 'abonoMenor', 'motivoSinAbono', 'revisionPago',
           'urgente', 'imagenes', 'nota', 'lectores', 'publico', 'denegados', 'asignados'
         ]) && accesoCoherente(p) && me().usuario in p.lectores
         && (admin() || me().get('bloquear', false)
@@ -264,15 +303,15 @@ service cloud.firestore {
         // del mismo pedido dentro de la transacción.
         && datosPedidoValidos(p) && reservaNueva(id, p);
     }
-    function altaAdministrativa(p) {
+    function altaAdministrativa(id, p) {
       return admin() && tipoValido(p.tipo) && !p.keys().hasAny(['autorAviso'])
         && ((p.get('demo', false) == true && p.codigo.matches('^[PS]-T[0-9]+$'))
-          || (p.get('restaurado', false) == true && (p.get('pagoVersion', 0) in [0, 1] || pagoValido(p))));
+          || (p.get('restaurado', false) == true && (p.get('pagoVersion', 0) in [0, 1] || pagoValidoPara(id, p, false))));
     }
     match /pedidos/{id} {
       allow get, list: if puedeVer(resource.data);
-      allow create: if activo() && (altaNormal(id, request.resource.data) || altaAdministrativa(request.resource.data));
-      allow update: if pedidoEditable(request.resource.data);
+      allow create: if activo() && (altaNormal(id, request.resource.data) || altaAdministrativa(id, request.resource.data));
+      allow update: if pedidoEditable(id, request.resource.data);
       allow delete: if admin() || (puedeVer(resource.data) && me().get('eliminar', false) == true);
     }
 

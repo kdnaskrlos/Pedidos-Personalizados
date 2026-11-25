@@ -5,7 +5,15 @@ import { fechasDelMes, entregasPorFecha } from "../calendario.mjs";
 import { continuarLista, iniciarLista } from "../notas.mjs";
 import { esHeif } from "../heic.mjs";
 import { archivoReferencia, codigoParaArchivo } from "../pedido-export.mjs";
-import { enlaceChatCliente } from "../whatsapp.mjs";
+import { dividirMensaje, enlaceChatCliente } from "../whatsapp.mjs";
+
+test("divide el mensaje de WhatsApp sin perder saltos de línea ni partir emojis", () => {
+  const texto = "Prenda · talla XL\n" + "x".repeat(11999) + "👕" + "fin\n".repeat(5000);
+  const partes = dividirMensaje(texto);
+  assert.ok(partes.length > 1);
+  assert.ok(partes.every(p => p.length <= 12000 && !/[\uD800-\uDBFF]$/.test(p)));
+  assert.equal(partes.join(""),texto);
+});
 
 test("calendario bisiesto y agrupación de las entregas recibidas", () => {
   const febrero = fechasDelMes(2028,1);

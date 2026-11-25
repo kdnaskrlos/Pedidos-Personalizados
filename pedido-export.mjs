@@ -91,7 +91,7 @@ function partirTexto(ctx, valor, limite) {
   return lineas;
 }
 
-function dibujarResumen(ctx, resumen) {
+function dibujarResumen(ctx, resumen, marcarCorte = () => {}) {
   ctx.textBaseline = "top";
   const medir = (valor, limite, {px = 22, peso = 600, paso = px + 8} = {}) => {
     const font = `${peso} ${px}px ${fuente}`;
@@ -127,6 +127,7 @@ function dibujarResumen(ctx, resumen) {
         escribir(valor,pos + 14,y + 34,celda - 28,{px:tam,peso:700});
       });
       y += alto + 8;
+      marcarCorte(y);
     }
     return y;
   };
@@ -183,6 +184,7 @@ function dibujarResumen(ctx, resumen) {
         trazar(valor,x + anchoImporte - 12,top + 8 + rotulo.alto,{alineado:"right"});
       });
       y += alto + 8;
+      marcarCorte(y);
     }
     y += 16;
   }
@@ -196,9 +198,11 @@ function dibujarResumen(ctx, resumen) {
 
   if (disponible(resumen.nota)) {
     ctx.font = `500 22px ${fuente}`;
-    const altoNota = partirTexto(ctx,resumen.nota,interior - 36).length * 32;
+    const lineas = partirTexto(ctx,resumen.nota,interior - 36).length;
+    const altoNota = lineas * 32;
     caja(margen,y,interior,altoNota + 36,"#fff1e5");
     escribir(resumen.nota,margen + 18,y + 18,interior - 36,{px:22,peso:500,paso:32});
+    for (let linea = 1; linea < lineas; linea++) marcarCorte(y + 18 + linea * 32);
     y += altoNota + 62;
   }
 
@@ -212,15 +216,42 @@ export async function archivoResumenPng(resumen) {
   const canvas = document.createElement("canvas");
   const ctx = canvas.getContext("2d");
   const alto = dibujarResumen(ctx,resumen);
+  return renderizarPagina(canvas,ctx,resumen,0,alto,"");
+}
+
+async function renderizarPagina(canvas,ctx,resumen,inicio,fin,sufijo) {
+  const margenPagina = sufijo ? 24 : 0;
+  const alto = fin - inicio + 2 * margenPagina;
   // Mantiene la proporción en pedidos históricos con muchas partidas.
   const escala = Math.min(1.5, 8192 / alto);
   canvas.width = Math.ceil(ancho * escala);
-  canvas.height = Math.ceil(alto * escala);
+  canvas.height = Math.min(8192,Math.ceil(alto * escala));
   ctx.scale(escala,escala);
   ctx.fillStyle = "#f3f6fb";
   ctx.fillRect(0,0,ancho,alto);
+  ctx.beginPath();
+  ctx.rect(0,margenPagina,ancho,fin - inicio);
+  ctx.clip();
+  ctx.translate(0,margenPagina - inicio);
   dibujarResumen(ctx,resumen);
   const datos = await new Promise(resolve => canvas.toBlob(resolve,"image/png"));
   if (!datos) throw new Error("No se pudo generar el PNG");
-  return {nombre:`resumen-pedido-${codigoParaArchivo(resumen.codigo)}.png`,tipo:"image/png",datos};
+  return {nombre:`resumen-pedido-${codigoParaArchivo(resumen.codigo)}${sufijo}.png`,tipo:"image/png",datos};
+}
+
+export async function archivosResumenPng(resumen) {
+  const canvas = document.createElement("canvas"), ctx = canvas.getContext("2d"), cortes = [];
+  const alto = dibujarResumen(ctx,resumen,y => cortes.push(y));
+  const maximo = 11000;
+  if (alto <= maximo) return [await renderizarPagina(canvas,ctx,resumen,0,alto,"")];
+  const paginas = [];
+  let inicio = 0;
+  const finales = [...cortes,alto];
+  for (const [i,fin] of finales.entries()) {
+    if (fin <= inicio) continue;
+    if (fin !== alto && fin <= inicio + maximo && finales[i + 1] <= inicio + maximo) continue;
+    paginas.push(await renderizarPagina(canvas,ctx,resumen,inicio,fin,`-parte-${paginas.length + 1}`));
+    inicio = fin;
+  }
+  return paginas;
 }

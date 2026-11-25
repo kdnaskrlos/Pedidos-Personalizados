@@ -1197,13 +1197,13 @@ html,body{overflow-x:clip}
 import { firebaseConfig } from "./config.js";
 import { entregasPorFecha, fechasDelMes } from "./calendario.mjs";
 import { esHeif, cargarHeif, FORMATOS_FOTO } from "./heic.mjs";
-import { enlaceChatCliente } from "./whatsapp.mjs";
+import { enlaceChatCliente, dividirMensaje } from "./whatsapp.mjs";
 import { crearNotificaciones } from "./notificaciones.mjs";
 import { montarPanelNotificaciones } from "./notificaciones-ui.mjs";
 import { conectarListasNota } from "./notas.mjs";
-import { consecutivoDe, documentosFoto, registrarPedido } from "./pedidos-sync.mjs";
+import { consecutivoDe, documentosFoto, registrarPedido, necesitaValidacionPago, prepararValidacionPago, encolarValidacionPago, pedidoCabe } from "./pedidos-sync.mjs";
 import { guardarPendiente, leerPendientes, borrarPendiente, guardarFotoLocal, leerFotoLocal, borrarFotoLocal } from "./cola-local.mjs";
-import { MAX_PARTIDAS, centavos, centavosHistoricos, cantidad, clavePrecio, precioHistorico, valorPrecioHistorico, validarPago, validarPagoEnCentavos, actualizarPagoPendiente } from "./pagos.mjs";
+import { centavos, centavosHistoricos, cantidad, clavePrecio, precioHistorico, valorPrecioHistorico, validarPago, validarPagoEnCentavos, actualizarPagoPendiente } from "./pagos.mjs";
 import { initializeApp, deleteApp } from "https://www.gstatic.com/firebasejs/10.12.2/firebase-app.js";
 import { getAuth, onAuthStateChanged, signInWithEmailAndPassword, createUserWithEmailAndPassword, signOut, updatePassword, reauthenticateWithCredential, EmailAuthProvider } from "https://www.gstatic.com/firebasejs/10.12.2/firebase-auth.js";
 import { initializeFirestore, getFirestore, persistentLocalCache, persistentMultipleTabManager, doc, collection, query, where, onSnapshot, getDoc, getDocFromCache, getDocFromServer, getDocsFromServer, setDoc as fsSetDoc, updateDoc as fsUpdateDoc, deleteDoc as fsDeleteDoc, writeBatch as fsWriteBatch, runTransaction, serverTimestamp } from "https://www.gstatic.com/firebasejs/10.12.2/firebase-firestore.js";
@@ -1219,7 +1219,7 @@ const updateDoc = (...a) => sinEsperar(fsUpdateDoc(...a));
 const deleteDoc = (...a) => sinEsperar(fsDeleteDoc(...a));
 const writeBatch = db => { const b = fsWriteBatch(db), c = b.commit.bind(b); b.commit = () => sinEsperar(c()); return b; };
 
-const VERSION = "v3.70.4";
+const VERSION = "v3.70.5";
 /* ================= Utilidades ================= */
 const $ = (s, r = document) => r.querySelector(s);
 const esc = s => String(s ?? "").replace(/[&<>"']/g, c => ({"&":"&amp;","<":"&lt;",">":"&gt;",'"':"&quot;","'":"&#39;"}[c]));
@@ -2076,7 +2076,7 @@ function validarPedidoRespaldo(p){
       || (p.imagenes && (!Array.isArray(p.imagenes) || p.imagenes.some(id => typeof id !== "string" || !id || id.includes("/")))))
     throw new Error("El respaldo incluye un pedido con formato inválido");
   if (p.pagoVersion === 1) {
-    const pago = validarPago(p.items, i => precioUnitario(p, i) / 100, p.abono, p.moneda, Infinity);
+    const pago = validarPago(p.items, i => precioUnitario(p, i) / 100, p.abono, p.moneda);
     if (pago.error || pago.total !== p.totalMenor || pago.abono !== p.abonoMenor)
       throw new Error("El respaldo contiene un pago histórico inconsistente");
   } else if (p.pagoVersion === 2) {
@@ -2124,10 +2124,17 @@ async function restaurarArchivo(f){
       const anterior = pedidos.get(id);
       if (anterior && fechaRespaldo(v) <= fechaRespaldo(anterior)) continue;
       if (anterior) reemplazados++; else nuevos++;
-      const {autorAviso, ...datos} = v;
+      const {autorAviso, revisionPago, ...datos} = v;
       const pedido = {...datos, restaurado:true};
       pedidos.set(id, pedido);
-      ops.push([`pedidos/${id}`, pedido]);
+      if (necesitaValidacionPago(pedido)) {
+        const revision = crypto.randomUUID(), identidad = identidadCola(S.me, S.uid);
+        const {ref} = await prepararValidacionPago(S.db, SDK_PEDIDOS, identidad, id, revision, pedido);
+        const lote = fsWriteBatch(S.db);
+        lote.set(doc(S.db, "pedidos", id), {...pedido, revisionPago:revision});
+        lote.delete(ref);
+        await lote.commit();
+      } else ops.push([`pedidos/${id}`, pedido]);
     }
     const vinculos = vinculosFotos(pedidos);
     for (const [id, foto] of Object.entries(C.fotos || {})) {
@@ -2287,8 +2294,7 @@ const erroresPago = {
   total:"El total supera el importe permitido",
   abono:"Escribe un abono no negativo de hasta dos decimales",
   sobrepago:"El abono no puede ser mayor que el total",
-  moneda:"Elige una moneda válida",
-  partidas:`El máximo es de ${MAX_PARTIDAS} partidas por pedido`
+  moneda:"Elige una moneda válida"
 };
 function dueShort(p){
   if (p.estado === "entregado") return {t:"Entregado", c:"ok"};
@@ -2499,14 +2505,14 @@ function avisoRow(p, modo){
   const cuando = n === null ? "" : n < 0 ? `vencido hace ${-n} d` : n === 0 ? "hoy" : n === 1 ? "mañana" : `en ${n} días`;
   const hace = p.avisadoEn ? Math.floor((Date.now() - Date.parse(p.avisadoEn)) / 86400000) : 0;
   const right = modo === "avisar"
-    ? `<a class="aw" href="${esc(waLink(p))}" target="_blank" rel="noopener" data-avisar="${esc(p._id)}" title="Avisar por WhatsApp">${I("msg")}</a><button class="ac2" data-ya="${esc(p._id)}" title="Ya le avisé">${I("check")}</button>`
+    ? `<a class="aw" ${atributosWhatsApp(p)} target="_blank" rel="noopener" data-avisar="${esc(p._id)}" title="Avisar por WhatsApp">${I("msg")}</a><button class="ac2" data-ya="${esc(p._id)}" title="Ya le avisé">${I("check")}</button>`
     : modo === "retiro"
     ? `<span class="aday vio">avisado hace ${hace} d</span>`
     : `<span class="aday ${n < 0 ? "err" : "warn"}">${cuando}</span>`;
   if (modo === "retiro") return `<div class="arow rt" style="--c:${T.c}">
     <div class="rt-top" data-open="${esc(p._id)}" role="button" tabindex="0"><div class="atx"><b>${esc(p.cliente.nombre)}</b><small>${esc(p.tema || "Sin nombre de diseño")}</small></div>${right}</div>
     <div class="rt-acts">
-      <a class="rbtn wa" href="${esc(waLink(p, cfg().plantillaRetiro))}" target="_blank" rel="noopener" data-recordar="${esc(p._id)}">${I("msg")}Recordar</a>
+      <a class="rbtn wa" ${atributosWhatsApp(p, cfg().plantillaRetiro)} target="_blank" rel="noopener" data-recordar="${esc(p._id)}">${I("msg")}Recordar</a>
       <button class="rbtn" data-posponer="${esc(p._id)}">${I("cal")}Posponer</button>
       <button class="rbtn ok" data-entregar="${esc(p._id)}">${I("box")}Entregado</button>
     </div>
@@ -2643,9 +2649,9 @@ function bindMain(){
     if (d.act === "mipin") return cambiarMiPin();
     if (d.act === "salir") return confirmar("¿Cerrar sesión?", "", "Cerrar sesión", cerrarCuenta);
     if (d.act === "cuenta") return openCuenta();
-    if (d.avisar) { marcarAvisado(d.avisar); return; }
+    if (d.avisar) return abrirAvisoWhatsApp(e,b,() => marcarAvisado(d.avisar));
     if (d.ya) return marcarAvisado(d.ya);
-    if (d.recordar) { const n = new Date().toISOString(); cambiar(d.recordar, {avisadoEn:n, recordadoEn:n, posponerHasta:""}, "Recordado"); return; }
+    if (d.recordar) return abrirAvisoWhatsApp(e,b,() => { const n = new Date().toISOString(); cambiar(d.recordar, {avisadoEn:n, recordadoEn:n, posponerHasta:""}, "Recordado"); });
     if (d.posponer) { const id = d.posponer; const man = new Date(); man.setDate(man.getDate() + 1); openCalendar(ymd(man), f => { if (daysUntil(f) <= 0) { toast("Elige desde mañana", true); return false; } cambiar(id, {posponerHasta:f}, "Pospuesto", "Error al posponer"); }, {confirmar:true}); return; }
     if (d.entregar) { cambiar(d.entregar, {estado:"entregado", entregadoEn:new Date().toISOString()}, "Entregado"); return; }
     if (d.open) return openDetail(d.open);
@@ -3624,7 +3630,6 @@ function erroresPaso(i){
     const llenas = F.items.filter(x => !itemVacio(x));
     const incompl = F.items.findIndex(x => !itemVacio(x) && (reqItem().some(f => !x[f])));
     if (!llenas.length) e.push(["f-items", "Agrega una prenda"]);
-    else if (llenas.length > MAX_PARTIDAS) e.push(["f-items", erroresPago.partidas]);
     else if (incompl >= 0) e.push(["f-items", "Completa lo marcado en rojo"]);
     else if (llenas.some(x => cantidad(x.cant) === null)) e.push(["f-items", "Las unidades deben ser un entero positivo"]);
   }
@@ -3715,7 +3720,8 @@ const reqItem = () => {
 const itemVacio = i => (!mostrarEtiqueta(F) || !i.etiqueta) && !i.prenda && !i.color && !i.talla && !i.nombre;
 // Cambios en la lista de prendas con transición suave de altura (abrir, cerrar, compactar todas, agregar)
 function animarPrendas(cambio){
-  const box = F._ov && $("#items", F._ov); if (!box) return cambio();
+  const box = F._ov && $("#items", F._ov);
+  if (!box || MENOS_MOV) return cambio();
   // Se identifica cada tarjeta por su prenda (no por su posición), así funciona también al quitar una del medio
   const h0 = new Map(), mini0 = new Map(), de = el => F.items[Number(el.dataset.i)];
   box.querySelectorAll(".irow3[data-i]").forEach(el => { const it = de(el); if (it) { h0.set(it, el.getBoundingClientRect().height); mini0.set(it, el.classList.contains("mini")); } });
@@ -4099,6 +4105,9 @@ async function saveForm(ov, orig){
     const cambios = campos.filter(([, f]) => J(f(orig)) !== J(f(data))).map(([n]) => n);
     if (cambios.length) Object.assign(data, {revisar:true, revisarCambios:[...new Set([...(orig.revisar ? orig.revisarCambios || [] : []), ...cambios])], revisarPor:S.me.usuario, revisarEn:now});
   }
+  if (!pedidoCabe({...orig, ...data})) {
+    return toast("El pedido supera el tamaño permitido. Reduce los textos o divide el pedido.", true);
+  }
   const form = F, uid = S.uid;
   const fotos = form.imagenes.filter(i => i.local).map(({id, data, mini}) => ({id, data, mini}));
   const peso = new TextEncoder().encode(JSON.stringify({data, fotos})).length;
@@ -4107,11 +4116,22 @@ async function saveForm(ov, orig){
   let envioLocal = false;
   try {
     if (orig) {
-      const batch = writeBatch(S.db);
+      const batch = fsWriteBatch(S.db);
+      let preparacion;
+      if (necesitaValidacionPago(data)) {
+        const revision = crypto.randomUUID(), identidad = identidadCola(S.me, uid);
+        preparacion = encolarValidacionPago(S.db, {doc, setDoc:fsSetDoc}, identidad, orig._id, revision, data);
+        data.revisionPago = revision;
+        batch.delete(preparacion.ref);
+      }
       batch.update(doc(S.db, "pedidos", orig._id), {...data,autorAviso:autorAviso()});
       for (const [id, foto] of documentosFoto(orig._id, fotos, S.me.usuario, now))
         batch.set(doc(S.db, "fotos", id), foto);
-      envioLocal = (await batch.commit()) === "local";
+      const guardar = Promise.all([...(preparacion?.escrituras || []), batch.commit()]);
+      if (preparacion) guardar.catch(() => {
+        if (S.uid === uid) fsDeleteDoc(preparacion.ref).catch(() => {});
+      });
+      envioLocal = (await sinEsperar(guardar)) === "local";
     } else {
       if (data.lectores === undefined) Object.assign(data, {asignados:[], denegados:[], publico:true, lectores:[creador]});
       Object.assign(data, {tipo:form.tipo, creadoEn:now, creadoPor:creador, estado:"pendiente", avisado:false});
@@ -4142,13 +4162,44 @@ async function saveForm(ov, orig){
 }
 
 /* ================= Detalle ================= */
-function waLink(p, plantilla){
-  const c = cfg(), t = totales(p), pz = Object.create(null);
-  (p.items || []).forEach(i => pz[i.prenda] = (pz[i.prenda] || 0) + unidadesDe(i, p));
-  const resumen = Object.entries(pz).map(([k, n]) => `${n} ${k}`).join(", ");
-  const msg = (plantilla || c.plantilla).replace(/\{cliente\}/g, (p.cliente.nombre || "").split(" ")[0]).replace(/\{negocio\}/g, c.negocio).replace(/\{codigo\}/g, p.codigo).replace(/\{resumen\}/g, resumen)
+function atributosWhatsApp(p, plantilla = cfg().plantilla){
+  const c = cfg(), t = totales(p);
+  const resumen = (p.items || []).map((i,n) => {
+    const detalles = [i.prenda,i.horma,i.talla && "Talla " + i.talla,i.color,i.etiqueta,i.nombre,i.numero && "N° " + i.numero].filter(Boolean);
+    return `${n + 1}. ${unidadesDe(i,p)}× ${detalles.join(" · ")} · ${money(precioUnitario(p,i)/100,p.moneda)} c/u · ${money(importeLinea(p,i),p.moneda)}`;
+  }).join("\n");
+  const msg = plantilla.replace(/\{cliente\}/g, (p.cliente.nombre || "").split(" ")[0]).replace(/\{negocio\}/g, c.negocio).replace(/\{codigo\}/g, p.codigo)
     .replace(/\{saldo\}/g, t.saldo < 0 ? `sobrepago de ${money(-t.saldo, p.moneda)}` : t.saldo > 0 ? money(t.saldo, p.moneda) : "ninguno, ¡ya está pagado!").replace(/\{total\}/g, money(t.total, p.moneda)).replace(/\{fecha\}/g, fmtDate(p.fechaEntrega));
-  return `https://wa.me/${p.cliente.telefono}?text=${encodeURIComponent(msg)}`;
+  const texto = msg.includes("{resumen}") ? msg.replace(/\{resumen\}/g, () => "\n" + resumen + "\n") : msg + "\n\n" + resumen;
+  const chat = `https://wa.me/${p.cliente.telefono}`, url = chat + "?text=" + encodeURIComponent(texto);
+  return url.length <= 1800 ? `href="${esc(url)}"` : `href="${esc(chat)}" data-wa-texto="${esc(texto).replaceAll("\r","&#13;").replaceAll("\n","&#10;")}"`;
+}
+function abrirAvisoWhatsApp(e, enlace, registrar){
+  const texto = enlace.dataset.waTexto;
+  if (!texto) { registrar(); return; }
+  e.preventDefault();
+  const partes = dividirMensaje(texto);
+  const copia = modal(`<div class="mh"><h2>Mensaje de WhatsApp</h2></div>
+    <div class="mb"><p class="note">Copia el texto, abre el chat y pégalo. ${partes.length > 1 ? "Envía las partes en orden." : ""}</p>
+      ${partes.length > 1 ? `<select class="inp" aria-label="Parte del mensaje">${partes.map((_,i) => `<option value="${i}">Parte ${i+1} de ${partes.length}</option>`).join("")}</select>` : ""}
+      <textarea class="inp" rows="10" aria-label="Texto completo de la parte" readonly></textarea></div>
+    <div class="mf"><button type="button" class="btn" data-close>Cancelar</button>
+      <button type="button" class="btn" data-copiar>Copiar texto</button>
+      <a class="btn wa" href="${esc(enlace.href)}" target="_blank" rel="noopener noreferrer">Abrir chat</a></div>`, "sm");
+  const campo = $("textarea",copia);
+  campo.value = partes[0];
+  const selector = $("select",copia);
+  if (selector) selector.onchange = () => { campo.value = partes[Number(selector.value)]; };
+  $("[data-copiar]",copia).onclick = async () => {
+    campo.focus(); campo.select(); campo.setSelectionRange(0,campo.value.length);
+    try { await navigator.clipboard.writeText(campo.value); toast("Texto copiado"); }
+    catch { toast("Texto seleccionado. Usa la opción Copiar del dispositivo."); }
+  };
+  $(".wa",copia).onclick = () => {
+    if (partes.length === 1) copia.close();
+    registrar();
+    registrar = () => {};
+  };
 }
 function resumenTexto(p){
   const t = totales(p);
@@ -4252,24 +4303,38 @@ async function descargarPedido(id, uid, boton, estado){
     const exportador = await import("./pedido-export.mjs");
     const ids = pedido.imagenes || [];
     const [resumen,...referencias] = await Promise.allSettled([
-      exportador.archivoResumenPng(modeloExportable(pedido)),
+      exportador.archivosResumenPng(modeloExportable(pedido)),
       ...ids.map((idFoto,i) => prepararArchivoReferencia(pedido.codigo,idFoto,i,exportador))
     ]);
     const actual = exigirPedidoVisible(id,uid);
     if (!boton.isConnected) return;
-    const solicitar = resultado => {
-      if (resultado.status !== "fulfilled") return false;
-      try { exportador.descargarArchivo(resultado.value); return true; }
+    const solicitar = archivo => {
+      try { exportador.descargarArchivo(archivo); return true; }
       catch { return false; }
     };
-    const resumenSolicitado = solicitar(resumen);
-    const faltan = referencias.flatMap((r,i) => (actual.imagenes || []).includes(ids[i]) && solicitar(r) ? [] : [String(i + 1).padStart(2,"0")]);
+    const resumenSolicitado = resumen.status === "fulfilled" && resumen.value.map(solicitar).every(Boolean);
+    const faltan = referencias.flatMap((r,i) => r.status === "fulfilled" && (actual.imagenes || []).includes(ids[i]) &&
+      solicitar(r.value) ? [] : [String(i + 1).padStart(2,"0")]);
     const mensajes = [];
     if (!resumenSolicitado) mensajes.push("No se pudo preparar o solicitar el resumen PNG.");
     if (faltan.length) mensajes.push(`No se pudieron descargar las referencias ${faltan.join(", ")}.`);
     estado.classList.toggle("bad",!resumenSolicitado || faltan.length > 0);
     estado.textContent = mensajes.join("\n");
-  } catch {
+    if (resumen.status === "fulfilled" && resumen.value.length > 1) {
+      for (const [i,pagina] of resumen.value.entries()) {
+        const parte = document.createElement("button");
+        parte.type = "button";
+        parte.className = "btn sm";
+        parte.textContent = `PNG ${i+1} de ${resumen.value.length}`;
+        parte.onclick = () => {
+          try { exigirPedidoVisible(id,uid); exportador.descargarArchivo(pagina); }
+          catch { toast("No se pudo descargar esa parte del resumen.",true); }
+        };
+        estado.append(parte);
+      }
+    }
+  } catch (error) {
+    console.warn("Descarga del pedido",error.code || error.message);
     estado.classList.add("bad");
     estado.textContent = "No se pudieron preparar las descargas de este pedido.";
   } finally {
@@ -4335,7 +4400,7 @@ function openDetail(id){
       </div>
       <span class="msg" id="d-download-status" role="status"></span>
       ${est === "pendiente" ? `<button class="btn pdlisto" id="d-listo">${I("check")}Marcar pedido listo</button>` : ""}
-      ${est === "listo" ? `<div class="dgrid">${p.avisado ? `<a class="btn wa big" id="d-rec" href="${esc(waLink(p, cfg().plantillaRetiro))}" target="_blank" rel="noopener">${I("msg")}Recordar</a>` : `<a class="btn wa big" id="d-wa" href="${esc(waLink(p))}" target="_blank" rel="noopener">${I("msg")}Avisar al cliente</a>`}<button class="btn listo" id="d-ent">${I("box")}Entregado</button></div>` : ""}
+      ${est === "listo" ? `<div class="dgrid">${p.avisado ? `<a class="btn wa big" id="d-rec" ${atributosWhatsApp(p, cfg().plantillaRetiro)} target="_blank" rel="noopener">${I("msg")}Recordar</a>` : `<a class="btn wa big" id="d-wa" ${atributosWhatsApp(p)} target="_blank" rel="noopener">${I("msg")}Avisar al cliente</a>`}<button class="btn listo" id="d-ent">${I("box")}Entregado</button></div>` : ""}
     </div>`, "pdmd");
   loadFotos(ov);
   const uid = S.uid, referencias = [...ov.querySelectorAll(".ref-btn")];
@@ -4393,8 +4458,8 @@ function openDetail(id){
     ov.close();
     popupListo(Object.assign({}, p, {estado:"listo"}));
   });
-  on("#d-wa", () => { marcarAvisado(id); ov.close(); });
-  on("#d-rec", () => { const n = new Date().toISOString(); cambiar(id, {avisadoEn:n, recordadoEn:n, posponerHasta:""}, "Recordado"); ov.close(); });
+  on("#d-wa", e => abrirAvisoWhatsApp(e,e.currentTarget,() => { marcarAvisado(id); ov.close(); }));
+  on("#d-rec", e => abrirAvisoWhatsApp(e,e.currentTarget,() => { const n = new Date().toISOString(); cambiar(id, {avisadoEn:n, recordadoEn:n, posponerHasta:""}, "Recordado"); ov.close(); }));
   on("#d-ent", () => upd({estado:"entregado", entregadoEn:new Date().toISOString()}, "Entregado"));
   on("#d-reab", () => upd({estado:"pendiente", avisado:false}, "Reabierto"));
   on("#d-del", () => confirmar(`¿Eliminar el pedido ${p.codigo}?`, "Podrás deshacerlo durante unos segundos.", "Eliminar", async () => { ov.close(); borrarPedido(p); }));
@@ -4406,11 +4471,11 @@ function popupListo(p){
       <h2>¡Pedido listo!</h2>
       <p>${esc(p.codigo)} · ${esc(p.cliente.nombre)}</p>
       <p class="note">Avísale a ${esc(nombre)} que ya puede retirarlo. El mensaje se escribe solo.</p>
-      <a class="btn wa big" id="pw" href="${esc(waLink(p))}" target="_blank" rel="noopener">${I("msg")}Avisar ahora por WhatsApp</a>
+      <a class="btn wa big" id="pw" ${atributosWhatsApp(p)} target="_blank" rel="noopener">${I("msg")}Avisar ahora por WhatsApp</a>
       <button class="btn" data-close>Más tarde</button>
       <span class="note" style="font-size:12px">Si lo dejas para después, aparece en Avisos → Por avisar al cliente.</span>
     </div>`, "sm pop");
-  $("#pw", pop).onclick = () => { marcarAvisado(p._id); pop.close(); };
+  $("#pw", pop).onclick = e => abrirAvisoWhatsApp(e,e.currentTarget,() => { marcarAvisado(p._id); pop.close(); });
 }
 async function marcarAvisado(id){
   cambiar(id, {avisado:true, avisadoEn:new Date().toISOString(), avisadoPor:S.me.usuario}, "Avisado", "Error al guardar");
