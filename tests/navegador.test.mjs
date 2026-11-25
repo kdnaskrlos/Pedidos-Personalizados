@@ -1123,14 +1123,30 @@ test("pedidos de 10, 30, 50 y 100 partidas en escritorio y móvil", {timeout:260
         }
         const id = await tarjeta.getAttribute("data-open");
         const inicioEdicion = performance.now();
-        if (offline) await context.setOffline(true);
+        if (offline) {
+          await page.waitForFunction(() => !!navigator.serviceWorker.controller && !!localStorage.getItem("cs-arranque"));
+          await context.setOffline(true);
+        }
         await page.locator("#save").click();
         await oculto(page.locator("#save"));
         if (offline) {
           await visible(page.locator('[data-act="cola"]'));
           await page.reload();
-          await visible(page.locator('[data-act="cola"]'));
+          const conservadas = await page.evaluate(() => new Promise((resolve,reject) => {
+            const abrir = indexedDB.open("pedidos-cola-local");
+            abrir.onerror = () => reject(abrir.error);
+            abrir.onsuccess = () => {
+              const db = abrir.result, leer = db.transaction("pedidos").objectStore("pedidos").getAll();
+              leer.onsuccess = () => { db.close(); resolve(leer.result); };
+              leer.onerror = () => { db.close(); reject(leer.error); };
+            };
+          }));
+          const edicion = conservadas.find(e => e.pedidoId === id);
+          assert.equal(edicion.pedido.items.length,101);
+          assert.equal(edicion.pedido.items.at(-1).nombre,"EXTRA");
           await context.setOffline(false);
+          await page.reload();
+          await visible(page.locator(".shell"));
         }
         assert.ok(id);
         let guardado;
