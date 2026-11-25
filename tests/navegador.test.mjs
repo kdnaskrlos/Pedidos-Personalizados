@@ -562,7 +562,8 @@ test("escritorio y móvil: login, altas offline en varios clientes, recarga, sin
     await page.setViewportSize({width:1440,height:900});
     await page.waitForFunction(() => !document.querySelector('[data-nt-tipo="ediciones"]').disabled);
     assert.equal(await ajustesNotificaciones.locator('[data-nt-tipo="ediciones"]').isChecked(),true);
-    assert.equal(await ajustesNotificaciones.locator("[data-nt-dispositivo]").isDisabled(),true);
+    assert.equal(await ajustesNotificaciones.locator("[data-nt-dispositivo]").isDisabled(),false);
+    await visible(ajustesNotificaciones.getByText("Desactivado",{exact:true}));
     await ajustesNotificaciones.locator('[data-nt-tipo="nuevos"]').check();
     await visible(ajustesNotificaciones.getByText("Preferencia guardada."));
     await cel.locator('.side [data-act="cuenta"]:visible').click();
