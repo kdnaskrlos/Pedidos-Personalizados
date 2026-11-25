@@ -58,6 +58,10 @@ async function appDePrueba() {
         // No se abre config.js del repositorio.
         res.setHeader("Content-Type",mime.js);
         data = "export const firebaseConfig = " + JSON.stringify({projectId,apiKey:"demo-key",appId:"1:123:web:synthetic",authDomain:"127.0.0.1"});
+      } else if (path === "/push-config.mjs") {
+        // El registro FCM real se verifica por separado de los emuladores.
+        res.setHeader("Content-Type",mime.mjs);
+        data = 'export const claveVapid = ""; export const regionAvisos = "us-central1";';
       } else if (/^\/sdk\/firebase-[\w-]+\.js$/.test(path)) {
         res.setHeader("Content-Type",mime.js);
         if (!sdk.has(path)) {
@@ -562,8 +566,7 @@ test("escritorio y móvil: login, altas offline en varios clientes, recarga, sin
     await page.setViewportSize({width:1440,height:900});
     await page.waitForFunction(() => !document.querySelector('[data-nt-tipo="ediciones"]').disabled);
     assert.equal(await ajustesNotificaciones.locator('[data-nt-tipo="ediciones"]').isChecked(),true);
-    assert.equal(await ajustesNotificaciones.locator("[data-nt-dispositivo]").isDisabled(),false);
-    await visible(ajustesNotificaciones.getByText("Desactivado",{exact:true}));
+    assert.equal(await ajustesNotificaciones.locator("[data-nt-dispositivo]").isDisabled(),true);
     await ajustesNotificaciones.locator('[data-nt-tipo="nuevos"]').check();
     await visible(ajustesNotificaciones.getByText("Preferencia guardada."));
     await cel.locator('.side [data-act="cuenta"]:visible').click();
