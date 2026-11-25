@@ -4,10 +4,9 @@ import { randomUUID } from "node:crypto";
 import { after, before, beforeEach, test } from "node:test";
 import { initializeTestEnvironment, assertFails, assertSucceeds } from "@firebase/rules-unit-testing";
 import {
-  collection, deleteDoc, doc, getDoc, getDocFromServer, getDocs, query, runTransaction, setDoc, setLogLevel, serverTimestamp, updateDoc, where, writeBatch
+  collection, deleteDoc, disableNetwork, enableNetwork, doc, getDoc, getDocFromServer, getDocs, query, runTransaction, setDoc, setLogLevel, serverTimestamp, updateDoc, where, writeBatch
 } from "firebase/firestore";
-import { MAX_PARTIDAS } from "../pagos.mjs";
-import { registrarPedido } from "../pedidos-sync.mjs";
+import { registrarPedido, prepararValidacionPago, confirmarEdicionGrande, versionPedido } from "../pedidos-sync.mjs";
 import { puedeNotificar } from "../functions/notificaciones.mjs";
 
 const PROJECT = "demo-pedidos-codex";
@@ -16,7 +15,7 @@ assert.match(FIRESTORE || "", /^(127\.0\.0\.1|localhost):\d+$/, "Usa el emulador
 const [host, port] = FIRESTORE.split(":");
 setLogLevel("silent");
 const reglas = await readFile(new URL("../firestore.rules", import.meta.url), "utf8");
-const sdk = {doc,getDocFromServer,runTransaction};
+const sdk = {doc,getDocFromServer,runTransaction,serverTimestamp,deleteDoc};
 let env, admin, ana, luis, asignado, inactivo, anon;
 
 const perfil = (usuario, opts) => ({
@@ -220,7 +219,7 @@ test("rechaza pagos directos inválidos y revierte contador, recibo, pedido y fo
   for (const f of fotos) assert.equal((await leer(luis,"fotos/" + f.id + "_m")).pedidoId,id);
 });
 
-test("verifica cada partida y el total de pedidos múltiples por API, incluso en el límite", async () => {
+test("verifica cada partida y el total de pedidos múltiples por API, y permite todavía la validación directa por bloque", async () => {
   const base = pedido("ana").items[0];
   const partida = (cant, precioMenor) => ({...base,cant,precioMenor});
   const items = [partida(3,1011), {...partida(5,213),prenda:"Short",horma:"Niño",talla:"6"}, partida(1,750)];
@@ -234,26 +233,172 @@ test("verifica cada partida y el total de pedidos múltiples por API, incluso en
     {items:[items[0],items[1],{...items[2],precioMenor:Infinity}]},
     {items:[items[0],items[1],{...items[2],precioMenor:0}]},
     {items:[items[0],null,items[2]],totalMenor:3783,abonoMenor:0},
-    {items:[partida(10 ** 12, 10 ** 12)],totalMenor:200},
-    {items:Array.from({length:MAX_PARTIDAS + 1}, () => partida(1,100)),totalMenor:(MAX_PARTIDAS + 1) * 100,abonoMenor:0}
+    {items:[partida(10 ** 12, 10 ** 12)],totalMenor:200}
   ]) await assertFails(alta(ana,"ana",{...p,...alteracion},id));
   assert.equal(await assertSucceeds(alta(ana,"ana",p,id)),"P-0050");
   await assertFails(cambiar(luis,"pedidos/" + id,{totalMenor:1}));
   await assertFails(cambiar(luis,"pedidos/" + id,{abono:1}));
   await assertSucceeds(cambiar(luis,"pedidos/" + id,{items:[...items.slice(0,2),partida(2,750)],totalMenor:5598}));
-  const partidasMaximas = Array.from({length:MAX_PARTIDAS}, () => partida(1,100));
-  const max = pedido("ana",{items:partidasMaximas,totalMenor:MAX_PARTIDAS * 100,abonoMenor:0});
+  const partidasMaximas = Array.from({length:8}, () => partida(1,100));
+  const max = pedido("ana",{items:partidasMaximas,totalMenor:8 * 100,abonoMenor:0});
   const fotos = Array.from({length:12}, () => ({id:randomUUID(),data:img,mini:img}));
-  await assertFails(alta(ana,"ana",{...max,items:[...partidasMaximas.slice(0,-1),partida(1,-100)],totalMenor:(MAX_PARTIDAS - 1) * 100}));
+  await assertFails(alta(ana,"ana",{...max,items:[...partidasMaximas.slice(0,-1),partida(1,-100)],totalMenor:(8 - 1) * 100}));
   const idMax = randomUUID();
   assert.equal(await assertSucceeds(alta(luis,"luis",{...max,creadoPor:"luis",lectores:["luis"],imagenes:fotos.map(f => f.id)},idMax,fotos))
     .catch(e => { throw new Error("Alta con el máximo de partidas y fotos", {cause:e}); }),"P-0051");
   await assertSucceeds(cambiar(admin,"usuarios/luis",{bloquear:true}));
   await assertSucceeds(cambiar(luis,"pedidos/" + idMax,{
-    items:[partida(2,100), ...partidasMaximas.slice(1)],totalMenor:(MAX_PARTIDAS + 1) * 100,editadoPor:"luis",
+    items:[partida(2,100), ...partidasMaximas.slice(1)],totalMenor:(8 + 1) * 100,editadoPor:"luis",
     revisar:true,revisarPor:"luis",revisarCambios:["Prendas"],publico:false,denegados:["ana"]
   }));
   assert.equal(await assertSucceeds(alta(ana,"ana",{...max,items:[partida(10 ** 12,1)],totalMenor:10 ** 12})),"P-0052");
+});
+
+test("valida los bloques de un pedido grande, reanuda el envío y consume el comprobante", async () => {
+  const id = randomUUID(), rutaPago = `usuarios/ana/validacionesPago/${id}`;
+  const base = pedido("ana").items[0];
+  const items = Array.from({length:97}, (_, n) => ({
+    ...base, cant:1 + n % 4, precioMenor:139 + n, nombre:"Prenda sintética " + n
+  }));
+  const suma = partidas => partidas.reduce((t, i) => t + i.cant * i.precioMenor, 0);
+  const estado = partidas => ({pedidoId:id,alta:true,items:partidas,totalMenor:suma(partidas)});
+  const parcial = items.slice(0,8);
+  await assertFails(guardar(ana,rutaPago,estado(items.slice(0,9))));
+  await assertFails(guardar(ana,rutaPago,{...estado(parcial),totalMenor:1}));
+  await assertSucceeds(guardar(ana,rutaPago,estado(parcial)));
+  await assertFails(leer(luis,rutaPago));
+  await assertFails(guardar(luis,rutaPago,estado(items.slice(0,16))));
+  await assertFails(guardar(ana,rutaPago,estado(items.slice(0,17))));
+  await assertFails(guardar(ana,rutaPago,estado([{...items[0],cant:9}, ...items.slice(1,16)])));
+  await assertFails(guardar(ana,rutaPago,estado([...parcial,{...items[8],precioMenor:-1}])));
+  await assertFails(guardar(ana,rutaPago,estado([...parcial,{...items[8],cant:1.5}])));
+  await assertFails(guardar(ana,rutaPago,{...estado(items.slice(0,16)),pedidoId:randomUUID()}));
+  assert.equal((await leer(admin,"contadores/personalizado")).n,49);
+  assert.equal(await leer(admin,"pedidos/" + id),undefined);
+
+  const p = pedido("ana",{items,totalMenor:suma(items),abonoMenor:125,revisionPago:id});
+  function confirmar(datos, consumir, uid = "ana", db = ana) {
+    const batch = writeBatch(db);
+    batch.set(doc(db,"contadores","personalizado"),{n:50,alineado:true,ultimoId:id});
+    batch.set(doc(db,"pedidos",id),{...datos,codigo:"P-0050",consecutivo:50,creadorUid:uid});
+    batch.set(doc(db,"usuarios",uid,"envios",id),{tipo:"personalizado",n:50,codigo:"P-0050"});
+    if (consumir) batch.delete(doc(db,rutaPago));
+    return batch.commit();
+  }
+  await assertFails(confirmar(p,true));
+  const {ref} = await prepararValidacionPago(ana,sdk,"ana",id,id,p,doc(ana,"usuarios","ana","envios",id));
+  assert.equal(ref.path,rutaPago);
+  await assertFails(confirmar(p,false));
+  await assertFails(confirmar({...p,revisionPago:randomUUID()},true));
+  await assertFails(confirmar({...p,totalMenor:p.totalMenor + 1},true));
+  await assertFails(confirmar({...p,abonoMenor:p.totalMenor + 1},true));
+  await assertFails(confirmar({...p,items:[...items.slice(0,-1),{...items.at(-1),nombre:"Fila distinta"}]},true));
+  await assertFails(confirmar({...p,creadoPor:"luis",lectores:["luis"]},false,"luis",luis));
+  assert.equal((await leer(admin,"contadores/personalizado")).n,49);
+  assert.equal(await leer(admin,"pedidos/" + id),undefined);
+  const fotos = [{id:randomUUID(),data:img,mini:img}];
+  assert.equal(await alta(ana,"ana",{...p,imagenes:[fotos[0].id]},id,fotos),"P-0050");
+  const confirmado = await leer(luis,"pedidos/" + id);
+  assert.deepEqual(confirmado.items,items);
+  assert.equal(confirmado.totalMenor,p.totalMenor);
+  assert.equal((await leer(luis,"fotos/" + fotos[0].id)).pedidoId,id);
+  assert.equal(await leer(ana,rutaPago),undefined);
+  await assertFails(guardar(ana,rutaPago,estado(parcial)));
+  assert.equal(await alta(ana,"ana",p,id),"P-0050");
+  assert.equal((await leer(admin,"contadores/personalizado")).n,50);
+
+  const concurrente = randomUUID(), otra = pedido("ana",{items:items.slice(0,15),totalMenor:suma(items.slice(0,15))});
+  assert.deepEqual(await Promise.all([
+    alta(ana,"ana",otra,concurrente), alta(ana,"ana",otra,concurrente)
+  ]),["P-0051","P-0051"]);
+  assert.equal((await leer(admin,"contadores/personalizado")).n,51);
+});
+
+test("edita y restaura pedidos grandes con bloques verificados y mantiene el código histórico", async () => {
+  const id = "pedido-historico-grande";
+  const anterior = pedido("ana");
+  const items = Array.from({length:24}, (_, n) => ({...anterior.items[0],cant:1,precioMenor:100 + n}));
+  const totalMenor = items.reduce((t, i) => t + i.precioMenor, 0);
+  const datos = {...anterior,items,totalMenor,codigo:"P-0012",restaurado:true};
+  const revisionRestauracion = randomUUID();
+  await assertFails(guardar(admin,"pedidos/" + id,datos));
+  const importar = {id:revisionRestauracion,pedidoId:id,base:null,pedido:datos,fotos:[],restauracion:true};
+  await confirmarEdicionGrande(admin,sdk,"admin",importar);
+  const importado = await leer(admin,"pedidos/" + id);
+  const otroRespaldo = {...datos,nota:"Nota actualizada desde respaldo",items:[...items,items[0]],totalMenor:totalMenor + 100};
+  await confirmarEdicionGrande(admin,sdk,"admin",{...importar,id:randomUUID(),base:versionPedido(importado),pedido:otroRespaldo});
+  assert.deepEqual((await leer(admin,"pedidos/" + id)).items,otroRespaldo.items);
+  await assertSucceeds(cambiar(luis,"pedidos/" + id,{nota:"Nota conservada"}));
+  const cambio = {items:[...items,{...items[0],cant:3}],totalMenor:totalMenor + 300,abonoMenor:150,editadoPor:"luis",
+    editadoEn:"2026-11-25T12:01:05.000Z",pagoVersion:2,moneda:"USD"};
+  const revision = randomUUID();
+  await assertFails(cambiar(luis,"pedidos/" + id,{...cambio,revisionPago:revision}));
+  const base = versionPedido(await leer(luis,"pedidos/" + id));
+  const guardarEdicion = {id:revision,pedidoId:id,uid:"luis",base,pedido:cambio,fotos:[]};
+  await confirmarEdicionGrande(luis,sdk,"luis",guardarEdicion);
+  await confirmarEdicionGrande(luis,sdk,"luis",guardarEdicion);
+  assert.equal(await leer(luis,`usuarios/luis/validacionesPago/${revision}`),undefined);
+  const final = await leer(ana,"pedidos/" + id);
+  assert.equal(final.codigo,"P-0012");
+  assert.equal(final.totalMenor,cambio.totalMenor);
+  assert.equal(final.abonoMenor,150);
+  assert.deepEqual(final.items,cambio.items);
+});
+
+test("protege un pedido grande contra una edición simultánea y un formulario antiguo", async () => {
+  const id = randomUUID(), rutaPedido = "pedidos/" + id;
+  const items = Array.from({length:30}, () => ({...pedido("ana").items[0],cant:1,precioMenor:100}));
+  await alta(ana,"ana",pedido("ana",{items,totalMenor:3000}),id);
+  const original = await leer(luis,rutaPedido);
+  const base = versionPedido(original);
+  const desde = (uid, precioMenor) => ({id:randomUUID(),pedidoId:id,uid,base,fotos:[],pedido:{
+    pagoVersion:2,moneda:"USD",abonoMenor:25,items:items.map(i => ({...i,precioMenor})),totalMenor:30 * precioMenor,editadoPor:uid,
+    editadoEn:"2026-11-25T12:01:05.000Z"
+  }});
+  const a = desde("ana",110), b = desde("luis",150);
+  const resultados = await Promise.allSettled([confirmarEdicionGrande(ana,sdk,"ana",a),confirmarEdicionGrande(luis,sdk,"luis",b)]);
+  assert.equal(resultados.filter(r => r.status === "fulfilled").length,1);
+  assert.equal(resultados.find(r => r.status === "rejected")?.reason.code,"conflicto-pedido");
+  const vigente = await leer(ana,rutaPedido);
+  assert.equal(vigente.items.length,30);
+  assert.equal(vigente.totalMenor,vigente.items.reduce((s,i) => s + i.cant * i.precioMenor,0));
+  assert.equal(vigente.autorAviso.uid,vigente.editadoPor);
+  await assertFails(cambiar(luis,rutaPedido,{items:items.slice(0,8),totalMenor:800,editadoPor:"luis"}));
+  await assertSucceeds(cambiar(luis,rutaPedido,{estado:"listo",listoPor:"luis",autorAviso:{uid:"luis",en:serverTimestamp()}}));
+  assert.equal((await leer(ana,rutaPedido)).totalMenor,vigente.totalMenor);
+  const reducir = {...b,id:randomUUID(),base:versionPedido(await leer(luis,rutaPedido)),
+    pedido:{...b.pedido,items:items.slice(0,8),totalMenor:800}};
+  await confirmarEdicionGrande(luis,sdk,"luis",reducir);
+  assert.equal((await leer(ana,rutaPedido)).items.length,8);
+  await assertSucceeds(cambiar(luis,rutaPedido,{items:items.slice(0,2),totalMenor:200,editadoPor:"luis"}));
+});
+
+test("reanuda una edición interrumpida tras el primer bloque sin duplicar la escritura", async () => {
+  const id = randomUUID(), rutaPedido = "pedidos/" + id;
+  const items = Array.from({length:20}, () => ({...pedido("ana").items[0],cant:1,precioMenor:100}));
+  await alta(ana,"ana",pedido("ana",{items,totalMenor:2000}),id);
+  const anterior = await leer(luis,rutaPedido);
+  const datos = {id:randomUUID(),pedidoId:id,uid:"luis",base:versionPedido(anterior),fotos:[],
+    pedido:{items:[...items,items[0]],totalMenor:2100,abonoMenor:50,moneda:"USD",pagoVersion:2,editadoPor:"luis",editadoEn:"2026-11-25T12:02:05.000Z"}};
+  const corte = {...sdk,runTransaction:async (...args) => {
+    await runTransaction(...args);
+    await disableNetwork(luis);
+    throw Object.assign(new Error("Conexión interrumpida"),{code:"unavailable"});
+  }};
+  try {
+    await assert.rejects(confirmarEdicionGrande(luis,corte,"luis",datos),{code:"unavailable"});
+    assert.equal((await leer(admin,rutaPedido)).totalMenor,2000);
+  } finally { await enableNetwork(luis); }
+  const comprobante = `usuarios/luis/validacionesPago/${datos.id}`;
+  assert.equal((await leer(luis,comprobante)).items.length,8);
+  await confirmarEdicionGrande(luis,sdk,"luis",datos);
+  const guardado = await leer(ana,rutaPedido);
+  assert.equal(guardado.totalMenor,2100);
+  assert.equal(guardado.abonoMenor,50);
+  assert.equal(guardado.items.length,21);
+  await confirmarEdicionGrande(luis,sdk,"luis",datos);
+  assert.equal((await leer(ana,rutaPedido)).autorAviso.en.isEqual(guardado.autorAviso.en),true);
+  assert.equal(await leer(luis,comprobante),undefined);
 });
 
 test("traslada los recibos y la cola al restablecer el PIN y separa a otras cuentas", async () => {
@@ -266,6 +411,10 @@ test("traslada los recibos y la cola al restablecer el PIN y separa a otras cuen
   };
   const previo = randomUUID();
   assert.equal(await alta(ana,"ana",pedido("ana"),previo),"P-0050");
+  const grandeId = randomUUID(), rutaGrande = `usuarios/ana/validacionesPago/${grandeId}`;
+  const partida = {...pedido("ana").items[0],cant:1,precioMenor:100};
+  const grande = pedido("ana",{items:Array.from({length:12}, () => partida),totalMenor:1200});
+  await assertSucceeds(guardar(ana,rutaGrande,{pedidoId:grandeId,alta:true,items:grande.items.slice(0,8),totalMenor:800}));
   await assertFails(cambiar(admin,"usuarios/luis",{identidadCola:"ana"}));
   await assertFails(guardar(admin,"usuarios/impostor",perfil("otro",{identidadCola:"ana"})));
   await assertFails(transferir("ana","anaNueva","luis"));
@@ -278,6 +427,9 @@ test("traslada los recibos y la cola al restablecer el PIN y separa a otras cuen
   const foto = {id:randomUUID(),data:img,mini:img};
   assert.equal(await alta(nueva,"anaNueva",pedido("ana",{imagenes:[foto.id]}),pendiente,[foto],"ana"),"P-0051");
   assert.equal((await leer(admin,"pedidos/" + pendiente)).creadorUid,"anaNueva");
+  await assertFails(leer(ana,rutaGrande));
+  assert.equal(await alta(nueva,"anaNueva",grande,grandeId,[],"ana"),"P-0052");
+  assert.equal(await leer(nueva,rutaGrande),undefined);
   await assertSucceeds(transferir("anaNueva","anaFinal","ana"));
   const final = env.authenticatedContext("anaFinal").firestore();
   await assertFails(leer(nueva,"usuarios/ana/envios/" + pendiente));

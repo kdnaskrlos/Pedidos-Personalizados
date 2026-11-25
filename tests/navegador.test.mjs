@@ -100,6 +100,9 @@ async function comprobarAlcanceDeAjustes(vista) {
 }
 const oculto = selector => selector.waitFor({state:"hidden"});
 async function descargarPedido(page, nombres) {
+  const errores = [];
+  const aviso = mensaje => { if (mensaje.text().startsWith("Descarga del pedido")) errores.push(mensaje.text()); };
+  page.on("console",aviso);
   // Registra las solicitudes y el texto dibujado, manteniendo las descargas reales de Chromium.
   await page.evaluate(() => {
     const click = HTMLAnchorElement.prototype.click, trazar = CanvasRenderingContext2D.prototype.fillText;
@@ -129,7 +132,12 @@ async function descargarPedido(page, nombres) {
     assert.deepEqual([...png.subarray(0,8)],[137,80,78,71,13,10,26,10]);
     assert.equal(png.readUInt32BE(16),1440);
     return {fotos,alto:png.readUInt32BE(20),resumen:await page.evaluate(() => window.textosResumen.join("\n"))};
+  } catch (e) {
+    const estado = await page.locator("#d-download-status").textContent({timeout:1000}).catch(() => "");
+    const solicitados = await page.evaluate(() => window.descargasPrueba);
+    throw new Error(`Descargas solicitadas: ${solicitados.join(", ")}. ${estado} ${errores.join(" ")}`,{cause:e});
   } finally {
+    page.off("console",aviso);
     await page.evaluate(() => window.restaurarDescargas());
   }
 }
@@ -357,6 +365,29 @@ async function crearSublimado(page, tema, opciones = {}) {
     await visible(page.getByText("Las unidades deben ser un entero positivo",{exact:false}));
   }
   await page.locator("[data-cant]").fill("2");
+  if (opciones.partidas) {
+    const agregarAlFinal = opciones.partidas === 10;
+    opciones.mediciones.push(await page.evaluate(n => {
+      const inicio = performance.now();
+      for (let i = 0; i < n; i++) {
+        if (i) document.querySelector("#dupItem").click();
+        const nombre = [...document.querySelectorAll('.irow3:not(.mini) [data-fld="nombre"]')].at(-1);
+        nombre.value = "LOTE" + String(i + 1).padStart(3,"0");
+        nombre.dispatchEvent(new Event("input",{bubbles:true}));
+      }
+      return performance.now() - inicio;
+    },opciones.partidas - Number(agregarAlFinal)));
+    if (agregarAlFinal) {
+      await page.locator("#addItem").click();
+      const fila = page.locator('.irow3:not(.mini)');
+      await fila.locator('[data-pick="prenda"]').click();
+      await page.locator(".pkgrid [data-v]").first().click();
+      await fila.locator('[data-pick="talla"]').click();
+      await page.locator('.pkgrid [data-v="2XL"]').click();
+      await fila.locator("[data-cant]").fill("2");
+      await fila.locator('[data-fld="nombre"]').fill("LOTE010");
+    }
+  }
   if (opciones.multi) {
     await page.locator("#addItem").click();
     await page.locator('[data-pick="prenda"]').last().click();
@@ -1038,4 +1069,237 @@ test("preview de Notificaciones sin red, con vistas y estados interactivos", {ti
     assert.ok((await page.locator("#marco").boundingBox()).width <= 350);
     assert.deepEqual(externas,[]);
   } finally { await browser.close(); }
+});
+
+test("pedidos de 10, 30, 50 y 100 partidas en escritorio y móvil", {timeout:260000}, async t => {
+  const {server,url} = await appDePrueba();
+  let browser, env;
+  try {
+    env = await initializeTestEnvironment({projectId,firestore:{host:dbHost,port:Number(dbPort)}});
+    await env.clearFirestore();
+    const executablePath = process.env.CHROMIUM_PATH || (existsSync("/usr/bin/chromium") ? "/usr/bin/chromium" : chromium.executablePath());
+    browser = await chromium.launch({executablePath,args:["--no-sandbox"]});
+    const escritorio = await browser.newContext({viewport:{width:1440,height:900},reducedMotion:"reduce"});
+    const movil = await browser.newContext({...devices["Pixel 7"],reducedMotion:"reduce"});
+    for (const context of [escritorio,movil]) await context.route(/^https?:/,r => new URL(r.request().url()).hostname === "127.0.0.1" ? r.continue() : r.abort());
+    const pc = await escritorio.newPage(), cel = await movil.newPage();
+    await pc.goto(url);
+    await pc.locator("#bn").fill("Admin de partidas");
+    await pc.locator("#bu").fill("adminpartidas");
+    await pc.locator("#bp").fill("65034927");
+    await pc.locator("#bp2").fill("65034927");
+    await pc.locator("#bootForm button").click();
+    await visible(pc.locator(".shell"));
+    await iniciar(cel,url,"adminpartidas","65034927");
+    const marcador = i => "LOTE" + String(i + 1).padStart(3,"0");
+    for (const [page,context,perfil] of [[pc,escritorio,"PC"],[cel,movil,"Móvil"]]) {
+      page.setDefaultTimeout(20000);
+      for (const n of [10,30,50,100]) {
+        const tema = `Pedido de ${n} partidas ${perfil}`, mediciones = [];
+        const offline = n === 100 && perfil === "Móvil";
+        const inicio = performance.now();
+        if (offline) await context.setOffline(true);
+        await crearSublimado(page,tema,{partidas:n,mediciones});
+        if (offline) {
+          await visible(page.locator('[data-act="cola"]'));
+          await context.setOffline(false);
+        }
+        const tarjeta = page.locator(".oc2:visible").filter({hasText:tema});
+        await visible(tarjeta);
+        await tarjeta.click();
+        assert.equal(await page.locator(".pdit li").count(),n);
+        const total = page.locator(".pdtot");
+        assert.ok((await total.innerText()).includes((n * 20.22).toLocaleString("en-US",{minimumFractionDigits:2})));
+        const alta = performance.now() - inicio;
+
+        await page.locator("#d-edit").click();
+        await page.locator('[data-go="1"]').click();
+        await page.evaluate(() => document.querySelector("#dupItem").click());
+        await page.locator('.irow3:not(.mini) [data-fld="nombre"]').fill("EXTRA");
+        await page.locator('.irow3:not(.mini) [data-cant]').fill("3");
+        if (n === 100) {
+          await page.locator('[data-go="3"]').click();
+          await page.locator("#in-nota").fill("Renglón de prueba\n".repeat(340) + "Último renglón de la nota");
+        }
+        const id = await tarjeta.getAttribute("data-open");
+        const inicioEdicion = performance.now();
+        if (offline) {
+          await page.waitForFunction(() => !!navigator.serviceWorker.controller && !!localStorage.getItem("cs-arranque"));
+          await context.setOffline(true);
+        }
+        await page.locator("#save").click();
+        await oculto(page.locator("#save"));
+        if (offline) {
+          await visible(page.locator('[data-act="cola"]'));
+          await page.reload();
+          const conservadas = await page.evaluate(() => new Promise((resolve,reject) => {
+            const abrir = indexedDB.open("pedidos-cola-local");
+            abrir.onerror = () => reject(abrir.error);
+            abrir.onsuccess = () => {
+              const db = abrir.result, leer = db.transaction("pedidos").objectStore("pedidos").getAll();
+              leer.onsuccess = () => { db.close(); resolve(leer.result); };
+              leer.onerror = () => { db.close(); reject(leer.error); };
+            };
+          }));
+          const edicion = conservadas.find(e => e.pedidoId === id);
+          assert.equal(edicion.pedido.items.length,101);
+          assert.equal(edicion.pedido.items.at(-1).nombre,"EXTRA");
+          await context.setOffline(false);
+          await page.reload();
+          await visible(page.locator(".shell"));
+        }
+        assert.ok(id);
+        let guardado;
+        const limite = performance.now() + 15000;
+        await env.withSecurityRulesDisabled(async contexto => {
+          const ref = doc(contexto.firestore(),"pedidos",id);
+          do {
+            guardado = (await getDocFromServer(ref)).data();
+            if (guardado?.items.length === n + 1) break;
+            await new Promise(r => setTimeout(r,100));
+          } while (performance.now() < limite);
+        });
+        await oculto(page.locator('[data-act="cola"]'));
+        await page.locator('[data-view="pedidos"]:visible').first().click();
+        if (page === cel) await page.locator('[data-tab="sublimacion"]').click();
+        await tarjeta.click();
+        assert.equal(await page.locator(".pdit li").count(),n + 1);
+        assert.ok((await page.locator(".pdit li").last().innerText()).includes("30.33"));
+        assert.equal(guardado.totalMenor,n * 2022 + 3033);
+        assert.equal(guardado.abonoMenor,25);
+        assert.equal(guardado.items.at(-1).nombre,"EXTRA");
+        assert.equal(guardado.autorAviso.uid,guardado.creadorUid);
+        const editar = performance.now() - inicioEdicion;
+
+        const inicioPNG = performance.now();
+        const descargas = [];
+        const registrar = d => descargas.push(d);
+        await page.evaluate(() => {
+          const original = CanvasRenderingContext2D.prototype.fillText;
+          window.filasPNG = [];
+          CanvasRenderingContext2D.prototype.fillText = function(texto,x,y,...resto) {
+            const {d,f} = this.getTransform(), yy = d * y + f;
+            if (this.canvas.width > 300 && yy >= 0 && yy + d * this.measureText(texto).actualBoundingBoxDescent <= this.canvas.height)
+              window.filasPNG.push(String(texto));
+            return original.call(this,texto,x,y,...resto);
+          };
+          window.restaurarPNG = () => { CanvasRenderingContext2D.prototype.fillText = original; };
+        });
+        page.on("download",registrar);
+        if (perfil === "PC") await Promise.all([page.waitForEvent("download"),page.locator("#d-download").click()]);
+        else await page.locator("#d-download").click();
+        await page.waitForFunction(() => !document.querySelector("#d-download").disabled);
+        const estado = page.locator("#d-download-status");
+        assert.doesNotMatch(await estado.innerText(),/No se pudo/);
+        if (n === 100) {
+          const botones = estado.getByRole("button",{name:/^PNG \d+ de \d+$/});
+          assert.ok(await botones.count() >= 2);
+          for (let i = 0; i < await botones.count(); i++) await Promise.all([
+            page.waitForEvent("download",{predicate:d => d.suggestedFilename().endsWith(`-parte-${i+1}.png`)}),
+            botones.nth(i).click()
+          ]);
+        } else if (perfil === "Móvil") {
+          await Promise.all([page.waitForEvent("download"),estado.getByRole("button",{name:"Descargar PNG",exact:true}).click()]);
+        }
+        for (const archivo of descargas) {
+          const png = await readFile(await archivo.path());
+          assert.deepEqual([...png.subarray(0,8)],[137,80,78,71,13,10,26,10]);
+          assert.ok(png.readUInt32BE(20) <= 8192);
+        }
+        const filas = await page.evaluate(() => { window.restaurarPNG(); return window.filasPNG.join("\n"); });
+        for (let i = 0; i < n; i++) assert.match(filas,new RegExp(marcador(i)));
+        assert.match(filas,/EXTRA/);
+        assert.match(filas,/30\.33/);
+        if (n === 100) assert.match(filas,/Último renglón de la nota/);
+        page.off("download",registrar);
+        const png = performance.now() - inicioPNG;
+
+        await page.locator("#d-listo").click();
+        const link = page.locator("#pw");
+        await visible(link);
+        let texto;
+        if (await link.getAttribute("data-wa-texto")) {
+          await link.click();
+          const campo = page.getByRole("textbox",{name:"Texto completo de la parte"});
+          const selector = page.getByLabel("Parte del mensaje",{exact:true});
+          texto = await campo.inputValue();
+          if (await selector.count()) for (let i = 1; i < await selector.locator("option").count(); i++) {
+            await selector.selectOption(String(i));
+            texto += await campo.inputValue();
+          }
+          await campo.locator("xpath=ancestor::*[contains(@class,'ov')][1]").getByRole("button",{name:"Cancelar"}).click();
+        } else texto = new URL(await link.getAttribute("href")).searchParams.get("text");
+        for (let i = 0; i < n; i++) assert.match(texto,new RegExp(marcador(i)));
+        assert.match(texto,/EXTRA.*30\.33/);
+        await page.getByRole("button",{name:"Más tarde",exact:true}).click();
+        await page.locator('[data-view="resumen"]:visible').first().click();
+        t.diagnostic(`${perfil}, ${n} partidas: duplicar ${Math.round(mediciones[0])} ms, alta ${Math.round(alta)} ms, edición ${Math.round(editar)} ms, PNG ${Math.round(png)} ms`);
+      }
+    }
+
+    // Los dos dispositivos editan la misma versión. El segundo conserva su copia local.
+    const temaCompartido = "Pedido de 10 partidas PC";
+    let idCompartido;
+    for (const [page,nota] of [[pc,"Cambio de escritorio"],[cel,"Cambio del móvil conservado"]]) {
+      await page.locator('[data-view="pedidos"]:visible').first().click();
+      await page.locator('[data-filtro="avisar"]:visible').click();
+      if (page === cel) await page.locator('[data-tab="sublimacion"]').click();
+      const tarjeta = page.locator(".oc2:visible").filter({hasText:temaCompartido});
+      idCompartido = await tarjeta.getAttribute("data-open");
+      await tarjeta.click();
+      await page.locator("#d-edit").click();
+      await page.locator('[data-go="3"]').click();
+      await page.locator("#in-nota").fill(nota);
+    }
+    await pc.locator("#save").click();
+    await oculto(pc.locator('[data-act="cola"]'));
+    await env.withSecurityRulesDisabled(async contexto => {
+      const ref = doc(contexto.firestore(),"pedidos",idCompartido);
+      const fin = performance.now() + 15000;
+      while ((await getDocFromServer(ref)).data().nota !== "Cambio de escritorio" && performance.now() < fin)
+        await new Promise(r => setTimeout(r,100));
+      assert.equal((await getDocFromServer(ref)).data().nota,"Cambio de escritorio");
+    });
+    await cel.locator("#save").click();
+    await cel.locator('[data-act="cola"]').click();
+    await cel.locator(".mb details summary").click();
+    await visible(cel.getByText("Cambio del móvil conservado",{exact:false}));
+    const copia = cel.waitForEvent("download");
+    await cel.getByRole("button",{name:"Descargar edición pendiente"}).click();
+    const rescatado = JSON.parse(await readFile(await (await copia).path(),"utf8"));
+    assert.equal(rescatado.pedido.nota,"Cambio del móvil conservado");
+    assert.equal(rescatado.pedido.items.length,11);
+
+    // El mismo archivo contiene un pedido largo nuevo y una actualización de uno existente.
+    let respaldo;
+    await env.withSecurityRulesDisabled(async contexto => {
+      respaldo = (await getDocFromServer(doc(contexto.firestore(),"pedidos",idCompartido))).data();
+    });
+    assert.equal(respaldo.nota,"Cambio de escritorio");
+    const {consecutivo,creadorUid, ...sinIdentidad} = respaldo;
+    const idNuevo = "restaurado-largo-e2e";
+    const archivos = {app:"comicshop-pedidos",creado:"2090-01-01",colecciones:{pedidos:{
+      [idCompartido]:{...respaldo,nota:"Recuperado desde respaldo",editadoEn:"2090-01-01T00:00:00Z"},
+      [idNuevo]:{...sinIdentidad,tema:"Importado largo nuevo",codigo:"S-2000"}
+    }}};
+    await pc.locator('.side [data-view="ajustes"]:visible').click();
+    await pc.locator("#rFile").setInputFiles({name:"pedidos-grandes.json",mimeType:"application/json",
+      buffer:Buffer.from(JSON.stringify(archivos))});
+    await pc.locator("#okc").click();
+    await visible(pc.getByText("Restaurado: 1 recuperados, 1 actualizados",{exact:true}));
+    await env.withSecurityRulesDisabled(async contexto => {
+      const db = contexto.firestore();
+      for (const id of [idCompartido,idNuevo]) {
+        const efectivo = (await getDocFromServer(doc(db,"pedidos",id))).data();
+        assert.deepEqual(efectivo.items,respaldo.items);
+        assert.equal(efectivo.totalMenor,respaldo.totalMenor);
+        assert.equal(efectivo.abonoMenor,respaldo.abonoMenor);
+        assert.equal(efectivo.autorAviso,undefined);
+      }
+    });
+  } finally {
+    await env?.cleanup();
+    await browser?.close();
+    await new Promise(resolve => server.close(resolve));
+  }
 });
