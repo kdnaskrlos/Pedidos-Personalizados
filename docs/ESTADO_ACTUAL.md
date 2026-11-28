@@ -2,11 +2,15 @@
 
 - Actualización del 28 de noviembre de 2026.
 - Repositorio `kdnaskrlos/Pedidos-Personalizados`. Base `main` en `f14b9fbda4cc4cb9c81dd9119ca8934dc4f3a88c`, verificada contra el remoto.
-- Base oficial comprobada `v3.70.6` en `d676719`. Candidata `v3.70.7` en `codex/v3.70.7-notificaciones`, pendiente de revisión.
+- Base oficial `v3.70.7` en `6528b81`. Candidata `v3.70.8` en `codex/v3.70.8-aviso-escritorio`, pendiente de revisión.
 - Versión de la entrega anterior `v3.70.6`, desde la base `v3.70.5`.
 - Diseño y publicación aprobados por el propietario, con publicación condicionada a CI en verde. [PR #14](https://github.com/kdnaskrlos/Pedidos-Personalizados/pull/14) · [Issue #13](https://github.com/kdnaskrlos/Pedidos-Personalizados/issues/13)
 
-## Incidencia de notificaciones
+## Incidencia de notificaciones en escritorio
+
+En la prueba física de v3.70.7, el móvil se activó y el escritorio quedó pendiente. En Chromium se reprodujo el estado usando las versiones oficiales, el worker real y un rechazo simulado del SDK al borrar un token anterior. La candidata `v3.70.8` incorpora diagnóstico local y recuperación con el mismo ID. Caché de aplicación `pedidos-v186`. Pendiente de identificar la causa en el PC físico. [Investigación](notificaciones-push.md)
+
+## Auditoría de v3.70.7
 
 La candidata distingue la intención persistida en IndexedDB de la verificación del registro. La auditoría corrigió la falsa activación tras un arranque sin red y la baja ignorada durante una renovación. Usa caché de aplicación `pedidos-v185`. Pendiente de comprobación física en Android e iOS. [Investigación y pruebas](notificaciones-push.md) · [PR #15](https://github.com/kdnaskrlos/Pedidos-Personalizados/pull/15)
 

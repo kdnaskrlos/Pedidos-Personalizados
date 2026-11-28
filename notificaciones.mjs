@@ -4,11 +4,27 @@ import {claveVapid,regionAvisos} from "./push-config.mjs";
 const SDK_MESSAGING = "https://www.gstatic.com/firebasejs/10.12.2/firebase-messaging.js";
 const SDK_FUNCTIONS = "https://www.gstatic.com/firebasejs/10.12.2/firebase-functions.js";
 const CACHE = "pedidos-push-v1";
-const URL_VINCULO = new URL("./.pedidos-push/dispositivo",import.meta.url);
+const URL_APP = new URL("./",import.meta.url);
+const URL_VINCULO = new URL(".pedidos-push/dispositivo",URL_APP);
+const URL_WORKER = new URL("sw.js",URL_APP);
 const CLAVE_LOCAL = "cs-dispositivo-avisos";
 const intervalo = 15 * 60000;
 const reintento = 60000;
 const vacias = admin => ({ediciones:admin,nuevos:false,estado:false});
+
+// No se muestran mensajes, datos del SDK ni códigos fuera de esta lista.
+const codigos = new Set([
+  "permission-denied","unauthenticated","unavailable","deadline-exceeded","aborted","resource-exhausted",
+  "messaging/unsupported-browser","messaging/indexed-db-unsupported","messaging/permission-blocked",
+  "messaging/token-subscribe-failed","messaging/token-subscribe-no-token","messaging/token-update-failed",
+  "messaging/token-update-no-token","messaging/token-unsubscribe-failed","messaging/invalid-sw-registration",
+  "installations/request-failed","worker-no-activo","worker-distinto","token-invalido","suscripcion-no-retirada",
+  "vinculo-invalido","SecurityError","QuotaExceededError","NotAllowedError","InvalidStateError","AbortError"
+]);
+const errorAvisos = code => Object.assign(new Error(code),{code});
+const codigoSeguro = error => [error?.code,error?.name].find(codigo => codigos.has(codigo)) || "fallo";
+const tokenValido = token => typeof token === "string" && token.length >= 32 && token.length <= 4096 && !/\s/.test(token);
+const idValido = id => typeof id === "string" && /^[a-f0-9-]{36}$/.test(id);
 
 function compatible() {
   return globalThis.isSecureContext && "Notification" in window && "PushManager" in window &&
@@ -32,7 +48,7 @@ async function cerrarAvisos() {
 function idDispositivo() {
   let id;
   try { id = localStorage.getItem(CLAVE_LOCAL); } catch {}
-  if (!id) {
+  if (!idValido(id)) {
     id = crypto.randomUUID();
     try { localStorage.setItem(CLAVE_LOCAL,id); } catch {}
   }
@@ -48,6 +64,21 @@ export function crearNotificaciones({sesion,app,datos,actualizar,cargarMessaging
   let ocupado = false, renovando = false, listo = false, cerrando = false;
   let preferencias = vacias(false), mensaje = "", error = false, revision = 0;
   let proximoIntento = 0, demora = reintento, forzarRenovacion = false;
+  let diagnostico, restauracionPendiente = false;
+  const informar = (gen,fase,codigo) => {
+    if (gen !== revision) return;
+    diagnostico = {fase,codigo};
+    actualizar();
+  };
+  async function paso(gen,fase,operacion) {
+    informar(gen,fase,"comprobando");
+    // El SDK no ofrece cancelación. Se informa de la espera sin liberar el
+    // bloqueo mientras aún puede estar cambiando la suscripción.
+    const aviso = setTimeout(() => informar(gen,fase,"espera-prolongada"),20000);
+    try { return await operacion(); }
+    catch (error) { informar(gen,fase,codigoSeguro(error)); throw error; }
+    finally { clearTimeout(aviso); }
+  }
   const comprobar = (id,gen) => {
     if (cerrando || !id || uid !== id || sesion()?.uid !== id || revision !== gen) throw new Error("La sesión cambió.");
   };
@@ -67,16 +98,23 @@ export function crearNotificaciones({sesion,app,datos,actualizar,cargarMessaging
       estado:!compatible() ? "incompatible" : Notification.permission === "denied" ? "bloqueado" :
         !claveVapid ? "configuracion" : !listo ? "cargando" : !habilitado ? "apagado" :
         confirmada === intencion.generacion ? "activo" : "pendiente",
+      diagnostico:diagnostico && {...diagnostico,espera:Math.max(0,Math.ceil((proximoIntento - Date.now()) / 1000))},
       habilitado,preferencias,ocupado,permitePreferencias:abierto && !cargandoPreferencias && listo,mensaje,error
     };
   };
 
-  async function prepararFCM() {
-    const sdk = await cargarMessaging();
-    if (!await sdk.isSupported()) throw new Error("El navegador no admite notificaciones web.");
-    const reg = await navigator.serviceWorker.getRegistration();
-    if (!reg?.active) throw new Error("Recarga Pedidos para terminar de instalar la aplicación.");
-    return {sdk,reg,messaging:sdk.getMessaging(app())};
+  async function prepararFCM(gen) {
+    const reg = await paso(gen,"worker",async () => {
+      const actual = await navigator.serviceWorker.getRegistration(URL_APP.href);
+      if (!actual?.active || actual.active.state === "activating") throw errorAvisos("worker-no-activo");
+      if (actual.active.scriptURL !== URL_WORKER.href) throw errorAvisos("worker-distinto");
+      return actual;
+    });
+    return paso(gen,"sdk",async () => {
+      const sdk = await cargarMessaging();
+      if (!await sdk.isSupported()) throw errorAvisos("messaging/unsupported-browser");
+      return {sdk,reg,messaging:sdk.getMessaging(app())};
+    });
   }
 
   // Web Locks cubre Chromium y Safari con Web Push. La concesión en IndexedDB
@@ -108,31 +146,68 @@ export function crearNotificaciones({sesion,app,datos,actualizar,cargarMessaging
       return actual;
     };
     const registro = await vigente();
-    const {sdk,reg,messaging} = await prepararFCM();
+    if (!idValido(dispositivo)) return paso(gen,"almacen",() => { throw errorAvisos("vinculo-invalido"); });
+    const {sdk,reg,messaging} = await prepararFCM(gen);
     const opciones = {vapidKey:claveVapid,serviceWorkerRegistration:reg};
-    const guardar = async comprobarRegistro => {
+    const obtenerToken = () => paso(gen,"token",async () => {
       await vigente();
       const token = await sdk.getToken(messaging,opciones);
+      if (!tokenValido(token)) throw errorAvisos("token-invalido");
+      return token;
+    });
+    const guardar = (token,comprobarRegistro) => paso(gen,"firestore",async () => {
       await vigente();
-      if (!token) throw new Error("Firebase no devolvió un token para el dispositivo.");
       return datos.guardarDispositivo(id,dispositivo,token,vigente,comprobarRegistro);
-    };
-    if (!await guardar(!!registro.registrado)) {
+    });
+    const limpiarTokenAnterior = () => paso(gen,"suscripcion",async () => {
       await vigente();
       await almacen.cambiar(actual => actual?.generacion === generacion ? {...actual,entrega:false} : actual);
       canal?.postMessage("cambio");
       await vigente();
-      await sdk.deleteToken(messaging);
+      let retirada;
+      try { retirada = await sdk.deleteToken(messaging); }
+      catch (error) {
+        if (error?.code !== "messaging/token-unsubscribe-failed") throw error;
+        // En el SDK 10.12.2 un DELETE rechazado deja la inscripción local intacta.
+        // Cambiar la suscripción hace que getToken obtenga una inscripción nueva.
+        await vigente();
+        retirada = await (await reg.pushManager.getSubscription())?.unsubscribe();
+      }
       await vigente();
-      await guardar(false);
+      if (retirada !== true && await reg.pushManager.getSubscription()) throw errorAvisos("suscripcion-no-retirada");
+      await almacen.cambiar(actual => actual?.generacion === generacion ? {...actual,registrado:false} : actual);
+    });
+    let token, reemplazado = false;
+    try { token = await obtenerToken(); }
+    catch (error) {
+      if (!registro.registrado || !["messaging/token-update-failed","messaging/token-update-no-token"].includes(error?.code)) throw error;
+      // Solo se rota aquí ante un rechazo definitivo o una ausencia confirmada
+      // por el servidor. Un fallo de red no debe destruir una suscripción útil.
+      const info = error.customData?.errorInfo;
+      const obsoleto = typeof info === "string" && /^(requested entity was not found|unregistered|registration-token-not-registered)\.?$/i.test(info.trim());
+      if (!obsoleto) {
+        const existe = await paso(gen,"firestore",async () => {
+          await vigente();
+          return datos.existeDispositivo(id,dispositivo);
+        });
+        if (existe) { informar(gen,"token",codigoSeguro(error)); throw error; }
+      }
+      await limpiarTokenAnterior();
+      reemplazado = true;
+      token = await obtenerToken();
+    }
+    if (!await guardar(token,registro.registrado && !reemplazado)) {
+      await limpiarTokenAnterior();
+      await guardar(await obtenerToken(),false);
     }
     await vigente();
-    const nuevo = await almacen.cambiar(actual => actual?.generacion === generacion ?
-      {...actual,entrega:true,registrado:true,comprobado:Date.now()} : actual);
+    const nuevo = await paso(gen,"almacen",() => almacen.cambiar(actual => actual?.generacion === generacion ?
+      {...actual,entrega:true,registrado:true,comprobado:Date.now()} : actual));
     comprobar(id,gen);
     if (nuevo?.generacion !== generacion) return;
     adoptar(nuevo);
     confirmada = generacion;
+    informar(gen,"firestore","verificado");
     canal?.postMessage("cambio");
   }
 
@@ -161,10 +236,35 @@ export function crearNotificaciones({sesion,app,datos,actualizar,cargarMessaging
     };
     if (!await vigente()) return;
     await datos.borrarDispositivo(baja.uid,baja.id);
-    const {sdk,messaging} = await prepararFCM();
+    const {sdk,messaging} = await prepararFCM(revision);
     if (!await vigente()) return;
     await sdk.deleteToken(messaging);
     await almacen.cambiar(actual => actual?.generacion === baja.generacion ? {...actual,limpieza:false} : actual);
+  }
+
+  async function restaurar(id,gen) {
+    const actual = await paso(gen,"migracion",async () => {
+      const guardado = await almacen.leer();
+      if (gen !== revision) return;
+      if (guardado?.uid === id) return guardado;
+      const legado = guardado ? null : await leerVinculo();
+      if (gen !== revision) return;
+      return almacen.cambiar(anterior => {
+        if (gen !== revision) return anterior;
+        if (!anterior && legado?.uid === id) {
+          if (!idValido(legado.id)) throw errorAvisos("vinculo-invalido");
+          return {uid:id,id:legado.id,generacion:crypto.randomUUID(),habilitado:true,entrega:true,registrado:true};
+        }
+        if (anterior?.uid === id || !anterior && !legado) return anterior;
+        return {uid:id,id:idDispositivo(),generacion:crypto.randomUUID(),habilitado:false,entrega:false};
+      });
+    });
+    if (gen !== revision) return;
+    restauracionPendiente = false;
+    diagnostico = actual?.habilitado ? {fase:"migracion",codigo:"comprobando"} : null;
+    adoptar(actual);
+    // La nueva vinculación ya es duradera antes de retirar el formato anterior.
+    if (actual) await quitarVinculo().catch(() => {});
   }
 
   async function cambiarSesion(id,admin) {
@@ -176,7 +276,7 @@ export function crearNotificaciones({sesion,app,datos,actualizar,cargarMessaging
     uid = id;
     adminActual = admin;
     const gen = ++revision;
-    intencion = confirmada = null;
+    intencion = confirmada = diagnostico = null;
     abierto = listo = ocupado = renovando = error = cerrando = cargandoPreferencias = false;
     preferencias = vacias(admin);
     proximoIntento = 0;
@@ -189,21 +289,11 @@ export function crearNotificaciones({sesion,app,datos,actualizar,cargarMessaging
         if (gen === revision && anterior?.uid && anterior.habilitado !== false) await retirar(anterior.uid);
       } catch {}
     }
-    if (compatible() && id) {
-      try {
-        const legado = await leerVinculo().catch(() => null);
-        if (gen !== revision) return;
-        const actual = await almacen.cambiar(anterior => {
-          if (gen !== revision) return anterior;
-          if (!anterior && legado?.uid === id)
-            return {uid:id,id:legado.id,generacion:crypto.randomUUID(),habilitado:true,entrega:true,registrado:true};
-          if (anterior?.uid === id || !anterior && !legado) return anterior;
-          return {uid:id,id:idDispositivo(),generacion:crypto.randomUUID(),habilitado:false,entrega:false};
-        });
-        if (gen !== revision) return;
-        adoptar(actual);
-        if (actual) await quitarVinculo().catch(() => {});
-      } catch { /* La app puede abrir aunque el almacenamiento de avisos no esté disponible. */ }
+    if (gen !== revision) return;
+    restauracionPendiente = compatible() && !!id;
+    if (restauracionPendiente) {
+      try { await restaurar(id,gen); }
+      catch { if (gen === revision) proximoIntento = Date.now() + reintento; }
     }
     if (gen === revision) { listo = true; actualizar(); await renovar(); }
   }
@@ -307,7 +397,14 @@ export function crearNotificaciones({sesion,app,datos,actualizar,cargarMessaging
     if (ocupado || renovando) return;
     renovando = true;
     try {
-      const actual = await almacen.leer();
+      if (restauracionPendiente) {
+        if (Date.now() < proximoIntento) return;
+        await restaurar(id,gen);
+      }
+      const actual = await almacen.leer().catch(error => {
+        informar(gen,"almacen",codigoSeguro(error));
+        throw error;
+      });
       comprobar(id,gen);
       adoptar(actual);
       if (actual?.uid !== id) return;
@@ -316,12 +413,17 @@ export function crearNotificaciones({sesion,app,datos,actualizar,cargarMessaging
         return;
       }
       const ahora = Date.now();
-      if (!navigator.onLine || ahora < proximoIntento) return;
+      if (!navigator.onLine) {
+        if (actual.habilitado && !confirmada) informar(gen,"conexion","sin-conexion");
+        return;
+      }
+      if (ahora < proximoIntento) return;
       if (!actual.habilitado && !actual.limpieza) return;
       if (!forzarRenovacion && confirmada && actual.comprobado + intervalo > ahora) return;
       confirmada = null;
       actualizar();
       let ejecutado = false;
+      informar(gen,"bloqueo","comprobando");
       await exclusivo(async conservar => {
         ejecutado = true;
         forzarRenovacion = false;
@@ -329,11 +431,13 @@ export function crearNotificaciones({sesion,app,datos,actualizar,cargarMessaging
         else await limpiar(actual,conservar);
       });
       if (gen === revision) {
+        if (!ejecutado) informar(gen,"bloqueo","otra-pestana");
         demora = reintento;
         proximoIntento = ahora + (ejecutado ? reintento : 5000);
       }
-    } catch {
+    } catch (error) {
       if (gen === revision) {
+        if (diagnostico?.fase === "bloqueo") informar(gen,"bloqueo",codigoSeguro(error));
         confirmada = null;
         proximoIntento = Date.now() + demora;
         demora = Math.min(demora * 2,intervalo);
@@ -359,6 +463,11 @@ export function crearNotificaciones({sesion,app,datos,actualizar,cargarMessaging
     }
   }
 
+  function workerListo() {
+    if (diagnostico?.fase === "worker" && diagnostico.codigo === "worker-no-activo") proximoIntento = 0;
+    return renovar();
+  }
+
   const cerrarSesion = () => invalidarSesion(uid);
-  return {estado,dispositivo,preferencia,prueba,cambiarSesion,abrirPanel,renovar,cerrarSesion,invalidarSesion};
+  return {estado,dispositivo,preferencia,prueba,cambiarSesion,abrirPanel,renovar,workerListo,cerrarSesion,invalidarSesion};
 }

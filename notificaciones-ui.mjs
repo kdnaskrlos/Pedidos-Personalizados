@@ -8,6 +8,12 @@ const estados = {
   cargando:["Comprobando…"]
 };
 
+const fases = {
+  migracion:"Migración de la vinculación",almacen:"Almacenamiento local",worker:"Service worker",
+  sdk:"SDK de Firebase Messaging",token:"Token de FCM",suscripcion:"Suscripción del navegador",
+  firestore:"Registro en Firestore",bloqueo:"Coordinación entre pestañas",conexion:"Conexión"
+};
+
 const categorias = [
   ["ediciones","Ediciones de pedidos por otros miembros"],
   ["nuevos","Nuevos pedidos"],
@@ -20,10 +26,13 @@ const escapeHTML = valor => String(valor).replace(/[&<>"']/g,c => ({
   "&":"&amp;","<":"&lt;",">":"&gt;",'"':"&quot;","'":"&#39;"
 })[c]);
 
-export function panelNotificaciones({estado, preferencias, ocupado, permitePreferencias = true, habilitado = estado === "activo", mensaje = "", error = false}, icono = "") {
+export function panelNotificaciones({estado, preferencias, ocupado, permitePreferencias = true, habilitado = estado === "activo", mensaje = "", error = false, diagnostico}, icono = "") {
   const [etiqueta,detalle] = estados[estado];
   const activo = estado === "activo";
   const listo = activo || estado === "apagado" || estado === "pendiente";
+  const verDiagnostico = diagnostico && (estado === "pendiente" || diagnostico.fase === "migracion");
+  const espera = diagnostico?.espera > 0 ? ` · reintento a partir de ${Math.ceil(diagnostico.espera)} s` : "";
+  const ayudaDiagnostico = diagnostico?.codigo === "espera-prolongada" ? " · si persiste, recarga Pedidos" : "";
   return `<section class="card nt-panel" aria-label="Notificaciones">
     <div class="sec">${icono}Notificaciones</div>
     <div class="nt-dispositivo">
@@ -36,6 +45,7 @@ export function panelNotificaciones({estado, preferencias, ocupado, permitePrefe
         <button class="btn sm" type="button" data-nt-prueba ${!activo || ocupado ? "disabled" : ""}>Enviar prueba a este dispositivo</button>
       </div>
       ${detalle ? `<p class="nt-ayuda">${detalle}</p>` : ""}
+      ${verDiagnostico ? `<p class="nt-ayuda" data-nt-diagnostico>Diagnóstico · ${escapeHTML(fases[diagnostico.fase] || "Registro")} · <code>${escapeHTML(diagnostico.codigo)}</code>${espera}${ayudaDiagnostico}</p>` : ""}
     </div>
     <div class="sec">Tipos de aviso</div>
     <div class="nt-tipos">${categorias.map(([id,nombre]) => `<label class="swr nt-fila">

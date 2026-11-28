@@ -1,5 +1,10 @@
 # Bitácora de Pedidos Personalizados
 
+## 2026-11-28 · Candidata v3.70.8
+
+- Se reprodujo la actualización de v3.70.6 a v3.70.7 en escritorio con Cache Storage, IndexedDB y el worker reales. Un fallo FCM simulado dejó el registro pendiente. Se añadió recuperación con el mismo ID, comprobación del worker y diagnóstico estricto por etapa.
+- La causa concreta del PC físico sigue pendiente. Candidata en borrador, sin cambios en Firebase de producción. [Investigación](notificaciones-push.md)
+
 ## 2026-11-28 · Auditoría del PR #15
 
 - Se reprodujeron una activación falsa al iniciar sin conexión y una baja manual ignorada durante la renovación. Se añadió estado pendiente, persistencia en IndexedDB, coordinación de operaciones y cierre seguro ante un perfil no verificable.

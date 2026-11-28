@@ -157,14 +157,14 @@ test("el mismo service worker muestra un aviso FCM y abre una URL segura, aunque
     await espera;
   };
   runInNewContext(await readFile(new URL("../sw.js",import.meta.url),"utf8"),{self,location:url,URL,importScripts() {},
-    almacenAvisos:{leer:async () => intencion},caches:{open:async () => cache,keys:async () => ["pedidos-v184","pedidos-v185","pedidos-push-v1","libs-v1"],
+    almacenAvisos:{leer:async () => intencion},caches:{open:async () => cache,keys:async () => ["pedidos-v185","pedidos-v186","pedidos-push-v1","libs-v1"],
     delete:async clave => { borradas.push(clave); }}});
   const datos = {app:"pedidos",uid:"uid123",dispositivo:"id-1",evento:"e1",pedidoId:"p-1",titulo:"Actualizado",cuerpo:"Ana modificó un pedido."};
   await lanzar("push",{data:{json:() => ({data:datos})}});
   assert.equal(mostrados.length,0);
   vinculos.set(binding,{json:async () => ({uid:"uid123",id:"id-1"})});
   await lanzar("activate",{});
-  assert.deepEqual(borradas,["pedidos-v184"]);
+  assert.deepEqual(borradas,["pedidos-v185"]);
   await Promise.all([lanzar("push",{data:{json:() => ({data:datos})}}),lanzar("push",{data:{json:() => ({data:datos})}})]);
   assert.equal(mostrados.length,1);
   await lanzar("notificationclick",{notification:{data:mostrados[0].opciones.data,close() {}}});
@@ -195,6 +195,9 @@ const controlador = (await readFile(new URL("../notificaciones.mjs",import.meta.
 
 function dispositivoSimulado(id, servidor) {
   let estado, arrendamiento;
+  const idLocal = Buffer.from(id).toString("hex").padEnd(36,"0");
+  const claveRemota = (uid,dispositivo) => uid + "/" + (dispositivo === idLocal ? id : dispositivo);
+  const vigilancias = new Map();
   let reloj = 0, usuario = "ana", token = id + "-token", intentos = 0, bajas = 0, escrituras = 0;
   const guardado = new Map();
   const cache = {
@@ -203,47 +206,78 @@ function dispositivoSimulado(id, servidor) {
     delete:async url => guardado.delete(String(url))
   };
   const Notification = {permission:"granted",requestPermission:async () => Notification.permission};
+  let falloToken, falloBaja, suspender;
   const navigator = {onLine:true,serviceWorker:{getRegistration:async () => ({
-    active:{},getNotifications:async () => [],pushManager:{getSubscription:async () => null}
+    active:{scriptURL:"https://example.test/Pedidos/sw.js"},getNotifications:async () => [],
+    pushManager:{getSubscription:async () => falloBaja ? {unsubscribe:async () => {
+      falloBaja = falloToken = null; token += "-nuevo"; return true;
+    }} : null}
   })}};
+  const prefijo = "token-de-prueba-sin-credenciales-";
   const almacenAvisos = {
     leer:async () => structuredClone(estado),
     cambiar:async fn => structuredClone(estado = fn(estado)),
     arrendar:async fn => structuredClone(arrendamiento = fn(arrendamiento))
   };
   const crear = runInNewContext(controlador + "\ncrearNotificaciones",{
-    URL,Response,crypto,almacenAvisos,setTimeout,clearTimeout,isSecureContext:true,window:{Notification,PushManager:{},caches:{}},
-    Notification,navigator,caches:{open:async () => cache},localStorage:{getItem:() => id},
+    URL,Response,crypto,almacenAvisos,
+    setTimeout:(fn,ms) => {
+      if (ms !== 20000) return setTimeout(fn,ms);
+      const marca = Symbol();
+      vigilancias.set(marca,{fn,vence:reloj + ms});
+      return marca;
+    },
+    clearTimeout:marca => typeof marca === "symbol" ? vigilancias.delete(marca) : clearTimeout(marca),
+    isSecureContext:true,window:{Notification,PushManager:{},caches:{}},
+    Notification,navigator,caches:{open:async () => cache},localStorage:{getItem:() => idLocal},
     Date:{now:() => reloj}
   });
   const sesion = () => usuario ? {uid:usuario} : null;
   return {
-    Notification,navigator,almacenAvisos,perderCache:() => guardado.clear(),
-    legado:() => cache.put("https://example.test/Pedidos/.pedidos-push/dispositivo",new Response(JSON.stringify({uid:"ana",id}))),
-    avanzar: ms => { reloj += ms; },
+    id:idLocal,Notification,navigator,almacenAvisos,perderCache:() => guardado.clear(),
+    legado:() => cache.put("https://example.test/Pedidos/.pedidos-push/dispositivo",new Response(JSON.stringify({uid:"ana",id:idLocal}))),
+    avanzar: ms => {
+      reloj += ms;
+      for (const [marca,{fn,vence}] of vigilancias) {
+        if (vence <= reloj) { vigilancias.delete(marca); fn(); }
+      }
+    },
+    fallar:(obtener,borrar) => { falloToken = obtener; falloBaja = borrar; },
+    esperarToken: promesa => { suspender = promesa; },
     cambiarToken: nuevo => { token = nuevo; }, cambiarUsuario: uid => { usuario = uid; },
     contadores: () => ({intentos,bajas,escrituras}),
     abrir:() => crear({
       sesion,app:() => ({}),actualizar:() => {},
       cargarMessaging: async () => ({
-        isSupported:async () => true, getMessaging:() => ({}), getToken:async () => token,
-        deleteToken:async () => { bajas++; token += "-nuevo"; }
+        isSupported:async () => true, getMessaging:() => ({}), getToken:async () => {
+          await suspender;
+          if (falloToken) throw falloToken;
+          return prefijo + token;
+        },
+        deleteToken:async () => {
+          bajas++;
+          if (falloBaja) throw falloBaja;
+          token += "-nuevo";
+          return true;
+        }
       }),
       datos:{
         leerPreferencias:async () => null,
         guardarDispositivo:async (uid,id,actual,vigencia,comprobarRegistro) => {
           intentos++;
-          if (!navigator.onLine || servidor.falla) throw new Error("Sin conexión");
+          if (!navigator.onLine || servidor.falla) throw (servidor.falla?.code ? servidor.falla : new Error("Sin conexión"));
           await servidor.espera;
           await vigencia();
-          const clave = uid + "/" + id;
+          const clave = claveRemota(uid,id);
           if (!servidor.has(clave) && comprobarRegistro) return false;
-          if (servidor.get(clave) !== actual) { servidor.set(clave,actual); escrituras++; }
+          const valor = actual.slice(prefijo.length);
+          if (servidor.get(clave) !== valor) { servidor.set(clave,valor); escrituras++; }
           return true;
         },
+        existeDispositivo:async (uid,id) => servidor.has(claveRemota(uid,id)),
         borrarDispositivo:async (uid,id) => {
-          if (!navigator.onLine) throw new Error("Sin conexión");
-          servidor.delete(uid + "/" + id);
+          if (!navigator.onLine) throw (servidor.falla?.code ? servidor.falla : new Error("Sin conexión"));
+          servidor.delete(claveRemota(uid,id));
         }
       }
     })
@@ -379,7 +413,7 @@ test("migra un vínculo anterior y conserva el ID tras perder Cache Storage", as
   app = movil.abrir();
   await app.cambiarSesion("ana",false);
   assert.equal(app.estado().estado,"activo");
-  assert.equal((await movil.almacenAvisos.leer()).id,"movil");
+  assert.equal((await movil.almacenAvisos.leer()).id,movil.id);
   assert.deepEqual([...servidor], [["ana/movil","movil-token-nuevo"]]);
   await app.dispositivo(false);
   await movil.legado();
@@ -461,4 +495,118 @@ test("una señal de suscripción durante la espera se procesa al terminar la pau
   await app.renovar();
   assert.equal(app.estado().estado,"activo");
   assert.equal(servidor.get("ana/movil"),"rotado");
+});
+
+test("una migración recupera la suscripción aunque FCM rechace borrar el token antiguo", async () => {
+  const servidor = new Map(), pc = dispositivoSimulado("pc",servidor), app = pc.abrir();
+  await pc.legado();
+  pc.fallar(null,Object.assign(new Error("Texto sensible de prueba"),{code:"messaging/token-unsubscribe-failed"}));
+  await app.cambiarSesion("ana",false);
+  assert.equal(app.estado().estado,"activo");
+  assert.equal(servidor.get("ana/pc"),"pc-token-nuevo");
+  assert.equal(pc.contadores().escrituras,1);
+});
+
+test("un token vencido puede recuperarse aunque falle su actualización y borrado en el SDK", async () => {
+  const servidor = new Map([["ana/pc","pc-token"]]), pc = dispositivoSimulado("pc",servidor), app = pc.abrir();
+  await pc.legado();
+  pc.fallar(Object.assign(new Error("No registrar este texto"),{
+    code:"messaging/token-update-failed",customData:{errorInfo:"Requested entity was not found."}
+  }),Object.assign(new Error("No registrar este texto"),{code:"messaging/token-unsubscribe-failed"}));
+  await app.cambiarSesion("ana",false);
+  assert.equal(app.estado().estado,"activo");
+  assert.equal(servidor.get("ana/pc"),"pc-token-nuevo");
+  assert.equal(pc.contadores().escrituras,1);
+});
+
+test("un fallo de actualización transitorio conserva la suscripción y diagnostica solo el código", async () => {
+  const servidor = new Map([["ana/pc","pc-token"]]), pc = dispositivoSimulado("pc",servidor), app = pc.abrir();
+  await pc.legado();
+  pc.fallar(Object.assign(new Error("token-uid-proyecto-sensibles"),{
+    code:"messaging/token-update-failed",customData:{errorInfo:"token-uid-proyecto-sensibles"}
+  }));
+  await app.cambiarSesion("ana",false);
+  assert.equal(app.estado().estado,"pendiente");
+  assert.equal(app.estado().habilitado,true);
+  assert.equal(JSON.stringify(app.estado().diagnostico),JSON.stringify({fase:"token",codigo:"messaging/token-update-failed",espera:60}));
+  assert.equal(pc.contadores().bajas,0);
+  pc.avanzar(60000);
+  pc.fallar(null);
+  await app.renovar();
+  assert.equal(app.estado().estado,"activo");
+  assert.equal(pc.contadores().escrituras,0);
+});
+
+test("diagnostica el service worker de otro ámbito y se reintenta al activarse el correcto", async () => {
+  const servidor = new Map([["ana/pc","pc-token"]]), pc = dispositivoSimulado("pc",servidor), app = pc.abrir();
+  const registro = pc.navigator.serviceWorker.getRegistration;
+  await pc.legado();
+  pc.navigator.serviceWorker.getRegistration = async () => ({active:{scriptURL:"https://example.test/sw.js"}});
+  await app.cambiarSesion("ana",false);
+  assert.equal(app.estado().diagnostico.codigo,"worker-distinto");
+  assert.equal(pc.contadores().intentos,0);
+  pc.navigator.serviceWorker.getRegistration = async () => ({});
+  pc.avanzar(60000);
+  await app.renovar();
+  assert.equal(app.estado().diagnostico.codigo,"worker-no-activo");
+  pc.navigator.serviceWorker.getRegistration = registro;
+  await app.workerListo();
+  assert.equal(app.estado().estado,"activo");
+  assert.equal(pc.contadores().escrituras,0);
+});
+
+test("distingue otra pestaña ocupada de una transacción de Firestore rechazada", async () => {
+  const servidor = new Map([["ana/pc","pc-token"]]), pc = dispositivoSimulado("pc",servidor), app = pc.abrir();
+  await pc.legado();
+  pc.navigator.locks = {request:async (nombre,opciones,fn) => fn(null)};
+  await app.cambiarSesion("ana",false);
+  assert.equal(app.estado().diagnostico.codigo,"otra-pestana");
+  assert.equal(pc.contadores().intentos,0);
+  pc.avanzar(5000);
+  pc.navigator.locks.request = async (nombre,opciones,fn) => fn({});
+  servidor.falla = Object.assign(new Error("Ruta privada de prueba"),{code:"permission-denied"});
+  await app.renovar();
+  assert.equal(app.estado().diagnostico.fase,"firestore");
+  assert.equal(app.estado().diagnostico.codigo,"permission-denied");
+  assert.equal(app.estado().estado,"pendiente");
+  assert.equal(pc.contadores().escrituras,0);
+});
+
+test("una migración que falla temporalmente en IndexedDB conserva la copia anterior y reintenta", async () => {
+  const servidor = new Map([["ana/pc","pc-token"]]), pc = dispositivoSimulado("pc",servidor), app = pc.abrir();
+  await pc.legado();
+  const leer = pc.almacenAvisos.leer;
+  pc.almacenAvisos.leer = async () => { throw new Error("Datos de diagnóstico privados"); };
+  await app.cambiarSesion("ana",false);
+  assert.equal(app.estado().diagnostico.fase,"migracion");
+  assert.equal(app.estado().diagnostico.codigo,"fallo");
+  assert.equal(pc.contadores().intentos,0);
+  pc.almacenAvisos.leer = leer;
+  pc.avanzar(60000);
+  await app.renovar();
+  assert.equal((await leer()).id,pc.id);
+  assert.equal(app.estado().estado,"activo");
+});
+
+test("una espera larga del SDK es visible y mantiene el bloqueo hasta que termina", {timeout:4000}, async () => {
+  const servidor = new Map([["ana/pc","pc-token"]]), pc = dispositivoSimulado("pc",servidor);
+  await pc.legado();
+  const primera = pc.abrir(), segunda = pc.abrir();
+  let continuar;
+  pc.esperarToken(new Promise(resolve => { continuar = resolve; }));
+  const migracion = primera.cambiarSesion("ana",false);
+  try {
+    while (primera.estado().diagnostico?.fase !== "token") await new Promise(resolve => setImmediate(resolve));
+    pc.avanzar(20000);
+    assert.equal(primera.estado().diagnostico.codigo,"espera-prolongada");
+    assert.equal(primera.estado().estado,"pendiente");
+    await segunda.cambiarSesion("ana",false);
+    assert.equal(segunda.estado().diagnostico.codigo,"otra-pestana");
+    assert.equal(pc.contadores().intentos,0);
+  } finally {
+    continuar();
+    await migracion;
+  }
+  assert.equal(primera.estado().estado,"activo");
+  assert.equal(pc.contadores().intentos,1);
 });
