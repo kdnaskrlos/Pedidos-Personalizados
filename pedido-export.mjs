@@ -91,7 +91,7 @@ function partirTexto(ctx, valor, limite) {
   return lineas;
 }
 
-function dibujarResumen(ctx, resumen, marcarCorte = () => {}) {
+function dibujarResumen(ctx, resumen, marcarCorte = () => {}, inicioPagina = 0) {
   ctx.textBaseline = "top";
   const medir = (valor, limite, {px = 22, peso = 600, paso = px + 8} = {}) => {
     const font = `${peso} ${px}px ${fuente}`;
@@ -135,15 +135,23 @@ function dibujarResumen(ctx, resumen, marcarCorte = () => {}) {
 
   let y = 40;
   const datos = activos(resumen.datos);
-  if (datos.length) {
+  if (resumen.titulo || datos.length) {
     caja(margen,y + 5,6,25,"#d2561c",3);
-    escribir("Datos del pedido",margen + 18,y,interior - 18,{px:25,peso:800});
+    escribir(resumen.titulo,margen + 18,y,interior - 18,{px:25,peso:800});
     y = campos(datos,margen,y + 44,interior,2,{fondo:"#fff"}) + 24;
   }
 
   if (resumen.prendas.length) {
     for (const prenda of resumen.prendas) {
-      const [nombre,horma,talla,color,cantidad,personalizado,numero,etiqueta,unitario,subtotal] = prenda;
+      const [nombre,horma,talla,color,cantidad,personalizado,numero,etiqueta,unitario,subtotal,separador] = prenda;
+      // El corte al final de la fila anterior suprime el divisor al iniciar página.
+      if (separador) {
+        if (y > inicioPagina) {
+          ctx.fillStyle = "#e1e8f0";
+          ctx.fillRect(margen + 16,y + 4,interior - 32,1);
+        }
+        y += 12;
+      }
       const montos = activos([["Precio unitario",unitario],["Subtotal",subtotal]]);
       const anchoImporte = 152, separacion = 8, pad = 16;
       const ladoCantidad = 52, gap = 12;
@@ -233,7 +241,7 @@ async function renderizarPagina(canvas,ctx,resumen,inicio,fin,sufijo) {
   ctx.rect(0,margenPagina,ancho,fin - inicio);
   ctx.clip();
   ctx.translate(0,margenPagina - inicio);
-  dibujarResumen(ctx,resumen);
+  dibujarResumen(ctx,resumen,undefined,inicio);
   const datos = await new Promise(resolve => canvas.toBlob(resolve,"image/png"));
   if (!datos) throw new Error("No se pudo generar el PNG");
   return {nombre:`resumen-pedido-${codigoParaArchivo(resumen.codigo)}${sufijo}.png`,tipo:"image/png",datos};

@@ -1,0 +1,51 @@
+<!doctype html>
+<html lang="es">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <title>Vista previa de Pedidos v3.70.6</title>
+  <style>
+    :root{color-scheme:light dark;font:16px/1.5 system-ui}
+    body{max-width:78rem;margin:auto;padding:1rem}
+    section{margin:2rem 0}
+    .vistas{display:grid;grid-template-columns:minmax(0,2fr) minmax(0,1fr);gap:1rem;align-items:start}
+    .png{grid-template-columns:repeat(2,minmax(0,1fr))}
+    figure{margin:0}
+    figcaption{margin-bottom:.4rem;font-weight:600}
+    img{width:100%;height:auto;border-radius:.5rem}
+    @media(max-width:38rem){.vistas,.png{grid-template-columns:1fr}}
+  </style>
+</head>
+<body>
+  <h1>Pedidos v3.70.6</h1>
+  <p>Capturas de Chromium y resúmenes descargables generados con datos ficticios para el issue #13.</p>
+  <section>
+    <h2>Detalle del pedido</h2>
+    <div class="vistas">
+      <figure><figcaption>Escritorio</figcaption><a href="detalle-escritorio.png"><img src="detalle-escritorio.png" alt="Partidas ordenadas por talla con subtotales y precios unitarios"></a></figure>
+      <figure><figcaption>Móvil · tema oscuro</figcaption><a href="detalle-movil.png"><img src="detalle-movil.png" alt="Detalle en móvil con separadores sutiles entre tallas"></a></figure>
+    </div>
+  </section>
+  <section>
+    <h2>Búsqueda de pedidos</h2>
+    <div class="vistas">
+      <figure><figcaption>Escritorio</figcaption><a href="busqueda-escritorio.png"><img src="busqueda-escritorio.png" alt="Búsqueda con el botón para limpiar el texto"></a></figure>
+      <figure><figcaption>Móvil</figcaption><a href="busqueda-movil.png"><img src="busqueda-movil.png" alt="Botón para limpiar la búsqueda en móvil"></a></figure>
+    </div>
+  </section>
+  <section>
+    <h2>Visor de referencias</h2>
+    <div class="vistas">
+      <figure><figcaption>Escritorio · imagen horizontal</figcaption><a href="visor-escritorio.png"><img src="visor-escritorio.png" alt="Botón Editar imagen debajo del borde derecho de una referencia horizontal"></a></figure>
+      <figure><figcaption>Móvil · imagen vertical</figcaption><a href="visor-movil.png"><img src="visor-movil.png" alt="Botón Editar imagen debajo del borde derecho de una referencia vertical"></a></figure>
+    </div>
+  </section>
+  <section>
+    <h2>Resúmenes de ejemplo</h2>
+    <div class="vistas png">
+      <figure><figcaption><a href="resumen-personalizado.png" download>Descargar PNG de Personalizado</a></figcaption><img src="resumen-personalizado.png" alt="Resumen de Personalizado con prenda a cargo del cliente y nombre de la última persona que editó"></figure>
+      <figure><figcaption><a href="resumen-sublimacion.png" download>Descargar PNG de Sublimación completa</a></figcaption><img src="resumen-sublimacion.png" alt="Resumen de Sublimación completa sin edición registrada"></figure>
+    </div>
+  </section>
+</body>
+</html>
