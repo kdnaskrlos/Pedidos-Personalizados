@@ -90,3 +90,25 @@ gcloud firestore fields ttls update expiraEn --collection-group=notificacionesEv
 ## Fuentes técnicas
 
 [FCM Web y VAPID](https://firebase.google.com/docs/cloud-messaging/web/get-started), [Recepción de mensajes web](https://firebase.google.com/docs/cloud-messaging/web/receive-messages), [Triggers de Firestore con contexto](https://firebase.google.com/docs/functions/firestore-events), [Precios de Firebase](https://firebase.google.com/pricing) y [TTL en Firestore](https://firebase.google.com/docs/firestore/ttl).
+
+## Auditoría de la recuperación en v3.70.7
+
+En v3.70.6, Ajustes borraba la vinculación local al encontrar ausente el documento de Firestore, y la renovación ya no podía identificar el dispositivo. El servidor retira registros con tokens rechazados definitivamente o con más de 45 días sin renovar.
+
+Al auditar el primer commit del PR #15 se reprodujeron otros dos fallos: un arranque sin red mostraba «Activo» sin comprobar el registro y una baja manual se ignoraba mientras una renovación ocupaba el controlador. También se verificó que Cache Storage era la única fuente de la intención de activación y que el bloqueo entre pestañas solo cubría renovaciones.
+
+### Intención, entrega y recuperación
+
+- IndexedDB conserva la intención asociada al UID, el identificador del dispositivo y una generación de la activación. El token permanece en el SDK FCM y en su documento habitual de Firestore.
+- El switch muestra la intención. El estado «Pendiente de verificación» mantiene disponible la baja manual y deshabilita el botón de prueba. «Activo» exige que la sesión de página haya confirmado el token y su registro.
+- La primera sesión autenticada migra la vinculación heredada del mismo UID. Después de migrar, eliminar Cache Storage no elimina la intención. Si se borran todos los datos del sitio, se necesita activar el dispositivo de nuevo.
+- El worker comprueba el UID, el dispositivo y el permiso local de entrega antes de mostrar un aviso. Una baja persistida prevalece aunque sobreviva una copia antigua de la caché. El worker actualizado conserva una lectura de la vinculación anterior para las instalaciones que todavía no han abierto la nueva app.
+- La baja, el cierre de sesión y la revocación invalidan la generación antes de intentar limpiar FCM. Web Locks coordina las mutaciones. Los navegadores que no lo exponen usan una concesión caducable en IndexedDB. Una operación de red ya enviada puede terminar y dejar un documento remoto huérfano. El worker lo ignora y una baja manual pendiente reintenta la limpieza al recuperar la conexión con la cuenta correspondiente.
+- El controlador revisa al abrir, reanudar o volver a conectar la app y con señales de cambio de suscripción. Mientras esté visible, revisa cada minuto si toca actuar. La comprobación ordinaria se limita a una vez cada 15 minutos por página. Los fallos aumentan progresivamente la espera de uno a 15 minutos. Una señal del worker que llegue durante la espera queda pendiente. Firestore usa el mismo documento y solo lo escribe si falta, cambia el token o toca renovar la vigencia semanal.
+- Un perfil inactivo o un error terminal de su suscripción bloquea la interfaz y la entrega local. Ante un fallo no definitivo, la intención se conserva y se exige un perfil confirmado por el servidor para reanudar. Los permisos insuficientes o un perfil inactivo confirmado retiran la intención. Las respuestas de una suscripción anterior al cambio de sesión se descartan.
+
+### Validación y límites
+
+- Las pruebas de lógica simulan pérdida de red, pérdida de un registro remoto, rotación del token, revocación y baja manual, dos pestañas, cierre de sesión durante una escritura, espera progresiva y migración después de perder Cache Storage.
+- Chromium verifica una actualización real de service worker y la persistencia de IndexedDB en un contexto con perfil móvil. El emulador de Firebase comprueba el bloqueo tras eliminar el perfil anterior y la baja persistida. Los casos simulados se ejecutan con el workflow del PR.
+- Android físico e iOS físico quedan pendientes: abrir y volver a primer plano tras suspensión, bloqueo o reinicio, reconectar con un registro eliminado, verificar el cambio de permiso y recibir avisos reales de FCM. En iOS, comprobar desde la PWA añadida a la pantalla de inicio. Si el navegador cambia la suscripción sin clientes activos, la recuperación se completa al abrir la app. [PR #15](https://github.com/kdnaskrlos/Pedidos-Personalizados/pull/15)

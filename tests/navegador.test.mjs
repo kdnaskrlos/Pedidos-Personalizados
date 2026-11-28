@@ -19,7 +19,7 @@ const firebaseCdn = "https://www.gstatic.com/firebasejs/10.12.2/";
 const curl = promisify(execFile);
 const mime = {html:"text/html",js:"text/javascript",mjs:"text/javascript",png:"image/png",webmanifest:"application/manifest+json"};
 
-async function appDePrueba(arranque = "boot();") {
+async function appDePrueba(arranque = "boot();",workerInicial) {
   const original = await readFile(new URL("index.html",root),"utf8");
   const html = original.replaceAll(firebaseCdn, "/sdk/")
     .replace("import { getAuth,", "import { connectAuthEmulator, getAuth as sdkAuth,")
@@ -54,6 +54,10 @@ async function appDePrueba(arranque = "boot();") {
       if (path === "/" || path === "/index.html") {
         res.setHeader("Content-Type",mime.html);
         data = html;
+      } else if (path === "/sw.js" && workerInicial) {
+        res.setHeader("Content-Type",mime.js);
+        res.setHeader("Cache-Control","no-store");
+        data = workerInicial;
       } else if (path === "/config.js") {
         // No se abre config.js del repositorio.
         res.setHeader("Content-Type",mime.js);
@@ -81,7 +85,7 @@ async function appDePrueba(arranque = "boot();") {
     } catch(e) { res.writeHead(404).end(); }
   });
   await new Promise(resolve => server.listen(0,"127.0.0.1",resolve));
-  return {server, url:"http://127.0.0.1:" + server.address().port};
+  return {server,url:"http://127.0.0.1:" + server.address().port,publicarWorker:() => { workerInicial = null; }};
 }
 
 const visible = selector => selector.waitFor({state:"visible"});
@@ -795,6 +799,10 @@ test("escritorio y móvil: login, altas offline en varios clientes, recarga, sin
     });
     await page.locator("#okc").click();
     await visible(page.getByText("Restaurado: 0 recuperados, 1 actualizados",{exact:true}));
+    const uidAnterior = await cel.evaluate(async () => (await import("/sdk/firebase-auth.js")).getAuth().currentUser.uid);
+    await cel.evaluate(uid => globalThis.almacenAvisos.cambiar(() => ({
+      uid,id:crypto.randomUUID(),generacion:crypto.randomUUID(),habilitado:true,entrega:true,registrado:true
+    })),uidAnterior);
     // El restablecimiento ocurre antes de que el móvil vuelva a tener contacto con Firestore.
     await mobile.setOffline(true);
     await crearSublimado(cel,"Pedido recuperado",{foto:true,multi:true});
@@ -809,6 +817,10 @@ test("escritorio y móvil: login, altas offline en varios clientes, recarga, sin
     await page.getByRole("button",{name:"Listo",exact:true}).click();
     await mobile.setOffline(false);
     await visible(cel.getByRole("heading",{name:"Acceso desactivado"}));
+    await cel.waitForFunction(async uid => {
+      const estado = await globalThis.almacenAvisos.leer();
+      return estado?.uid === uid && !estado.habilitado && !estado.entrega && !document.querySelector(".shell");
+    },uidAnterior);
     await cel.locator("#lo").click();
     await visible(cel.locator("#loginForm"));
     await iniciar(cel,null,"equipoprueba",nuevoPin);
@@ -1472,6 +1484,50 @@ test("issue 13: búsqueda, detalle, visor y PNG con datos ficticios", {timeout:4
     }
   } finally {
     await navegador.close();
+    server.close();
+  }
+});
+
+test("una actualización PWA conserva la intención y el estado pendiente con IndexedDB real", {timeout:30000}, async () => {
+  const anterior = 'self.addEventListener("install",()=>self.skipWaiting()); self.addEventListener("activate",e=>e.waitUntil(self.clients.claim()));';
+  const {server,url,publicarWorker} = await appDePrueba("",anterior);
+  const executablePath = process.env.CHROMIUM_PATH || (existsSync("/usr/bin/chromium") ? "/usr/bin/chromium" : chromium.executablePath());
+  let navegador;
+  try {
+    navegador = await chromium.launch({executablePath,args:["--no-sandbox"]});
+    const page = await navegador.newPage({...devices["Pixel 7"]});
+    await page.route(/^https?:/,r => new URL(r.request().url()).hostname === "127.0.0.1" ? r.continue() : r.abort());
+    await page.goto(url);
+    await page.evaluate(async () => {
+      const registro = {uid:"ana",id:crypto.randomUUID(),generacion:crypto.randomUUID(),habilitado:true,entrega:true};
+      await globalThis.almacenAvisos.cambiar(() => registro);
+      await caches.open("pedidos-v184");
+      await (await caches.open("pedidos-push-v1")).put("/.pedidos-push/dispositivo",new Response(JSON.stringify(registro)));
+      await navigator.serviceWorker.register("/sw.js");
+      await navigator.serviceWorker.ready;
+    });
+    await page.waitForFunction(() => !!navigator.serviceWorker.controller);
+    publicarWorker();
+    await page.evaluate(async () => (await navigator.serviceWorker.getRegistration()).update().then(() => {}));
+    await page.waitForFunction(async () => {
+      const claves = await caches.keys();
+      return claves.includes("pedidos-v185") && !claves.includes("pedidos-v184");
+    });
+    await page.evaluate(() => caches.delete("pedidos-push-v1"));
+    await page.reload();
+    const estado = await page.evaluate(() => globalThis.almacenAvisos.leer());
+    assert.equal(estado.uid,"ana");
+    assert.equal(estado.habilitado,true);
+    await page.evaluate(async () => {
+      const {panelNotificaciones} = await import("/notificaciones-ui.mjs");
+      document.querySelector("#app").innerHTML = panelNotificaciones({estado:"pendiente",preferencias:{},habilitado:true});
+    });
+    await visible(page.getByText("Pendiente de verificación",{exact:true}));
+    assert.equal(await page.locator("[data-nt-dispositivo]").isChecked(),true);
+    assert.equal(await page.locator("[data-nt-dispositivo]").isEnabled(),true);
+    assert.equal(await page.locator("[data-nt-prueba]").isDisabled(),true);
+  } finally {
+    await navegador?.close();
     server.close();
   }
 });
