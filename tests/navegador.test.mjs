@@ -148,7 +148,7 @@ function comprobarCamposPNG(resumen, titulo = "SUBLIMACIÓN COMPLETA") {
     assert.ok(lineas.includes(campo),campo);
   for (const omitido of ["Datos del pedido","Prendas","Pago","Notas","Seguimiento"])
     if (omitido !== titulo) assert.ok(!lineas.includes(omitido),omitido);
-  assert.match(resumen,/\bPrecio\s+unitario\b/);
+  assert.ok(lineas.includes(titulo === "Datos del pedido" ? "Precio unitario" : "Unidad"));
   assert.match(resumen,/^\d+$/m);
   assert.match(resumen,/Talla /);
   assert.doesNotMatch(resumen,/RESUMEN DEL PEDIDO|\b[PS]-\d{4}\b|Teléfono|Estado|Urgente|Moneda|584120000000|12025550142/);
@@ -1332,7 +1332,7 @@ test("issue 13: búsqueda, detalle, visor y PNG con datos ficticios", {timeout:4
     const pers = {
       _id:"personalizado",tipo:"personalizado",codigo:"P-0042",estado:"pendiente",tema:"Equipo Horizonte",
       cliente:{nombre:"Cliente Ficticio"},fechaEntrega:"2026-12-03",creadoEn:"2026-11-28",creadoPor:"ana",
-      editadoEn:"2026-11-28",editadoPor:"leo",revisarEn:"2026-11-28",revisarCambios:["Tema"],etiqueta:"Etiqueta General",
+      editadoEn:"2026-11-28T10:30:00",editadoPor:"leo",revisarEn:"2026-11-28",revisarCambios:["Tema"],etiqueta:"Etiqueta General",
       prendaDe:"cliente",items:partidas,moneda:"COP",pagoVersion:2,abonoMenor:12000000,nota:"Separar las tallas por paquete."
     };
     const sub = {
@@ -1399,7 +1399,7 @@ test("issue 13: búsqueda, detalle, visor y PNG con datos ficticios", {timeout:4
 
       const detalle = page.locator(".pdmd");
       await page.locator(".oc2:visible").filter({hasText:"Festival Aurora"}).click();
-      assert.match(await detalle.locator(".pdit li").nth(3).innerText(),/Adulto uno.*\n.*59\.91\s*\nUnitario:.*19\.97/s);
+      assert.match(await detalle.locator(".pdit li").nth(3).innerText(),/Adulto uno.*\n.*59\.91\s*\nUnidad:.*19\.97/s);
       await detalle.getByRole("button",{name:"Volver"}).click();
       await pendientes.click();
       await page.locator(".oc2:visible").filter({hasText:"Equipo Horizonte"}).click();
@@ -1408,8 +1408,8 @@ test("issue 13: búsqueda, detalle, visor y PNG con datos ficticios", {timeout:4
       const textos = await filas.allTextContents();
       assert.deepEqual(textos.map(t => nombres.find(n => t.includes(n))),nombres);
       assert.deepEqual(await filas.evaluateAll(fs => fs.flatMap((f,i) => f.classList.contains("separador") ? [i] : [])),[2,5,6]);
-      assert.match(await filas.nth(3).innerText(),/144[.\s]000\s*\nUnitario:.*48[.\s]000/);
-      assert.match(await filas.first().innerText(),/48[.\s]000\s*\nUnitario:.*48[.\s]000/);
+      assert.match(await filas.nth(3).innerText(),/144[.\s]000\s*\nUnidad:.*48[.\s]000/);
+      assert.match(await filas.first().innerText(),/48[.\s]000\s*\nUnidad:.*48[.\s]000/);
       if (perfil === "movil") await page.evaluate(() => document.documentElement.dataset.theme = "dark");
       if (carpeta) {
         await detalle.locator(".pdrow").first().evaluate(fila => {
@@ -1456,7 +1456,8 @@ test("issue 13: búsqueda, detalle, visor y PNG con datos ficticios", {timeout:4
           comprobarCamposPNG(lineas.join("\n"),personalizado ? "PERSONALIZADO" : "SUBLIMACIÓN COMPLETA");
           assert.equal(lineas.includes("Prenda a cargo de"),personalizado);
           assert.ok(lineas.some(l => l.includes("Serie Taller")));
-          assert.deepEqual(lineas.slice(-4),["Registrado por","Ana Muestra","Última edición por",personalizado ? "Leo Ejemplo" : "—"]);
+          assert.deepEqual(lineas.slice(personalizado ? -5 : -4),["Registrado por","Ana Muestra","Última edición por",
+            ...(personalizado ? ["Leo Ejemplo","28/11/2026 10:30 am"] : ["—"])]);
           assert.ok(!lineas.some(l => ["Etiqueta General","Cambio por revisar","Editado por"].includes(l)));
           assert.deepEqual(lineas.flatMap(t => nombres.filter(n => t.includes(n))),nombres);
           assert.deepEqual(divisores.map(i => nombres.find(n => lineas.slice(i,i+4).join(" ").includes(n))),

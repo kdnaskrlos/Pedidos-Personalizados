@@ -707,7 +707,7 @@ table.mx{border-collapse:collapse;width:100%;font-size:13px}
 .pdit .d{flex:1;min-width:0;display:flex;flex-direction:column;line-height:1.25}
 .pdit .d b{font-size:15px;font-weight:700;white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
 .pdit small{font-size:12px;color:var(--muted)}
-.pdit li.separador{border-top:1px solid var(--line);padding-top:12px}
+.pdit li.separador{border-top:1px solid color-mix(in srgb,var(--muted) 58%,var(--line));padding-top:12px}
 .pdit .pr{flex:none;max-width:48%;text-align:right;font-weight:800;font-size:14px;overflow-wrap:anywhere}
 .pdit .pr small{display:block;font-weight:400}
 .pdtl{font-size:15px;font-weight:700}
@@ -4300,6 +4300,7 @@ function modeloExportable(p){
   const totalDisponible = items.length > 0 && items.every(i => tienePrecio(i) && cantidad(i.cant) !== null);
   const abonoDisponible = p.pagoVersion === 2 ? Number.isSafeInteger(p.abonoMenor)
     : typeof p.abono === "number" ? Number.isFinite(p.abono) : centavos(p.abono) !== null;
+  const ultimaEdicion = fecha(p.editadoEn);
   return {codigo:p.codigo,titulo:TIPOS[p.tipo].label.toUpperCase(),nota:p.nota,datos:[
     ["Creación",fecha(p.creadoEn)],["Entrega",p.fechaEntrega && Number.isFinite(Date.parse(p.fechaEntrega)) ? fmtDate(p.fechaEntrega) : p.fechaEntrega],["Cliente",p.cliente?.nombre],
     ["Tema",p.tema],["Servicio",servsDe(p).join(", ")],
@@ -4314,7 +4315,7 @@ function modeloExportable(p){
     ["Saldo",totalDisponible && abonoDisponible ? importe(calculado.saldo) : ""],["Motivo sin abono",p.motivoSinAbono]
   ],seguimiento:[
     ["Registrado por",persona(p.creadoPor) || "—"],
-    ["Última edición por",p.editadoEn ? persona(p.editadoPor) || "—" : "—"]
+    ["Última edición por",ultimaEdicion ? [persona(p.editadoPor) || "—",ultimaEdicion].join("\n") : "—"]
   ]};
 }
 
@@ -4446,7 +4447,7 @@ function openDetail(id){
           return `<li${separador ? ' class="separador"' : ""}>
             <span class="q num">${esc(unidadesDe(i,p))}</span>
             <span class="d"><b>${esc(i.prenda)} ${esc(String(i.color || "").toLowerCase())}</b>${sub.length ? `<small>${esc(sub.join(" · "))}</small>` : ""}</span>
-            <span class="pr num">${esc(money(importeLinea(p,i),p.moneda))}<small>Unitario: ${esc(money(precioUnitario(p,i) / 100,p.moneda))}</small></span>
+            <span class="pr num">${esc(money(importeLinea(p,i),p.moneda))}<small>Unidad: ${esc(money(precioUnitario(p,i) / 100,p.moneda))}</small></span>
           </li>`;
         }).join("")}</ul>
       </div>

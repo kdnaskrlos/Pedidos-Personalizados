@@ -147,12 +147,12 @@ function dibujarResumen(ctx, resumen, marcarCorte = () => {}, inicioPagina = 0) 
       // El corte al final de la fila anterior suprime el divisor al iniciar página.
       if (separador) {
         if (y > inicioPagina) {
-          ctx.fillStyle = "#e1e8f0";
+          ctx.fillStyle = "#aebdce";
           ctx.fillRect(margen + 16,y + 4,interior - 32,1);
         }
         y += 12;
       }
-      const montos = activos([["Precio unitario",unitario],["Subtotal",subtotal]]);
+      const montos = activos([["Unidad",unitario],["Subtotal",subtotal]]);
       const anchoImporte = 152, separacion = 8, pad = 16;
       const ladoCantidad = 52, gap = 12;
       const tieneCantidad = disponible(cantidad);
