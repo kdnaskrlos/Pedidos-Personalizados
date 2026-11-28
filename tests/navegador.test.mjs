@@ -1601,7 +1601,7 @@ test("escritorio: recupera una vinculación v3.70.6 con el mismo ID tras el rech
     const otra = await context.newPage();
     await otra.goto(url);
     await otra.evaluate(() => new Promise(resolve => {
-      navigator.locks.request("pedidos-push-registro",() => new Promise(soltar => {
+      window.finRegistro = navigator.locks.request("pedidos-push-registro",() => new Promise(soltar => {
         window.soltarRegistro = soltar;
         resolve();
       }));
@@ -1612,7 +1612,12 @@ test("escritorio: recupera una vinculación v3.70.6 con el mismo ID tras el rech
     assert.match(await page.locator("[data-nt-diagnostico]").innerText(),/otra-pestana/);
     assert.equal(await page.locator("[data-nt-dispositivo]").isChecked(),true);
     assert.equal(await page.locator("[data-nt-prueba]").isDisabled(),true);
-    await otra.close();
+    await otra.evaluate(async () => {
+      window.soltarRegistro();
+      await window.finRegistro;
+    });
+    await page.waitForFunction(async () =>
+      !(await navigator.locks.query()).held.some(lock => lock.name === "pedidos-push-registro"));
     const resultado = await page.evaluate(() => window.reintentarAvisos());
     assert.deepEqual(resultado,{guardado:{id:dispositivo,nuevo:true},lectura:2,conservado:true});
     await visible(page.getByText("Activo",{exact:true}));
