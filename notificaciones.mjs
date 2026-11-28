@@ -1,3 +1,4 @@
+import "./notificaciones-almacen.js";
 import {claveVapid,regionAvisos} from "./push-config.mjs";
 
 const SDK_MESSAGING = "https://www.gstatic.com/firebasejs/10.12.2/firebase-messaging.js";
@@ -29,28 +30,46 @@ async function cerrarAvisos() {
 }
 
 function idDispositivo() {
-  let id = localStorage.getItem(CLAVE_LOCAL);
+  let id;
+  try { id = localStorage.getItem(CLAVE_LOCAL); } catch {}
   if (!id) {
     id = crypto.randomUUID();
-    localStorage.setItem(CLAVE_LOCAL,id);
+    try { localStorage.setItem(CLAVE_LOCAL,id); } catch {}
   }
   return id;
 }
 
-// La sesión se verifica de nuevo después de cada operación de red.
+// La intención persiste incluso cuando no se puede confirmar el registro remoto.
 export function crearNotificaciones({sesion,app,datos,actualizar,cargarMessaging = () => import(SDK_MESSAGING)}) {
-  let uid, adminActual = false, activo = false, abierto = false, cargandoPreferencias = false;
-  let ocupado = false, listo = false, cerrando = false;
+  const almacen = globalThis.almacenAvisos;
+  let canal;
+  try { canal = new BroadcastChannel("pedidos-avisos"); } catch {}
+  let uid, intencion, confirmada, adminActual = false, abierto = false, cargandoPreferencias = false;
+  let ocupado = false, renovando = false, listo = false, cerrando = false;
   let preferencias = vacias(false), mensaje = "", error = false, revision = 0;
-  let intento = -Infinity, sincronizado = -Infinity;
+  let proximoIntento = 0, demora = reintento, forzarRenovacion = false;
   const comprobar = (id,gen) => {
-    if (cerrando || !id || sesion()?.uid !== id || revision !== gen) throw new Error("La sesión cambió.");
+    if (cerrando || !id || uid !== id || sesion()?.uid !== id || revision !== gen) throw new Error("La sesión cambió.");
   };
-  const estado = () => ({
-    estado:!compatible() ? "incompatible" : Notification.permission === "denied" ? "bloqueado" :
-      !claveVapid ? "configuracion" : !listo ? "cargando" : activo && Notification.permission === "granted" ? "activo" : "apagado",
-    preferencias,ocupado,permitePreferencias:abierto && !cargandoPreferencias && listo,mensaje,error
-  });
+  const adoptar = valor => {
+    if (valor?.generacion !== intencion?.generacion || !valor?.entrega) confirmada = null;
+    intencion = valor?.uid === uid ? valor : null;
+    actualizar();
+  };
+  if (canal) canal.onmessage = async () => {
+    const gen = revision;
+    const actual = await almacen.leer().catch(() => null);
+    if (gen === revision) adoptar(actual);
+  };
+  const estado = () => {
+    const habilitado = compatible() && !!intencion?.habilitado && Notification.permission === "granted";
+    return {
+      estado:!compatible() ? "incompatible" : Notification.permission === "denied" ? "bloqueado" :
+        !claveVapid ? "configuracion" : !listo ? "cargando" : !habilitado ? "apagado" :
+        confirmada === intencion.generacion ? "activo" : "pendiente",
+      habilitado,preferencias,ocupado,permitePreferencias:abierto && !cargandoPreferencias && listo,mensaje,error
+    };
+  };
 
   async function prepararFCM() {
     const sdk = await cargarMessaging();
@@ -60,56 +79,96 @@ export function crearNotificaciones({sesion,app,datos,actualizar,cargarMessaging
     return {sdk,reg,messaging:sdk.getMessaging(app())};
   }
 
-  async function registrar(id,gen,vinculo) {
-    const {sdk,reg,messaging} = await prepararFCM();
-    comprobar(id,gen);
-    const opciones = {vapidKey:claveVapid,serviceWorkerRegistration:reg};
-    const dispositivo = vinculo?.id || idDispositivo(), cache = await cacheAvisos();
-    const vigencia = () => {
-      comprobar(id,gen);
-      if (Notification.permission !== "granted") throw new Error("El permiso de notificaciones cambió.");
+  // Web Locks cubre Chromium y Safari con Web Push. La concesión en IndexedDB
+  // coordina clientes sin Web Locks y permite recuperarse si se cierra el proceso.
+  async function exclusivo(fn) {
+    if (navigator.locks) return navigator.locks.request("pedidos-push-registro",{ifAvailable:true},async lock => {
+      if (lock) return fn(async () => {});
+    });
+    const clave = crypto.randomUUID();
+    const toma = await almacen.arrendar(actual => actual?.vence > Date.now() ? actual : {clave,vence:Date.now() + 120000});
+    if (toma.clave !== clave) return;
+    const conservar = async () => {
+      const vigente = await almacen.arrendar(actual =>
+        actual?.clave === clave && actual.vence > Date.now() ? {clave,vence:Date.now() + 120000} : actual);
+      if (vigente?.clave !== clave || vigente.vence <= Date.now()) throw new Error("La operación de avisos caducó.");
     };
-    const guardar = async recuperar => {
-      const token = await sdk.getToken(messaging,opciones);
-      vigencia();
-      if (!token) throw new Error("Firebase no devolvió un token para el dispositivo.");
-      return datos.guardarDispositivo(id,dispositivo,token,vigencia,recuperar);
-    };
-    if (!await guardar(!!vinculo)) {
-      // El servidor puede haber borrado un token inválido que aún conserva el SDK.
-      vigencia();
-      await sdk.deleteToken(messaging);
-      vigencia();
-      await guardar(false);
-    }
-    try {
-      vigencia();
-      await cache.put(URL_VINCULO,new Response(JSON.stringify({uid:id,id:dispositivo})));
-      vigencia();
-    } catch (e) {
-      const vinculo = await leerVinculo().catch(() => null);
-      if (vinculo?.uid === id && vinculo.id === dispositivo) await quitarVinculo();
-      throw e;
-    }
-    activo = true;
-    sincronizado = Date.now();
+    try { return await fn(conservar); }
+    finally { await almacen.arrendar(actual => actual?.clave === clave ? null : actual); }
   }
 
-  async function retirar(id) {
-    const vinculo = await leerVinculo();
-    if (vinculo?.uid !== id) { activo = false; return; }
-    // Silencia el SW antes de intentar operaciones que necesitan red.
-    await quitarVinculo();
-    activo = false;
-    const quitarToken = prepararFCM().then(({sdk,messaging}) => sdk.deleteToken(messaging));
-    const quitarSuscripcion = navigator.serviceWorker.getRegistration().then(async reg => {
-      await (await reg?.pushManager.getSubscription())?.unsubscribe();
+  async function registrar(preferido,gen,conservar) {
+    const {uid:id,id:dispositivo,generacion} = preferido;
+    const vigente = async () => {
+      await conservar();
+      const actual = await almacen.leer();
+      comprobar(id,gen);
+      if (!actual?.habilitado || actual.generacion !== generacion || Notification.permission !== "granted")
+        throw new Error("La autorización de avisos cambió.");
+      return actual;
+    };
+    const registro = await vigente();
+    const {sdk,reg,messaging} = await prepararFCM();
+    const opciones = {vapidKey:claveVapid,serviceWorkerRegistration:reg};
+    const guardar = async comprobarRegistro => {
+      await vigente();
+      const token = await sdk.getToken(messaging,opciones);
+      await vigente();
+      if (!token) throw new Error("Firebase no devolvió un token para el dispositivo.");
+      return datos.guardarDispositivo(id,dispositivo,token,vigente,comprobarRegistro);
+    };
+    if (!await guardar(!!registro.registrado)) {
+      await vigente();
+      await almacen.cambiar(actual => actual?.generacion === generacion ? {...actual,entrega:false} : actual);
+      canal?.postMessage("cambio");
+      await vigente();
+      await sdk.deleteToken(messaging);
+      await vigente();
+      await guardar(false);
+    }
+    await vigente();
+    const nuevo = await almacen.cambiar(actual => actual?.generacion === generacion ?
+      {...actual,entrega:true,registrado:true,comprobado:Date.now()} : actual);
+    comprobar(id,gen);
+    if (nuevo?.generacion !== generacion) return;
+    adoptar(nuevo);
+    confirmada = generacion;
+    canal?.postMessage("cambio");
+  }
+
+  async function retirar(id,{conservar = false} = {}) {
+    const legado = !await almacen.leer() && await leerVinculo().catch(() => null);
+    const generacion = crypto.randomUUID();
+    const actual = await almacen.cambiar(anterior => {
+      if (anterior && anterior.uid !== id) return anterior;
+      const dispositivo = anterior?.id || (legado?.uid === id && legado.id) || idDispositivo();
+      return {uid:id,id:dispositivo,generacion,habilitado:conservar && !!(anterior?.habilitado || !anterior && legado?.uid === id),
+        entrega:false,registrado:!!(anterior?.registrado || !anterior && legado?.uid === id),
+        limpieza:!!(anterior?.limpieza || !conservar && (anterior?.habilitado || !anterior && legado?.uid === id))};
     });
-    await Promise.all([datos.borrarDispositivo(id,vinculo.id),quitarToken,quitarSuscripcion,cerrarAvisos()]);
+    if (actual?.generacion !== generacion) return null;
+    if (uid === id) adoptar(actual);
+    canal?.postMessage("cambio");
+    await Promise.allSettled([quitarVinculo(),cerrarAvisos()]);
+    return actual;
+  }
+
+  async function limpiar(baja,conservar) {
+    const vigente = async () => {
+      await conservar();
+      const actual = await almacen.leer();
+      return actual?.generacion === baja.generacion && !actual.habilitado && sesion()?.uid === baja.uid;
+    };
+    if (!await vigente()) return;
+    await datos.borrarDispositivo(baja.uid,baja.id);
+    const {sdk,messaging} = await prepararFCM();
+    if (!await vigente()) return;
+    await sdk.deleteToken(messaging);
+    await almacen.cambiar(actual => actual?.generacion === baja.generacion ? {...actual,limpieza:false} : actual);
   }
 
   async function cambiarSesion(id,admin) {
-    if (id === uid) {
+    if (id === uid && !cerrando) {
       if (admin !== adminActual && !abierto) { preferencias = vacias(admin); actualizar(); }
       adminActual = admin;
       return;
@@ -117,23 +176,36 @@ export function crearNotificaciones({sesion,app,datos,actualizar,cargarMessaging
     uid = id;
     adminActual = admin;
     const gen = ++revision;
-    cerradoEstado(admin);
-    try {
-      const vinculo = await leerVinculo();
-      if (gen !== revision) return;
-      if (vinculo && vinculo.uid !== id) {
-        await quitarVinculo();
-        await cerrarAvisos();
-      } else if (id && vinculo?.uid === id && Notification.permission === "granted") activo = true;
-    } catch { /* La app sigue funcionando cuando el almacenamiento de avisos está bloqueado. */ }
-    if (gen === revision) { listo = true; actualizar(); await renovar(); }
-  }
-
-  function cerradoEstado(admin) {
-    abierto = activo = listo = ocupado = error = cerrando = cargandoPreferencias = false;
+    intencion = confirmada = null;
+    abierto = listo = ocupado = renovando = error = cerrando = cargandoPreferencias = false;
     preferencias = vacias(admin);
-    intento = sincronizado = -Infinity;
+    proximoIntento = 0;
+    demora = reintento;
+    forzarRenovacion = false;
     mensaje = "";
+    if (compatible() && !id) {
+      try {
+        const anterior = await almacen.leer() || await leerVinculo();
+        if (gen === revision && anterior?.uid && anterior.habilitado !== false) await retirar(anterior.uid);
+      } catch {}
+    }
+    if (compatible() && id) {
+      try {
+        const legado = await leerVinculo().catch(() => null);
+        if (gen !== revision) return;
+        const actual = await almacen.cambiar(anterior => {
+          if (gen !== revision) return anterior;
+          if (!anterior && legado?.uid === id)
+            return {uid:id,id:legado.id,generacion:crypto.randomUUID(),habilitado:true,entrega:true,registrado:true};
+          if (anterior?.uid === id || !anterior && !legado) return anterior;
+          return {uid:id,id:idDispositivo(),generacion:crypto.randomUUID(),habilitado:false,entrega:false};
+        });
+        if (gen !== revision) return;
+        adoptar(actual);
+        if (actual) await quitarVinculo().catch(() => {});
+      } catch { /* La app puede abrir aunque el almacenamiento de avisos no esté disponible. */ }
+    }
+    if (gen === revision) { listo = true; actualizar(); await renovar(); }
   }
 
   async function abrirPanel() {
@@ -170,15 +242,40 @@ export function crearNotificaciones({sesion,app,datos,actualizar,cargarMessaging
     }
   }
 
-  function dispositivo(encender) {
+  async function dispositivo(encender) {
+    if (!encender) {
+      const id = sesion()?.uid;
+      if (!id || cerrando) return;
+      const gen = ++revision;
+      confirmada = null;
+      renovando = ocupado = false;
+      try {
+        const baja = await retirar(id);
+        if (baja?.limpieza) await exclusivo(conservar => limpiar(baja,conservar));
+        if (gen === revision) mensaje = "Avisos desactivados en este dispositivo.";
+      } catch {
+        if (gen === revision) { mensaje = "No se pudo completar la baja del registro remoto."; error = true; }
+      } finally { if (gen === revision) actualizar(); }
+      return;
+    }
     return operar(async (id,gen) => {
-      if (!encender) return retirar(id);
-      // El navegador exige una interacción directa para mostrar este diálogo.
+      // Mantiene la llamada al permiso dentro del gesto del usuario.
+      const esperada = intencion?.generacion;
       const permiso = await Notification.requestPermission();
       comprobar(id,gen);
       if (permiso !== "granted") throw new Error("No se concedió permiso para mostrar notificaciones.");
-      await registrar(id,gen);
-    },encender ? "Dispositivo activado." : "Avisos desactivados en este dispositivo.");
+      const generacion = crypto.randomUUID();
+      const actual = await almacen.cambiar(anterior => {
+        comprobar(id,gen);
+        if (anterior?.generacion !== esperada || anterior?.habilitado) return anterior;
+        return {uid:id,id:anterior?.uid === id ? anterior.id : idDispositivo(),generacion,habilitado:true,entrega:false};
+      });
+      comprobar(id,gen);
+      adoptar(actual);
+      if (actual?.uid !== id || !actual.habilitado) return;
+      canal?.postMessage("cambio");
+      proximoIntento = 0;
+    },"").then(() => renovar(true));
   }
 
   const preferencia = (key,val) => operar(async (id,gen) => {
@@ -189,54 +286,79 @@ export function crearNotificaciones({sesion,app,datos,actualizar,cargarMessaging
   },"Preferencia guardada.");
 
   const prueba = () => operar(async (id,gen) => {
-    const vinculo = await leerVinculo();
+    const vinculo = await almacen.leer();
     comprobar(id,gen);
-    if (vinculo?.uid !== id) throw new Error("Activa este dispositivo primero.");
+    if (vinculo?.uid !== id || !vinculo.entrega || confirmada !== vinculo.generacion) throw new Error("Activa este dispositivo primero.");
     const {getFunctions,httpsCallable} = await import(SDK_FUNCTIONS);
     comprobar(id,gen);
     await httpsCallable(getFunctions(app(),regionAvisos),"probarNotificacion")({dispositivo:vinculo.id});
   },"Prueba solicitada. Revisa las notificaciones de este dispositivo.");
 
   async function renovar(forzar = false) {
-    if (!claveVapid || !listo || ocupado || cerrando || !compatible()) return;
+    if (!claveVapid || !listo || cerrando || !compatible()) return;
     const id = sesion()?.uid, gen = revision;
     if (!id || id !== uid) return;
-    const permiso = Notification.permission;
-    const ahora = Date.now();
-    if (permiso === "granted" &&
-        (!navigator.onLine || ahora - intento < reintento || (!forzar && ahora - sincronizado < intervalo))) return;
-    const vinculo = await leerVinculo().catch(() => null);
-    if (gen !== revision || ocupado || cerrando || sesion()?.uid !== id || vinculo?.uid !== id) return;
-    ocupado = true;
-    intento = ahora;
+    if (intencion?.habilitado && Notification.permission !== "granted") return dispositivo(false);
+    if (forzar && intencion?.habilitado) {
+      forzarRenovacion = true;
+      confirmada = null;
+      actualizar();
+    }
+    if (ocupado || renovando) return;
+    renovando = true;
     try {
-      if (Notification.permission !== "granted") await retirar(id);
-      else {
-        const reconciliar = async bloqueo => {
-          if (!bloqueo) return;
-          const actual = await leerVinculo();
-          comprobar(id,gen);
-          if (actual?.uid === id && actual.id === vinculo.id) await registrar(id,gen,actual);
-        };
-        if (navigator.locks) await navigator.locks.request("pedidos-push-reconciliar",{ifAvailable:true},reconciliar);
-        else await reconciliar(true);
+      const actual = await almacen.leer();
+      comprobar(id,gen);
+      adoptar(actual);
+      if (actual?.uid !== id) return;
+      if (actual.habilitado && Notification.permission !== "granted") {
+        await dispositivo(false);
+        return;
       }
-    } catch { /* La intención local se conserva ante errores de red o del SDK. */ }
-    finally { if (gen === revision) { ocupado = false; actualizar(); } }
+      const ahora = Date.now();
+      if (!navigator.onLine || ahora < proximoIntento) return;
+      if (!actual.habilitado && !actual.limpieza) return;
+      if (!forzarRenovacion && confirmada && actual.comprobado + intervalo > ahora) return;
+      confirmada = null;
+      actualizar();
+      let ejecutado = false;
+      await exclusivo(async conservar => {
+        ejecutado = true;
+        forzarRenovacion = false;
+        if (actual.habilitado) await registrar(actual,gen,conservar);
+        else await limpiar(actual,conservar);
+      });
+      if (gen === revision) {
+        demora = reintento;
+        proximoIntento = ahora + (ejecutado ? reintento : 5000);
+      }
+    } catch {
+      if (gen === revision) {
+        confirmada = null;
+        proximoIntento = Date.now() + demora;
+        demora = Math.min(demora * 2,intervalo);
+      }
+    } finally { if (gen === revision) { renovando = false; actualizar(); } }
   }
 
-  async function cerrarSesion() {
-    const id = sesion()?.uid;
-    if (!id) return;
+  async function invalidarSesion(id,conservar = false) {
+    if (!compatible() || !id) return;
     cerrando = true;
     ++revision;
-    const limpieza = retirar(id);
-    let temporizador;
-    try {
-      await Promise.race([limpieza,new Promise(resolve => { temporizador = setTimeout(resolve,1800); })]);
-    } catch { /* La vinculación local se desactiva aunque Firestore esté sin conexión. */ }
-    finally { clearTimeout(temporizador); }
+    confirmada = null;
+    const baja = await retirar(id,{conservar}).catch(() => null);
+    if (baja?.limpieza && navigator.onLine) {
+      let temporizador;
+      try {
+        await Promise.race([
+          exclusivo(guardar => limpiar(baja,guardar)),
+          new Promise(resolve => { temporizador = setTimeout(resolve,1800); })
+        ]);
+      } catch { /* La entrega local ya quedó desactivada. */ }
+      finally { clearTimeout(temporizador); }
+    }
   }
 
-  return {estado,dispositivo,preferencia,prueba,cambiarSesion,abrirPanel,renovar,cerrarSesion};
+  const cerrarSesion = () => invalidarSesion(uid);
+  return {estado,dispositivo,preferencia,prueba,cambiarSesion,abrirPanel,renovar,cerrarSesion,invalidarSesion};
 }

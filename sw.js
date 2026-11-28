@@ -1,8 +1,9 @@
 // Permite instalar la app y abrirla al instante, con o sin internet.
 // La cola de pedidos usa IndexedDB y las lecturas guardadas usan la caché de Firebase.
-const CACHE = "pedidos-v184";
+importScripts("./notificaciones-almacen.js");
+const CACHE = "pedidos-v185";
 const LIBS = "libs-v1"; // Firebase y la fuente: archivos con versión fija, se guardan una vez
-const SHELL = ["./", "./index.html", "./config.js", "./pagos.mjs", "./calendario.mjs", "./notas.mjs", "./notificaciones.mjs", "./notificaciones-ui.mjs", "./push-config.mjs", "./pedido-export.mjs", "./tallas-resumen.mjs", "./heic.mjs", "./heic-worker.mjs", "./vendor/libheif-bundle.mjs", "./whatsapp.mjs", "./pedidos-sync.mjs", "./cola-local.mjs", "./manifest.webmanifest", "./icono-192.png", "./icono-512.png", "./icono-maskable-512.png", "./apple-touch-icon.png"];
+const SHELL = ["./", "./index.html", "./config.js", "./pagos.mjs", "./calendario.mjs", "./notas.mjs", "./notificaciones.mjs", "./notificaciones-almacen.js", "./notificaciones-ui.mjs", "./push-config.mjs", "./pedido-export.mjs", "./tallas-resumen.mjs", "./heic.mjs", "./heic-worker.mjs", "./vendor/libheif-bundle.mjs", "./whatsapp.mjs", "./pedidos-sync.mjs", "./cola-local.mjs", "./manifest.webmanifest", "./icono-192.png", "./icono-512.png", "./icono-maskable-512.png", "./apple-touch-icon.png"];
 self.addEventListener("install", e => { e.waitUntil(caches.open(CACHE).then(c => c.addAll(SHELL.map(u => new Request(u, {cache:"reload"})))).then(() => self.skipWaiting())); });
 self.addEventListener("activate", e => { e.waitUntil(caches.keys().then(ks => Promise.all(ks.filter(k => k !== CACHE && k !== LIBS && k !== PUSH_CACHE).map(k => caches.delete(k)))).then(() => self.clients.claim())); });
 self.addEventListener("fetch", e => {
@@ -39,14 +40,23 @@ self.addEventListener("push",e => {
     if (datos?.app !== "pedidos" || !idPushValido(datos.uid) || !idPushValido(datos.dispositivo) ||
       typeof datos.evento !== "string" || datos.evento.length > 160 ||
       typeof datos.titulo !== "string" || typeof datos.cuerpo !== "string") return;
-    const registro = await (await caches.open(PUSH_CACHE)).match(vinculoPush);
-    const vinculo = await registro?.json();
-    if (datos.uid !== vinculo?.uid || datos.dispositivo !== vinculo?.id) return;
+    const autorizado = async () => {
+      try {
+        const intencion = await globalThis.almacenAvisos.leer();
+        if (intencion) return intencion.habilitado && intencion.entrega &&
+          intencion.uid === datos.uid && intencion.id === datos.dispositivo;
+        const registro = await (await caches.open(PUSH_CACHE)).match(vinculoPush);
+        const vinculo = await registro?.json();
+        return datos.uid === vinculo?.uid && datos.dispositivo === vinculo?.id;
+      } catch { return false; }
+    };
+    if (!await autorizado()) return;
     const tag = "pedidos:" + datos.evento;
     if (mostrando.has(tag)) return;
     mostrando.add(tag);
     try {
       if ((await self.registration.getNotifications({tag})).length) return;
+      if (!await autorizado()) return;
       await self.registration.showNotification(datos.titulo.slice(0,100),{
         body:datos.cuerpo.slice(0,140),tag,icon:new URL("./icono-192.png",self.location).href,
         data:{app:"pedidos",uid:datos.uid,pedidoId:idPushValido(datos.pedidoId) ? datos.pedidoId : ""}

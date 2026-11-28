@@ -8,7 +8,7 @@
 
 ## Incidencia de notificaciones
 
-La consulta de un registro remoto ausente borraba la vinculación local y bloqueaba la renovación automática. La candidata conserva la intención y recupera el registro con el mismo ID. Usa caché de aplicación `pedidos-v184` y conserva la vinculación de avisos. [Investigación y pruebas](notificaciones-push.md)
+La candidata distingue la intención persistida en IndexedDB de la verificación del registro. La auditoría corrigió la falsa activación tras un arranque sin red y la baja ignorada durante una renovación. Usa caché de aplicación `pedidos-v185`. Pendiente de comprobación física en Android e iOS. [Investigación y pruebas](notificaciones-push.md) · [PR #15](https://github.com/kdnaskrlos/Pedidos-Personalizados/pull/15)
 
 ## Alcance de v3.70.6
 

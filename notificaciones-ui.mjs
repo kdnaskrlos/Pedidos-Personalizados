@@ -1,6 +1,7 @@
 const estados = {
   activo:["Activo"],
   apagado:["Desactivado"],
+  pendiente:["Pendiente de verificación","La app volverá a comprobar el registro automáticamente."],
   bloqueado:["Bloqueado","Permite las notificaciones en la configuración del navegador y vuelve a abrir Pedidos."],
   incompatible:["No compatible","Usa un navegador compatible. En iPhone, añade Pedidos a la pantalla de inicio y ábrela desde allí."],
   configuracion:["Pendiente de configuración","Las notificaciones se podrán activar cuando el administrador configure la clave pública del proyecto."],
@@ -19,16 +20,16 @@ const escapeHTML = valor => String(valor).replace(/[&<>"']/g,c => ({
   "&":"&amp;","<":"&lt;",">":"&gt;",'"':"&quot;","'":"&#39;"
 })[c]);
 
-export function panelNotificaciones({estado, preferencias, ocupado, permitePreferencias = true, mensaje = "", error = false}, icono = "") {
+export function panelNotificaciones({estado, preferencias, ocupado, permitePreferencias = true, habilitado = estado === "activo", mensaje = "", error = false}, icono = "") {
   const [etiqueta,detalle] = estados[estado];
   const activo = estado === "activo";
-  const listo = activo || estado === "apagado";
+  const listo = activo || estado === "apagado" || estado === "pendiente";
   return `<section class="card nt-panel" aria-label="Notificaciones">
     <div class="sec">${icono}Notificaciones</div>
     <div class="nt-dispositivo">
       <label class="swr nt-fila">
         <b>Notificaciones en este dispositivo</b>
-        <input class="swi" type="checkbox" role="switch" data-nt-dispositivo ${activo ? "checked" : ""} ${!listo || ocupado ? "disabled" : ""}>
+        <input class="swi" type="checkbox" role="switch" data-nt-dispositivo ${habilitado ? "checked" : ""} ${!listo || ocupado ? "disabled" : ""}>
       </label>
       <div class="nt-acciones">
         <span class="nt-estado" data-estado="${estado}">${etiqueta}</span>

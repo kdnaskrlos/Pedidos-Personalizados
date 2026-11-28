@@ -1454,7 +1454,7 @@ const pushPedidos = crearNotificaciones({
     }),
     guardarDispositivo:(uid,id,token,comprobarSesion,comprobarRegistro) => runTransaction(S.db,async tx => {
       const ref = dispositivoAvisos(uid,id), actual = (await tx.get(ref)).data();
-      comprobarSesion();
+      await comprobarSesion();
       if (!actual && comprobarRegistro) return false;
       if (actual?.token !== token || (actual.renovadoEn?.toMillis() || 0) <= Date.now() - vigenciaAvisos)
         tx.set(ref,{token,renovadoEn:serverTimestamp()});
@@ -1535,7 +1535,7 @@ function boot(){
   navigator.permissions?.query({name:"notifications"}).then(permiso => {
     permiso.addEventListener("change",() => pushPedidos.renovar());
   }).catch(() => {});
-  setInterval(() => { if (document.visibilityState === "visible") pushPedidos.renovar(); }, 15 * 60000);
+  setInterval(() => { if (document.visibilityState === "visible") pushPedidos.renovar(); }, 60000);
   setInterval(() => sincronizarPendientes(), 30000);
   addEventListener("offline", () => { S.online = false; render(); });
   addEventListener("beforeinstallprompt", e => { e.preventDefault(); S.installEvt = e; render(); });
@@ -1597,14 +1597,32 @@ function stopSubs(){
 }
 function startMe(){
   const uid = S.uid;
-  const desactivar = () => { pushPedidos.cambiarSesion(null,false); S.me = false; limpiarDatos(); borrarArranque(); route(); };
-  const un = onSnapshot(doc(S.db, "usuarios/" + uid), { includeMetadataChanges: true }, s => {
-    if (uid !== S.uid || s.metadata.hasPendingWrites || (s.metadata.fromCache && !S.me)) return;
-    const was = S.me, perfil = s.exists() ? s.data() : null;
+  let invalidando, exigeServidor = false, observacion = 0, vigente = true;
+  const desactivar = conservar => {
+    observacion++;
+    exigeServidor = true;
+    invalidando = pushPedidos.invalidarSesion(uid,conservar);
+    S.me = false;
+    limpiarDatos();
+    borrarArranque();
+    route();
+  };
+  const un = onSnapshot(doc(S.db, "usuarios/" + uid), { includeMetadataChanges: true }, async s => {
+    if (!vigente || uid !== S.uid || s.metadata.hasPendingWrites) return;
+    const perfil = s.exists() ? s.data() : null;
     if (!perfil?.activo) {
-      if (!s.metadata.fromCache) desactivar();
+      if (!s.metadata.fromCache || perfil || S.me) desactivar(s.metadata.fromCache);
       return;
     }
+    if (s.metadata.fromCache && (!S.me || exigeServidor)) return;
+    if (invalidando) {
+      const pendiente = ++observacion;
+      await invalidando;
+      if (!vigente || uid !== S.uid || pendiente !== observacion) return;
+      invalidando = null;
+    }
+    exigeServidor = false;
+    const was = S.me;
     S.me = perfil;
     pushPedidos.cambiarSesion(uid,perfil.rol === "admin").then(() => pushPedidos.renovar());
     if (!was || ["rol","soloAsignados","verPersonalizado","verSublimacion","bloquear","eliminar"].some(k => was[k] !== perfil[k])) {
@@ -1614,8 +1632,8 @@ function startMe(){
     route();
     actualizarPendientes();
     sincronizarPendientes();
-  }, e => { console.warn(e); if (uid === S.uid && e.code === "permission-denied") desactivar(); });
-  S.unsubs.push(un);
+  }, e => { console.warn(e); if (vigente && uid === S.uid) desactivar(e.code !== "permission-denied"); });
+  S.unsubs.push(() => { vigente = false; un(); });
 }
 function startData(keep){
   S.dataUnsubs.forEach(u => u());

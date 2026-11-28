@@ -1,5 +1,10 @@
 # Bitácora de Pedidos Personalizados
 
+## 2026-11-28 · Auditoría del PR #15
+
+- Se reprodujeron una activación falsa al iniciar sin conexión y una baja manual ignorada durante la renovación. Se añadió estado pendiente, persistencia en IndexedDB, coordinación de operaciones y cierre seguro ante un perfil no verificable.
+- Se añadieron regresiones simuladas y una prueba de actualización PWA con IndexedDB en Chromium. Quedan pendientes pruebas con Android, iOS y FCM reales. [PR #15](https://github.com/kdnaskrlos/Pedidos-Personalizados/pull/15)
+
 ## 2026-11-28 · Candidata v3.70.7
 
 - Se reprodujo la pérdida de vinculación local al faltar el registro en Firestore y se añadió reconciliación automática con el mismo ID. Las pruebas de ciclo de vida y FCM son simuladas. [Investigación](notificaciones-push.md)
