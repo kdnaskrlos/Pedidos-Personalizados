@@ -1411,7 +1411,7 @@ test("issue 13: búsqueda, detalle, visor y PNG con datos ficticios", {timeout:4
 
       const detalle = page.locator(".pdmd");
       await page.locator(".oc2:visible").filter({hasText:"Festival Aurora"}).click();
-      assert.match(await detalle.locator(".pdit li").nth(3).innerText(),/Adulto uno.*\n.*59\.91\s*\nUnidad:.*19\.97/s);
+      assert.match(await detalle.locator(".pdit li").nth(3).innerText(),/Adulto uno.*\n.*59\.91\s*\nc\/u:.*19\.97/s);
       await detalle.getByRole("button",{name:"Volver"}).click();
       await pendientes.click();
       await page.locator(".oc2:visible").filter({hasText:"Equipo Horizonte"}).click();
@@ -1420,10 +1420,15 @@ test("issue 13: búsqueda, detalle, visor y PNG con datos ficticios", {timeout:4
       const textos = await filas.allTextContents();
       assert.deepEqual(textos.map(t => nombres.find(n => t.includes(n))),nombres);
       assert.deepEqual(await filas.evaluateAll(fs => fs.flatMap((f,i) => f.classList.contains("separador") ? [i] : [])),[2,5,6]);
-      assert.match(await filas.nth(3).innerText(),/144[.\s]000\s*\nUnidad:.*48[.\s]000/);
+      assert.match(await filas.nth(3).innerText(),/144[.\s]000\s*\nc\/u:.*48[.\s]000/);
       assert.match(await filas.first().locator(".pr").innerText(),/^COP 48[.\s]000$/);
       assert.equal(await filas.locator(".pr small").count(),1);
       if (perfil === "movil") await page.evaluate(() => document.documentElement.dataset.theme = "dark");
+      const borde = await detalle.locator(".pdit li.separador").first().evaluate(el => {
+        const estilo = getComputedStyle(el);
+        return [estilo.borderTopColor,estilo.borderTopWidth];
+      });
+      assert.deepEqual(borde,[perfil === "movil" ? "rgb(255, 255, 255)" : "rgb(0, 0, 0)","1px"]);
       if (carpeta) {
         await detalle.locator(".pdrow").first().evaluate(fila => {
           const cuerpo = fila.closest(".pdb");
@@ -1448,27 +1453,28 @@ test("issue 13: búsqueda, detalle, visor y PNG con datos ficticios", {timeout:4
 
       if (perfil === "escritorio") {
         for (const tipo of ["personalizado","sublimacion"]) {
-          const {lineas,divisores,datos} = await page.evaluate(async ({tipo,guardarPNG}) => {
+          const {lineas,divisores,coloresDivisor,datos} = await page.evaluate(async ({tipo,guardarPNG}) => {
             const proto = CanvasRenderingContext2D.prototype, {fillText,fillRect} = proto;
-            const lineas = [], divisores = [];
+            const lineas = [], divisores = [], coloresDivisor = [];
             proto.fillText = function(texto,...args) {
               if (this.canvas.width > 300) lineas.push(texto);
               return fillText.call(this,texto,...args);
             };
             proto.fillRect = function(x,y,w,h) {
-              if (this.canvas.width > 300 && h === 1) divisores.push(lineas.length);
+              if (this.canvas.width > 300 && h === 1) { divisores.push(lineas.length); coloresDivisor.push(this.fillStyle); }
               return fillRect.call(this,x,y,w,h);
             };
             try {
               const [png] = await window.muestra.exportar(tipo);
               const datos = guardarPNG ? Array.from(new Uint8Array(await png.datos.arrayBuffer())) : null;
-              return {lineas,divisores,datos};
+              return {lineas,divisores,coloresDivisor,datos};
             } finally { Object.assign(proto,{fillText,fillRect}); }
           },{tipo,guardarPNG:!!carpeta});
           const personalizado = tipo === "personalizado";
           comprobarCamposPNG(lineas.join("\n"),personalizado ? "PERSONALIZADO" : "SUBLIMACIÓN COMPLETA");
           assert.equal(lineas.includes("Prenda a cargo de"),personalizado);
-          assert.equal(lineas.filter(l => l === "Unidad").length,1);
+          assert.equal(lineas.filter(l => l === "c/u").length,1);
+          assert.deepEqual(coloresDivisor,["#000000","#000000","#000000"]);
           assert.equal(lineas.filter(l => l === "Subtotal").length,nombres.length);
           assert.ok(lineas.some(l => l.includes("Serie Taller")));
           assert.deepEqual(lineas.slice(personalizado ? -5 : -4),["Registrado por","Ana Muestra","Última edición por",
@@ -1501,7 +1507,7 @@ test("una actualización PWA conserva la intención y el estado pendiente con In
     await page.evaluate(async () => {
       const registro = {uid:"ana",id:crypto.randomUUID(),generacion:crypto.randomUUID(),habilitado:true,entrega:true};
       await globalThis.almacenAvisos.cambiar(() => registro);
-      await caches.open("pedidos-v185");
+      await caches.open("pedidos-v186");
       await (await caches.open("pedidos-push-v1")).put("/.pedidos-push/dispositivo",new Response(JSON.stringify(registro)));
       await navigator.serviceWorker.register("/sw.js");
       await navigator.serviceWorker.ready;
@@ -1511,7 +1517,7 @@ test("una actualización PWA conserva la intención y el estado pendiente con In
     await page.evaluate(async () => (await navigator.serviceWorker.getRegistration()).update().then(() => {}));
     await page.waitForFunction(async () => {
       const claves = await caches.keys();
-      return claves.includes("pedidos-v186") && !claves.includes("pedidos-v185");
+      return claves.includes("pedidos-v187") && !claves.includes("pedidos-v186");
     });
     await page.evaluate(() => caches.delete("pedidos-push-v1"));
     await page.reload();
