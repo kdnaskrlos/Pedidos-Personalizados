@@ -3,7 +3,7 @@
 - Actualización del 28 de noviembre de 2026.
 - Repositorio `kdnaskrlos/Pedidos-Personalizados`. Base `main` en `f14b9fbda4cc4cb9c81dd9119ca8934dc4f3a88c`, verificada contra el remoto.
 - Versión de la base `v3.70.5`. Candidata `v3.70.6` en `codex/issue-13-v3.70.6`.
-- Estado pendiente de aprobación visual. [Issue #13](https://github.com/kdnaskrlos/Pedidos-Personalizados/issues/13)
+- Estado pendiente de aprobación visual. [PR #14 en borrador](https://github.com/kdnaskrlos/Pedidos-Personalizados/pull/14) · [Issue #13](https://github.com/kdnaskrlos/Pedidos-Personalizados/issues/13)
 
 ## Alcance
 
@@ -13,7 +13,7 @@
 
 ## Evidencia y operaciones
 
-- `npm test` y `npm run test:emuladores` verificaron pagos, compatibilidad histórica, tallas, paginación y reglas preexistentes con el proyecto local `demo-pedidos-codex`. Se comprobó la carga de Cloud Functions con ese mismo ID.
+- Verificación local con Node 24, Java 21, Chromium y el proyecto de emuladores `demo-pedidos-codex`. Pasaron 27 pruebas unitarias, 18 de Firestore y 5 de navegador. Se comprobó la carga de Cloud Functions con ese mismo ID. El resultado del workflow remoto se consulta en el PR.
 - La galería de aprobación incluye capturas de escritorio y móvil y los PNG de ambos tipos, con datos ficticios. [Galería](../demo/v3706/index.html)
 - La rama candidata y el PR en borrador son el alcance de la entrega en GitHub. La publicación requiere aprobación expresa. Los cambios se limitan a este repositorio y excluyen la configuración de Firebase, reglas, índices y Cloud Functions.
 
