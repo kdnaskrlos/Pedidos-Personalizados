@@ -136,7 +136,7 @@ test("procesa bajas FCM definitivas y conserva los tokens con fallo temporal",as
 });
 
 test("el mismo service worker muestra un aviso FCM y abre una URL segura, aunque el cliente esté cerrado", async () => {
-  const handlers = {}, mostrados = [], aperturas = [], mensajes = [];
+  const handlers = {}, mostrados = [], aperturas = [], mensajes = [], borradas = [];
   const url = new URL("https://example.test/Pedidos/sw.js");
   const vinculos = new Map();
   const binding = new URL("./.pedidos-push/dispositivo",url).href;
@@ -148,18 +148,21 @@ test("el mismo service worker muestra un aviso FCM y abre una URL segura, aunque
       getNotifications:async ({tag}) => mostrados.filter(m => m.opciones.tag === tag),
       showNotification:async (titulo,opciones) => { mostrados.push({titulo,opciones}); }
     },
-    clients:{matchAll:async () => [],openWindow:async href => { aperturas.push(href); }}
+    clients:{claim:async () => {},matchAll:async () => [],openWindow:async href => { aperturas.push(href); }}
   };
   const lanzar = async (tipo,datos) => {
     let espera;
     handlers[tipo]({...datos,waitUntil:p => { espera = p; }});
     await espera;
   };
-  runInNewContext(await readFile(new URL("../sw.js",import.meta.url),"utf8"),{self,location:url,URL,caches:{open:async () => cache}});
+  runInNewContext(await readFile(new URL("../sw.js",import.meta.url),"utf8"),{self,location:url,URL,caches:{open:async () => cache,keys:async () => ["pedidos-v183","pedidos-v184","pedidos-push-v1","libs-v1"],
+    delete:async clave => { borradas.push(clave); }}});
   const datos = {app:"pedidos",uid:"uid123",dispositivo:"id-1",evento:"e1",pedidoId:"p-1",titulo:"Actualizado",cuerpo:"Ana modificó un pedido."};
   await lanzar("push",{data:{json:() => ({data:datos})}});
   assert.equal(mostrados.length,0);
   vinculos.set(binding,{json:async () => ({uid:"uid123",id:"id-1"})});
+  await lanzar("activate",{});
+  assert.deepEqual(borradas,["pedidos-v183"]);
   await Promise.all([lanzar("push",{data:{json:() => ({data:datos})}}),lanzar("push",{data:{json:() => ({data:datos})}})]);
   assert.equal(mostrados.length,1);
   await lanzar("notificationclick",{notification:{data:mostrados[0].opciones.data,close() {}}});
@@ -168,7 +171,145 @@ test("el mismo service worker muestra un aviso FCM y abre una URL segura, aunque
   await lanzar("notificationclick",{notification:{data:mostrados[0].opciones.data,close() {}}});
   assert.equal(mensajes[0].id,"p-1");
   assert.equal(aperturas.length,1);
+  await lanzar("pushsubscriptionchange",{});
+  assert.equal(mensajes.at(-1).tipo,"pedidos-renovar-avisos");
   vinculos.clear();
   await lanzar("push",{data:{json:() => ({data:{...datos,evento:"e2"}})}});
   assert.equal(mostrados.length,1);
+});
+
+const controlador = (await readFile(new URL("../notificaciones.mjs",import.meta.url),"utf8"))
+  .replace(/^import .*$/m,'const claveVapid = "simulada", regionAvisos = "simulada";')
+  .replace("import.meta.url",'"https://example.test/Pedidos/notificaciones.mjs"')
+  .replace("export function crearNotificaciones","function crearNotificaciones");
+
+function dispositivoSimulado(id, servidor) {
+  let reloj = 0, usuario = "ana", token = id + "-token", intentos = 0, bajas = 0, escrituras = 0;
+  const guardado = new Map();
+  const cache = {
+    match:async url => guardado.get(String(url))?.clone(),
+    put:async (url,res) => { guardado.set(String(url),res); },
+    delete:async url => guardado.delete(String(url))
+  };
+  const Notification = {permission:"granted",requestPermission:async () => Notification.permission};
+  const navigator = {onLine:true,serviceWorker:{getRegistration:async () => ({
+    active:{},getNotifications:async () => [],pushManager:{getSubscription:async () => null}
+  })}};
+  const crear = runInNewContext(controlador + "\ncrearNotificaciones",{
+    URL,Response,setTimeout,clearTimeout,isSecureContext:true,window:{Notification,PushManager:{},caches:{}},
+    Notification,navigator,caches:{open:async () => cache},localStorage:{getItem:() => id},
+    Date:{now:() => reloj}
+  });
+  const sesion = () => usuario ? {uid:usuario} : null;
+  return {
+    Notification,navigator, avanzar: ms => { reloj += ms; },
+    cambiarToken: nuevo => { token = nuevo; }, cambiarUsuario: uid => { usuario = uid; },
+    contadores: () => ({intentos,bajas,escrituras}),
+    abrir:() => crear({
+      sesion,app:() => ({}),actualizar:() => {},
+      cargarMessaging: async () => ({
+        isSupported:async () => true, getMessaging:() => ({}), getToken:async () => token,
+        deleteToken:async () => { bajas++; token += "-nuevo"; }
+      }),
+      datos:{
+        leerPreferencias:async () => null,
+        guardarDispositivo:async (uid,id,actual,vigencia,comprobarRegistro) => {
+          intentos++;
+          if (!navigator.onLine || servidor.falla) throw new Error("Sin conexión");
+          await servidor.espera;
+          vigencia();
+          const clave = uid + "/" + id;
+          if (!servidor.has(clave) && comprobarRegistro) return false;
+          if (servidor.get(clave) !== actual) { servidor.set(clave,actual); escrituras++; }
+          return true;
+        },
+        borrarDispositivo:async (uid,id) => {
+          if (!navigator.onLine) throw new Error("Sin conexión");
+          servidor.delete(uid + "/" + id);
+        }
+      }
+    })
+  };
+}
+
+test("restaura la intención tras recargar, desconectarse y perder el registro remoto", async () => {
+  const servidor = new Map(), movil = dispositivoSimulado("movil",servidor), pc = dispositivoSimulado("pc",servidor);
+  let app = movil.abrir();
+  await app.cambiarSesion("ana",false);
+  await app.dispositivo(true);
+  const escritorio = pc.abrir();
+  await escritorio.cambiarSesion("ana",false);
+  await escritorio.dispositivo(true);
+  assert.equal(app.estado().estado,"activo");
+  servidor.delete("ana/movil");
+  movil.navigator.onLine = false;
+  app = movil.abrir();
+  await app.cambiarSesion("ana",false);
+  await app.abrirPanel();
+  assert.equal(app.estado().estado,"activo");
+  movil.navigator.onLine = true;
+  servidor.falla = true;
+  await app.renovar();
+  assert.equal(app.estado().estado,"activo");
+  servidor.falla = false;
+  await app.renovar(true);
+  assert.equal(servidor.has("ana/movil"),false);
+  movil.avanzar(60000);
+  await Promise.all([app.renovar(),app.renovar(true),app.renovar()]);
+  assert.equal(servidor.get("ana/movil"),"movil-token-nuevo");
+  assert.equal(servidor.get("ana/pc"),"pc-token");
+  assert.deepEqual(movil.contadores(),{intentos:4,bajas:1,escrituras:2});
+  movil.avanzar(15 * 60000);
+  await app.renovar();
+  assert.equal(movil.contadores().escrituras,2);
+  movil.cambiarToken("rotado");
+  movil.avanzar(60000);
+  await app.renovar(true);
+  assert.equal(servidor.get("ana/movil"),"rotado");
+  assert.equal(servidor.size,2);
+});
+
+test("desactivar sin conexión, revocar permiso y cerrar sesión impiden la recuperación", async () => {
+  for (const accion of ["manual","permiso","sesion"]) {
+    const servidor = new Map(), movil = dispositivoSimulado("movil",servidor);
+    let app = movil.abrir();
+    await app.cambiarSesion("ana",false);
+    await app.dispositivo(true);
+    movil.navigator.onLine = false;
+    if (accion === "manual") await app.dispositivo(false);
+    if (accion === "permiso") {
+      movil.Notification.permission = "denied";
+      await app.renovar();
+      assert.equal(app.estado().estado,"bloqueado");
+      movil.Notification.permission = "granted";
+    }
+    if (accion === "sesion") {
+      await app.cerrarSesion();
+      movil.cambiarUsuario("otra");
+    }
+    movil.navigator.onLine = true;
+    app = movil.abrir();
+    await app.cambiarSesion(accion === "sesion" ? "otra" : "ana",false);
+    assert.equal(app.estado().estado,"apagado");
+    assert.equal(movil.contadores().escrituras,1);
+  }
+});
+
+test("una reconciliación pendiente no restaura el dispositivo después de cerrar sesión", async () => {
+  const servidor = new Map(), movil = dispositivoSimulado("movil",servidor), app = movil.abrir();
+  await app.cambiarSesion("ana",false);
+  await app.dispositivo(true);
+  movil.cambiarToken("rotado");
+  movil.avanzar(15 * 60000);
+  let continuar;
+  servidor.espera = new Promise(resolve => { continuar = resolve; });
+  const renovacion = app.renovar();
+  while (movil.contadores().intentos < 2) await new Promise(resolve => setImmediate(resolve));
+  await app.cerrarSesion();
+  continuar();
+  await renovacion;
+  assert.equal(servidor.has("ana/movil"),false);
+  const restaurada = movil.abrir();
+  await restaurada.cambiarSesion("ana",false);
+  assert.equal(restaurada.estado().estado,"apagado");
 });

@@ -90,3 +90,13 @@ gcloud firestore fields ttls update expiraEn --collection-group=notificacionesEv
 ## Fuentes técnicas
 
 [FCM Web y VAPID](https://firebase.google.com/docs/cloud-messaging/web/get-started), [Recepción de mensajes web](https://firebase.google.com/docs/cloud-messaging/web/receive-messages), [Triggers de Firestore con contexto](https://firebase.google.com/docs/functions/firestore-events), [Precios de Firebase](https://firebase.google.com/pricing) y [TTL en Firestore](https://firebase.google.com/docs/firestore/ttl).
+
+## Recuperación de la vinculación en v3.70.7
+
+En v3.70.6 la vinculación en `pedidos-push-v1` cumplía dos funciones: guardar la intención del usuario y permitir al service worker filtrar avisos por cuenta y dispositivo. Al abrir Ajustes, una lectura válida de Firestore sin documento borraba esa vinculación y apagaba el interruptor. La renovación requería encontrar la misma vinculación, así que el dispositivo quedaba fuera de recuperación. El servidor puede eliminar registros con tokens rechazados definitivamente o con más de 45 días sin renovar. Se reprodujo la ruta por código y con simulación, sin atribuir a un teléfono concreto la causa de la desaparición de su documento.
+
+La vinculación local se conserva ante errores de red, del SDK o ausencia del documento remoto. Al restaurar la sesión, volver a primer plano, recuperar conexión o recibir `pushsubscriptionchange`, la app comprueba el token y el documento del mismo ID. Si falta el registro confirmado, vuelve a solicitar un token al SDK y lo registra de nuevo. El interruptor representa la intención local y el permiso del navegador. Al desactivar manualmente, cerrar sesión o detectar una revocación se retira la vinculación que usa el worker, incluso si la limpieza remota falla por falta de conexión.
+
+Con la app visible, la revisión ordinaria se limita a una vez cada 15 minutos por sesión de página. Los reintentos y señales del worker tienen un mínimo de un minuto. Cuando el token coincide, se escribe solo para renovar la vigencia semanal. La transacción reaprovecha el mismo documento, y Web Locks evita renovaciones simultáneas entre pestañas compatibles. La actualización de la caché de la PWA conserva `pedidos-push-v1`.
+
+Las regresiones simulan restauración, reconexión, pérdidas del registro, rotación, baja sin red, revocación, cambio de cuenta, independencia de dos dispositivos y activación de un service worker actualizado. Las pruebas de navegador usan Chromium y un móvil emulado. Quedan por comprobar en teléfonos físicos la suspensión, el reinicio y la entrega real de FCM. La recuperación necesita que se vuelva a abrir la app si el navegador cambia la suscripción mientras no hay clientes activos.

@@ -2,10 +2,15 @@
 
 - Actualización del 28 de noviembre de 2026.
 - Repositorio `kdnaskrlos/Pedidos-Personalizados`. Base `main` en `f14b9fbda4cc4cb9c81dd9119ca8934dc4f3a88c`, verificada contra el remoto.
-- Versión de esta entrega `v3.70.6`, desde la base `v3.70.5`.
+- Base oficial comprobada `v3.70.6` en `d676719`. Candidata `v3.70.7` en `codex/v3.70.7-notificaciones`, pendiente de revisión.
+- Versión de la entrega anterior `v3.70.6`, desde la base `v3.70.5`.
 - Diseño y publicación aprobados por el propietario, con publicación condicionada a CI en verde. [PR #14](https://github.com/kdnaskrlos/Pedidos-Personalizados/pull/14) · [Issue #13](https://github.com/kdnaskrlos/Pedidos-Personalizados/issues/13)
 
-## Alcance
+## Incidencia de notificaciones
+
+La consulta de un registro remoto ausente borraba la vinculación local y bloqueaba la renovación automática. La candidata conserva la intención y recupera el registro con el mismo ID. Usa caché de aplicación `pedidos-v184` y conserva la vinculación de avisos. [Investigación y pruebas](notificaciones-push.md)
+
+## Alcance de v3.70.6
 
 - Resumen PNG según el tipo real, datos administrativos reducidos y precio unitario visible solo en partidas de más de una unidad. El detalle interno conserva la trazabilidad.
 - Las partidas del detalle y del PNG se ordenan por el catálogo de niños, adultos y plus. Los empates conservan el orden de origen y las tallas fuera del catálogo se muestran al final. El almacenamiento y el formulario de edición conservan el orden original.

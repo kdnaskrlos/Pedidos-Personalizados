@@ -1,5 +1,10 @@
 # Bitácora de Pedidos Personalizados
 
+## 2026-11-28 · Candidata v3.70.7
+
+- Se reprodujo la pérdida de vinculación local al faltar el registro en Firestore y se añadió reconciliación automática con el mismo ID. Las pruebas de ciclo de vida y FCM son simuladas. [Investigación](notificaciones-push.md)
+- Base oficial `d676719`. Entrega en borrador para revisión, pendiente de pruebas en dispositivos físicos y autorización de publicación.
+
 ## 2026-11-28 · Entrega v3.70.6
 
 - Se aprobó el diseño y la publicación tras CI en verde. La última revisión oculta «Unidad» en las partidas de una pieza del detalle y del PNG, y conserva el subtotal.

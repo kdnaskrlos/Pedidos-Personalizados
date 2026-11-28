@@ -1233,7 +1233,7 @@ const updateDoc = (...a) => sinEsperar(fsUpdateDoc(...a));
 const deleteDoc = (...a) => sinEsperar(fsDeleteDoc(...a));
 const writeBatch = db => { const b = fsWriteBatch(db), c = b.commit.bind(b); b.commit = () => sinEsperar(c()); return b; };
 
-const VERSION = "v3.70.6";
+const VERSION = "v3.70.7";
 /* ================= Utilidades ================= */
 const $ = (s, r = document) => r.querySelector(s);
 const esc = s => String(s ?? "").replace(/[&<>"']/g, c => ({"&":"&amp;","<":"&lt;",">":"&gt;",'"':"&quot;","'":"&#39;"}[c]));
@@ -1439,6 +1439,7 @@ const pedidosList = () => Object.values(S.pedidos);
 
 /* ================= Notificaciones personales ================= */
 const preferenciaAvisos = uid => doc(S.db,"usuarios",uid,"preferencias","notificaciones");
+const vigenciaAvisos = 7 * 86400000;
 const dispositivoAvisos = (uid,id) => doc(S.db,"usuarios",uid,"dispositivos",id);
 const pushPedidos = crearNotificaciones({
   sesion:() => S.me?.activo && S.auth?.currentUser?.uid === S.uid ? {uid:S.uid} : null,
@@ -1451,11 +1452,15 @@ const pushPedidos = crearNotificaciones({
       tx.set(ref,preferencias);
       return preferencias;
     }),
-    guardarDispositivo:(uid,id,token) => runTransaction(S.db,async tx => {
-      tx.set(dispositivoAvisos(uid,id),{token,renovadoEn:serverTimestamp()});
+    guardarDispositivo:(uid,id,token,comprobarSesion,comprobarRegistro) => runTransaction(S.db,async tx => {
+      const ref = dispositivoAvisos(uid,id), actual = (await tx.get(ref)).data();
+      comprobarSesion();
+      if (!actual && comprobarRegistro) return false;
+      if (actual?.token !== token || (actual.renovadoEn?.toMillis() || 0) <= Date.now() - vigenciaAvisos)
+        tx.set(ref,{token,renovadoEn:serverTimestamp()});
+      return true;
     }),
-    borrarDispositivo:(uid,id) => runTransaction(S.db,async tx => { tx.delete(dispositivoAvisos(uid,id)); }),
-    existeDispositivo:async (uid,id) => (await getDocFromServer(dispositivoAvisos(uid,id))).exists()
+    borrarDispositivo:(uid,id) => runTransaction(S.db,async tx => { tx.delete(dispositivoAvisos(uid,id)); })
   },
   actualizar:() => document.querySelectorAll("[data-panel-notificaciones]").forEach(panel => panel.dibujarAvisos?.())
 });
@@ -1526,6 +1531,11 @@ function boot(){
   document.addEventListener("visibilitychange", () => {
     if (document.visibilityState === "visible") { actualizarPendientes(); sincronizarPendientes(); pushPedidos.renovar(); }
   });
+  addEventListener("pageshow", e => { if (e.persisted) pushPedidos.renovar(); });
+  navigator.permissions?.query({name:"notifications"}).then(permiso => {
+    permiso.addEventListener("change",() => pushPedidos.renovar());
+  }).catch(() => {});
+  setInterval(() => { if (document.visibilityState === "visible") pushPedidos.renovar(); }, 15 * 60000);
   setInterval(() => sincronizarPendientes(), 30000);
   addEventListener("offline", () => { S.online = false; render(); });
   addEventListener("beforeinstallprompt", e => { e.preventDefault(); S.installEvt = e; render(); });
@@ -1591,7 +1601,10 @@ function startMe(){
   const un = onSnapshot(doc(S.db, "usuarios/" + uid), { includeMetadataChanges: true }, s => {
     if (uid !== S.uid || s.metadata.hasPendingWrites || (s.metadata.fromCache && !S.me)) return;
     const was = S.me, perfil = s.exists() ? s.data() : null;
-    if (!perfil?.activo) return desactivar();
+    if (!perfil?.activo) {
+      if (!s.metadata.fromCache) desactivar();
+      return;
+    }
     S.me = perfil;
     pushPedidos.cambiarSesion(uid,perfil.rol === "admin").then(() => pushPedidos.renovar());
     if (!was || ["rol","soloAsignados","verPersonalizado","verSublimacion","bloquear","eliminar"].some(k => was[k] !== perfil[k])) {
@@ -1601,7 +1614,7 @@ function startMe(){
     route();
     actualizarPendientes();
     sincronizarPendientes();
-  }, e => { console.warn(e); if (uid === S.uid) desactivar(); });
+  }, e => { console.warn(e); if (uid === S.uid && e.code === "permission-denied") desactivar(); });
   S.unsubs.push(un);
 }
 function startData(keep){
