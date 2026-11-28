@@ -19,7 +19,7 @@ const firebaseCdn = "https://www.gstatic.com/firebasejs/10.12.2/";
 const curl = promisify(execFile);
 const mime = {html:"text/html",js:"text/javascript",mjs:"text/javascript",png:"image/png",webmanifest:"application/manifest+json"};
 
-async function appDePrueba(arranque = "boot();",workerInicial) {
+async function appDePrueba(arranque = "boot();",workerInicial,claveVapid = "") {
   const original = await readFile(new URL("index.html",root),"utf8");
   const html = original.replaceAll(firebaseCdn, "/sdk/")
     .replace("import { getAuth,", "import { connectAuthEmulator, getAuth as sdkAuth,")
@@ -65,7 +65,7 @@ async function appDePrueba(arranque = "boot();",workerInicial) {
       } else if (path === "/push-config.mjs") {
         // El registro FCM real se verifica por separado de los emuladores.
         res.setHeader("Content-Type",mime.mjs);
-        data = 'export const claveVapid = ""; export const regionAvisos = "us-central1";';
+        data = `export const claveVapid = ${JSON.stringify(claveVapid)}; export const regionAvisos = "us-central1";`;
       } else if (/^\/sdk\/firebase-[\w-]+\.js$/.test(path)) {
         res.setHeader("Content-Type",mime.js);
         if (!sdk.has(path)) {
@@ -1501,7 +1501,7 @@ test("una actualización PWA conserva la intención y el estado pendiente con In
     await page.evaluate(async () => {
       const registro = {uid:"ana",id:crypto.randomUUID(),generacion:crypto.randomUUID(),habilitado:true,entrega:true};
       await globalThis.almacenAvisos.cambiar(() => registro);
-      await caches.open("pedidos-v184");
+      await caches.open("pedidos-v185");
       await (await caches.open("pedidos-push-v1")).put("/.pedidos-push/dispositivo",new Response(JSON.stringify(registro)));
       await navigator.serviceWorker.register("/sw.js");
       await navigator.serviceWorker.ready;
@@ -1511,7 +1511,7 @@ test("una actualización PWA conserva la intención y el estado pendiente con In
     await page.evaluate(async () => (await navigator.serviceWorker.getRegistration()).update().then(() => {}));
     await page.waitForFunction(async () => {
       const claves = await caches.keys();
-      return claves.includes("pedidos-v185") && !claves.includes("pedidos-v184");
+      return claves.includes("pedidos-v186") && !claves.includes("pedidos-v185");
     });
     await page.evaluate(() => caches.delete("pedidos-push-v1"));
     await page.reload();
@@ -1526,6 +1526,102 @@ test("una actualización PWA conserva la intención y el estado pendiente con In
     assert.equal(await page.locator("[data-nt-dispositivo]").isChecked(),true);
     assert.equal(await page.locator("[data-nt-dispositivo]").isEnabled(),true);
     assert.equal(await page.locator("[data-nt-prueba]").isDisabled(),true);
+  } finally {
+    await navegador?.close();
+    server.close();
+  }
+});
+
+test("escritorio: recupera una vinculación v3.70.6 con el mismo ID tras el rechazo de FCM", {timeout:35000}, async () => {
+  // El worker previo y su Cache Storage representan una instalación v3.70.6.
+  const anterior = 'self.addEventListener("install",()=>self.skipWaiting()); self.addEventListener("activate",e=>e.waitUntil(self.clients.claim()));';
+  const {server,url,publicarWorker} = await appDePrueba(`
+    window.comprobarAvisos = async dispositivo => {
+      const {montarPanelNotificaciones} = await import("./notificaciones-ui.mjs");
+      let suscripcionAnterior = true, lectura = 0, guardado;
+      const reg = await navigator.serviceWorker.getRegistration();
+      Object.defineProperty(reg.pushManager,"getSubscription",{value:async () => ({
+        unsubscribe:async () => { suscripcionAnterior = false; return true; }
+      })});
+      // getRegistration devuelve un objeto distinto por llamada en algunos navegadores.
+      Object.defineProperty(PushManager.prototype,"getSubscription",{configurable:true,value:reg.pushManager.getSubscription});
+      const api = crearNotificaciones({
+        sesion:() => ({uid:"ana"}),app:() => ({}),actualizar:() => window.dibujarAvisos?.(),
+        cargarMessaging:async () => ({
+          isSupported:async () => true,getMessaging:() => ({}),
+          getToken:async () => "token-ficticio-sin-credenciales-" + (suscripcionAnterior ? "anterior" : "nuevo"),
+          deleteToken:async () => { throw Object.assign(new Error("Detalle privado ficticio"),{code:"messaging/token-unsubscribe-failed"}); }
+        }),
+        datos:{
+          guardarDispositivo:async (uid,id,token,vigente,comprobar) => {
+            await vigente();
+            lectura++;
+            if (comprobar) return false;
+            guardado = {id,nuevo:token.endsWith("-nuevo")};
+            return true;
+          }
+        }
+      });
+      window.dibujarAvisos = montarPanelNotificaciones(document.querySelector("#app"),api);
+      await api.cambiarSesion("ana",false);
+      window.reintentarAvisos = async () => {
+        const reloj = Date.now;
+        Date.now = () => reloj() + 6000;
+        try { await api.renovar(); }
+        finally { Date.now = reloj; }
+        return {guardado,lectura,conservado:(await globalThis.almacenAvisos.leer()).id === dispositivo};
+      };
+    };
+  `,anterior,"simulada");
+  const executablePath = process.env.CHROMIUM_PATH || (existsSync("/usr/bin/chromium") ? "/usr/bin/chromium" : chromium.executablePath());
+  let navegador;
+  try {
+    navegador = await chromium.launch({executablePath,args:["--no-sandbox"]});
+    const context = await navegador.newContext({viewport:{width:1440,height:900},permissions:["notifications"]});
+    await context.route(/^https?:/,r => new URL(r.request().url()).hostname === "127.0.0.1" ? r.continue() : r.abort());
+    const page = await context.newPage();
+    await page.goto(url);
+    const dispositivo = await page.evaluate(async () => {
+      const id = crypto.randomUUID();
+      await caches.open("pedidos-v183");
+      await (await caches.open("pedidos-push-v1")).put("/.pedidos-push/dispositivo",new Response(JSON.stringify({
+        uid:"ana",id,renovado:Date.now() - 8 * 86400000
+      })));
+      await navigator.serviceWorker.register("/sw.js");
+      await navigator.serviceWorker.ready;
+      return id;
+    });
+    await page.waitForFunction(() => !!navigator.serviceWorker.controller);
+    publicarWorker();
+    await page.evaluate(async () => {
+      const cambio = new Promise(resolve => navigator.serviceWorker.addEventListener("controllerchange",resolve,{once:true}));
+      await (await navigator.serviceWorker.getRegistration()).update();
+      await cambio;
+    });
+    const otra = await context.newPage();
+    await otra.goto(url);
+    await otra.evaluate(() => new Promise(resolve => {
+      window.finRegistro = navigator.locks.request("pedidos-push-registro",() => new Promise(soltar => {
+        window.soltarRegistro = soltar;
+        resolve();
+      }));
+    }));
+    await page.reload();
+    await page.evaluate(dispositivo => window.comprobarAvisos(dispositivo),dispositivo);
+    await visible(page.getByText("Pendiente de verificación",{exact:true}));
+    assert.match(await page.locator("[data-nt-diagnostico]").innerText(),/otra-pestana/);
+    assert.equal(await page.locator("[data-nt-dispositivo]").isChecked(),true);
+    assert.equal(await page.locator("[data-nt-prueba]").isDisabled(),true);
+    await otra.evaluate(async () => {
+      window.soltarRegistro();
+      await window.finRegistro;
+    });
+    await page.waitForFunction(async () =>
+      !(await navigator.locks.query()).held.some(lock => lock.name === "pedidos-push-registro"));
+    const resultado = await page.evaluate(() => window.reintentarAvisos());
+    assert.deepEqual(resultado,{guardado:{id:dispositivo,nuevo:true},lectura:2,conservado:true});
+    await visible(page.getByText("Activo",{exact:true}));
+    assert.equal(await page.locator("[data-nt-prueba]").isEnabled(),true);
   } finally {
     await navegador?.close();
     server.close();

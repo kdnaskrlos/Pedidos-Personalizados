@@ -1233,7 +1233,7 @@ const updateDoc = (...a) => sinEsperar(fsUpdateDoc(...a));
 const deleteDoc = (...a) => sinEsperar(fsDeleteDoc(...a));
 const writeBatch = db => { const b = fsWriteBatch(db), c = b.commit.bind(b); b.commit = () => sinEsperar(c()); return b; };
 
-const VERSION = "v3.70.7";
+const VERSION = "v3.70.8";
 /* ================= Utilidades ================= */
 const $ = (s, r = document) => r.querySelector(s);
 const esc = s => String(s ?? "").replace(/[&<>"']/g, c => ({"&":"&amp;","<":"&lt;",">":"&gt;",'"':"&quot;","'":"&#39;"}[c]));
@@ -1460,6 +1460,7 @@ const pushPedidos = crearNotificaciones({
         tx.set(ref,{token,renovadoEn:serverTimestamp()});
       return true;
     }),
+    existeDispositivo:async (uid,id) => (await getDocFromServer(dispositivoAvisos(uid,id))).exists(),
     borrarDispositivo:(uid,id) => runTransaction(S.db,async tx => { tx.delete(dispositivoAvisos(uid,id)); })
   },
   actualizar:() => document.querySelectorAll("[data-panel-notificaciones]").forEach(panel => panel.dibujarAvisos?.())
@@ -1541,6 +1542,7 @@ function boot(){
   addEventListener("beforeinstallprompt", e => { e.preventDefault(); S.installEvt = e; render(); });
   if ("serviceWorker" in navigator && location.protocol === "https:") {
     actualizacionSilenciosa();
+    navigator.serviceWorker.addEventListener("controllerchange",() => pushPedidos.workerListo());
     navigator.serviceWorker.addEventListener("message",e => {
       if (e.source?.scriptURL !== new URL("./sw.js",location.href).href) return;
       if (e.data?.tipo === "pedidos-renovar-avisos") pushPedidos.renovar(true);
