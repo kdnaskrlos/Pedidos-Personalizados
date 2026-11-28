@@ -2,7 +2,7 @@ import assert from "node:assert/strict";
 import { execFile } from "node:child_process";
 import { createServer } from "node:http";
 import { existsSync } from "node:fs";
-import { readFile } from "node:fs/promises";
+import { mkdir, readFile, writeFile } from "node:fs/promises";
 import { promisify } from "node:util";
 import { test } from "node:test";
 import { chromium, devices } from "playwright-core";
@@ -19,7 +19,7 @@ const firebaseCdn = "https://www.gstatic.com/firebasejs/10.12.2/";
 const curl = promisify(execFile);
 const mime = {html:"text/html",js:"text/javascript",mjs:"text/javascript",png:"image/png",webmanifest:"application/manifest+json"};
 
-async function appDePrueba() {
+async function appDePrueba(arranque = "boot();") {
   const original = await readFile(new URL("index.html",root),"utf8");
   const html = original.replaceAll(firebaseCdn, "/sdk/")
     .replace("import { getAuth,", "import { connectAuthEmulator, getAuth as sdkAuth,")
@@ -44,7 +44,7 @@ async function appDePrueba() {
       }
       const initializeFirestore = (...a) => conectar(sdkInitDb(...a));
       const getFirestore = (...a) => conectar(sdkDb(...a));
-      boot();
+      ${arranque}
     `);
   const sdk = new Map();
   const server = createServer(async (req,res) => {
@@ -142,13 +142,13 @@ async function descargarPedido(page, nombres) {
   }
 }
 
-function comprobarCamposPNG(resumen) {
+function comprobarCamposPNG(resumen, titulo = "SUBLIMACIÓN COMPLETA") {
   const lineas = resumen.split("\n");
-  for (const campo of ["Datos del pedido","Creación","Entrega","Cliente","Tema","Subtotal","Total","Abono","Saldo"])
+  for (const campo of [titulo,"Creación","Entrega","Cliente","Tema","Subtotal","Total","Abono","Saldo"])
     assert.ok(lineas.includes(campo),campo);
-  for (const titulo of ["Prendas","Pago","Notas","Seguimiento"])
-    assert.ok(!lineas.includes(titulo),titulo);
-  assert.match(resumen,/\bPrecio\s+unitario\b/);
+  for (const omitido of ["Datos del pedido","Prendas","Pago","Notas","Seguimiento"])
+    if (omitido !== titulo) assert.ok(!lineas.includes(omitido),omitido);
+  if (titulo === "Datos del pedido") assert.ok(lineas.includes("Precio unitario"));
   assert.match(resumen,/^\d+$/m);
   assert.match(resumen,/Talla /);
   assert.doesNotMatch(resumen,/RESUMEN DEL PEDIDO|\b[PS]-\d{4}\b|Teléfono|Estado|Urgente|Moneda|584120000000|12025550142/);
@@ -162,6 +162,19 @@ async function comprobarIconoSobreFoto(icono) {
     return a.width >= 40 && a.height >= 40 && Math.abs(f.right - a.right - 4) <= 2 &&
       Math.abs(a.top - f.top - 4) <= 2 && a.right <= innerWidth;
   }));
+}
+
+async function comprobarEdicionFueraDeFoto(visor) {
+  const editar = visor.getByRole("button",{name:"Editar imagen"});
+  await visible(editar);
+  await visor.page().waitForFunction(() => {
+    const area = document.querySelector(".lbvp").getBoundingClientRect();
+    const foto = document.querySelector('.lbs[aria-hidden="false"] img').getBoundingClientRect();
+    const boton = document.querySelector(".lbx-ed").getBoundingClientRect();
+    return Math.abs(boton.right - Math.min(foto.right,area.right)) <= 2 &&
+      Math.abs(boton.top - Math.min(foto.bottom,area.bottom) - 6) <= 2 &&
+      boton.bottom <= innerHeight && boton.left >= 0;
+  },null,{timeout:2500});
 }
 
 async function comprobarAncla(page,id) {
@@ -207,6 +220,7 @@ async function comprobarZoomMovil(page,visor) {
     await tocar("touchMove",-125,125);
     await tocar("touchEnd");
     assert.equal((await estado()).escala,4);
+    await comprobarEdicionFueraDeFoto(visor);
     await tocar("touchStart",0);
     await tocar("touchMove",-155);
     await tocar("touchEnd");
@@ -684,9 +698,11 @@ test("escritorio y móvil: login, altas offline en varios clientes, recarga, sin
     assert.equal(await visor.locator(".lbx-prev").isDisabled(),true);
     const icono = visor.getByRole("button",{name:"Descargar foto"});
     await comprobarIconoSobreFoto(icono);
+    await comprobarEdicionFueraDeFoto(visor);
     await visor.locator(".lbx-next").click();
     assert.equal(await visor.locator(".lbx-next").isDisabled(),true);
     await comprobarIconoSobreFoto(icono);
+    await comprobarEdicionFueraDeFoto(visor);
     const original = page.waitForEvent("download");
     await icono.click();
     const imagen = await original;
@@ -709,6 +725,7 @@ test("escritorio y móvil: login, altas offline en varios clientes, recarga, sin
       /^resumen-pedido-S-\d+\.png$/, /^S-\d+-referencia-01\.png$/, /^S-\d+-referencia-02\.png$/
     ]);
     comprobarCamposPNG(resumen);
+    assert.doesNotMatch(resumen,/Prenda a cargo de/);
     assert.ok(fotos.every(foto => foto.subarray(0,8).equals(Buffer.from([137,80,78,71,13,10,26,10]))));
     assert.match(resumen,/Nota Tema Escritorio\n• Separar prendas\n• Doblar\n• Revisar empaque\nLínea normal/i);
     assert.match(resumen,/19\.97/);
@@ -998,7 +1015,7 @@ test("demo independiente: agenda, HEIC, PNG, Etiqueta y WhatsApp sin servicios e
       /^resumen-pedido-P-0042\.png$/, /^P-0042-referencia-01\.png$/,
       /^P-0042-referencia-02\.png$/, /^P-0042-referencia-03\.png$/
     ]);
-    comprobarCamposPNG(resumen);
+    comprobarCamposPNG(resumen,"Datos del pedido");
     assert.equal(fotos.length,3);
     assert.ok(alto < 2400, "Dos partidas deben caber en un resumen compacto");
     assert.match(resumen,/Camisetas del club/);
@@ -1301,5 +1318,160 @@ test("pedidos de 10, 30, 50 y 100 partidas en escritorio y móvil", {timeout:260
     await env?.cleanup();
     await browser?.close();
     await new Promise(resolve => server.close(resolve));
+  }
+});
+
+test("issue 13: búsqueda, detalle, visor y PNG con datos ficticios", {timeout:45000}, async () => {
+  const {server,url} = await appDePrueba(`
+    const partidas = [
+      ["3XL","Primer Plus",1], ["M","Adulto uno",3], ["Especial","Talla histórica",1],
+      ["8","Infantil ocho",1], ["S","Adulto ese",1], ["6","Infantil seis",1], ["M","Adulto dos",1]
+    ].map(([talla,nombre,cant]) => ({
+      talla,nombre,cant,prenda:"Franela",horma:"Unisex",color:"Azul",etiqueta:"Serie Taller",precioMenor:4800000
+    }));
+    const pers = {
+      _id:"personalizado",tipo:"personalizado",codigo:"P-0042",estado:"pendiente",tema:"Equipo Horizonte",
+      cliente:{nombre:"Cliente Ficticio"},fechaEntrega:"2026-12-03",creadoEn:"2026-11-28",creadoPor:"ana",
+      editadoEn:"2026-11-28T10:30:00",editadoPor:"leo",revisarEn:"2026-11-28",revisarCambios:["Tema"],etiqueta:"Etiqueta General",
+      prendaDe:"cliente",items:partidas,moneda:"COP",pagoVersion:2,abonoMenor:12000000,nota:"Separar las tallas por paquete."
+    };
+    const sub = {
+      ...pers,_id:"sublimacion",tipo:"sublimacion",codigo:"S-0043",estado:"entregado",tema:"Festival Aurora",
+      editadoEn:"",editadoPor:"leo",moneda:"USD",pagoVersion:1,precio:19.97,abono:10
+    };
+    const referencia = (w,h) => {
+      const canvas = document.createElement("canvas"), ctx = canvas.getContext("2d");
+      canvas.width = w; canvas.height = h;
+      ctx.fillStyle = "#e4eef3"; ctx.fillRect(0,0,w,h);
+      ctx.fillStyle = "#254463"; ctx.beginPath();
+      const puntos = [[.35,.19],[.44,.13],[.56,.13],[.65,.19],[.83,.29],[.74,.47],[.66,.42],
+        [.66,.86],[.34,.86],[.34,.42],[.26,.47],[.17,.29]];
+      puntos.forEach(([x,y],i) => i ? ctx.lineTo(x*w,y*h) : ctx.moveTo(x*w,y*h));
+      ctx.closePath(); ctx.fill();
+      ctx.fillStyle = "#eab464"; ctx.fillRect(w*.34,h*.57,w*.32,h*.08);
+      ctx.fillStyle = "#fff"; ctx.textAlign = "center";
+      ctx.font = "bold " + Math.round(Math.min(w,h)*.055) + "px system-ui";
+      ctx.fillText("HORIZONTE",w*.5,h*.51);
+      return {src:canvas.toDataURL()};
+    };
+    Object.assign(S,{
+      me:{activo:true,nombre:"Ana Muestra",usuario:"ana",rol:"admin"},uid:"ana",online:false,
+      auth:{currentUser:{uid:"ana"}},view:"pedidos",pedidos:{personalizado:pers,sublimacion:sub},
+      usuarios:{ana:{usuario:"ana",nombre:"Ana Muestra"},leo:{usuario:"leo",nombre:"Leo Ejemplo"}}
+    });
+    window.muestra = {
+      visor:editable => lightbox([referencia(480,620),referencia(700,365)],{editar:editable ? () => {} : undefined}),
+      exportar:async id => {
+        const {archivosResumenPng} = await import("./pedido-export.mjs");
+        return archivosResumenPng(modeloExportable(S.pedidos[id]));
+      }
+    };
+    render();
+  `);
+  const executablePath = process.env.CHROMIUM_PATH || (existsSync("/usr/bin/chromium") ? "/usr/bin/chromium" : chromium.executablePath());
+  const navegador = await chromium.launch({executablePath,args:["--no-sandbox"]});
+  const carpeta = process.env.PEDIDOS_VISTAS_ISSUE_13;
+  if (carpeta) await mkdir(carpeta,{recursive:true});
+  try {
+    for (const [perfil,opciones] of [
+      ["escritorio",{viewport:{width:1280,height:900}}],
+      ["movil",devices["Pixel 7"]]
+    ]) {
+      const page = await navegador.newPage({...opciones,reducedMotion:"reduce"});
+      await page.route(/^https?:/,r => new URL(r.request().url()).hostname === "127.0.0.1" ? r.continue() : r.abort());
+      await page.goto(url);
+      const buscar = page.getByRole("textbox",{name:"Buscar pedidos"});
+      const limpiar = page.getByRole("button",{name:"Limpiar búsqueda"});
+      const pendientes = page.locator('[data-filtro="pendientes"]');
+      const entregados = page.locator('[data-filtro="entregados"]');
+      await oculto(limpiar);
+      await entregados.click();
+      await buscar.fill("Horizonte");
+      await visible(page.locator(".oc2:visible").filter({hasText:"Equipo Horizonte"}));
+      await visible(limpiar);
+      if (carpeta) await page.screenshot({path:`${carpeta}/busqueda-${perfil}.png`,animations:"disabled"});
+      await limpiar.click();
+      await visible(page.locator(".oc2:visible").filter({hasText:"Festival Aurora"}));
+      assert.equal(await entregados.getAttribute("aria-pressed"),"true");
+      assert.equal(await buscar.inputValue(),"");
+      assert.equal(await buscar.evaluate(e => e === document.activeElement),true);
+      await oculto(limpiar);
+
+      const detalle = page.locator(".pdmd");
+      await page.locator(".oc2:visible").filter({hasText:"Festival Aurora"}).click();
+      assert.match(await detalle.locator(".pdit li").nth(3).innerText(),/Adulto uno.*\n.*59\.91\s*\nUnidad:.*19\.97/s);
+      await detalle.getByRole("button",{name:"Volver"}).click();
+      await pendientes.click();
+      await page.locator(".oc2:visible").filter({hasText:"Equipo Horizonte"}).click();
+      const filas = detalle.locator(".pdit li");
+      const nombres = ["Infantil seis","Infantil ocho","Adulto ese","Adulto uno","Adulto dos","Primer Plus","Talla histórica"];
+      const textos = await filas.allTextContents();
+      assert.deepEqual(textos.map(t => nombres.find(n => t.includes(n))),nombres);
+      assert.deepEqual(await filas.evaluateAll(fs => fs.flatMap((f,i) => f.classList.contains("separador") ? [i] : [])),[2,5,6]);
+      assert.match(await filas.nth(3).innerText(),/144[.\s]000\s*\nUnidad:.*48[.\s]000/);
+      assert.match(await filas.first().locator(".pr").innerText(),/^COP 48[.\s]000$/);
+      assert.equal(await filas.locator(".pr small").count(),1);
+      if (perfil === "movil") await page.evaluate(() => document.documentElement.dataset.theme = "dark");
+      if (carpeta) {
+        await detalle.locator(".pdrow").first().evaluate(fila => {
+          const cuerpo = fila.closest(".pdb");
+          cuerpo.scrollTop += fila.getBoundingClientRect().top - cuerpo.getBoundingClientRect().top - 14;
+        });
+        await page.screenshot({path:`${carpeta}/detalle-${perfil}.png`,animations:"disabled"});
+      }
+      await detalle.getByRole("button",{name:"Volver"}).click();
+
+      await page.evaluate(() => window.muestra.visor(true));
+      const visor = page.getByRole("dialog",{name:"Referencias"});
+      await comprobarEdicionFueraDeFoto(visor);
+      if (carpeta && perfil === "movil") await page.screenshot({path:`${carpeta}/visor-${perfil}.png`,animations:"disabled"});
+      await visor.press("ArrowRight");
+      await comprobarEdicionFueraDeFoto(visor);
+      if (carpeta && perfil === "escritorio") await page.screenshot({path:`${carpeta}/visor-${perfil}.png`,animations:"disabled"});
+      await visor.getByRole("button",{name:"Cerrar"}).click();
+      await page.evaluate(() => window.muestra.visor(false));
+      await visible(visor.locator('.lbs[aria-hidden="false"] img'));
+      assert.equal(await visor.getByRole("button",{name:"Editar imagen"}).count(),0);
+      await visor.getByRole("button",{name:"Cerrar"}).click();
+
+      if (perfil === "escritorio") {
+        for (const tipo of ["personalizado","sublimacion"]) {
+          const {lineas,divisores,datos} = await page.evaluate(async ({tipo,guardarPNG}) => {
+            const proto = CanvasRenderingContext2D.prototype, {fillText,fillRect} = proto;
+            const lineas = [], divisores = [];
+            proto.fillText = function(texto,...args) {
+              if (this.canvas.width > 300) lineas.push(texto);
+              return fillText.call(this,texto,...args);
+            };
+            proto.fillRect = function(x,y,w,h) {
+              if (this.canvas.width > 300 && h === 1) divisores.push(lineas.length);
+              return fillRect.call(this,x,y,w,h);
+            };
+            try {
+              const [png] = await window.muestra.exportar(tipo);
+              const datos = guardarPNG ? Array.from(new Uint8Array(await png.datos.arrayBuffer())) : null;
+              return {lineas,divisores,datos};
+            } finally { Object.assign(proto,{fillText,fillRect}); }
+          },{tipo,guardarPNG:!!carpeta});
+          const personalizado = tipo === "personalizado";
+          comprobarCamposPNG(lineas.join("\n"),personalizado ? "PERSONALIZADO" : "SUBLIMACIÓN COMPLETA");
+          assert.equal(lineas.includes("Prenda a cargo de"),personalizado);
+          assert.equal(lineas.filter(l => l === "Unidad").length,1);
+          assert.equal(lineas.filter(l => l === "Subtotal").length,nombres.length);
+          assert.ok(lineas.some(l => l.includes("Serie Taller")));
+          assert.deepEqual(lineas.slice(personalizado ? -5 : -4),["Registrado por","Ana Muestra","Última edición por",
+            ...(personalizado ? ["Leo Ejemplo","28/11/2026 10:30 am"] : ["—"])]);
+          assert.ok(!lineas.some(l => ["Etiqueta General","Cambio por revisar","Editado por"].includes(l)));
+          assert.deepEqual(lineas.flatMap(t => nombres.filter(n => t.includes(n))),nombres);
+          assert.deepEqual(divisores.map(i => nombres.find(n => lineas.slice(i,i+4).join(" ").includes(n))),
+            ["Adulto ese","Primer Plus","Talla histórica"]);
+          if (carpeta) await writeFile(`${carpeta}/resumen-${tipo}.png`,Buffer.from(datos));
+        }
+      }
+      await page.close();
+    }
+  } finally {
+    await navegador.close();
+    server.close();
   }
 });

@@ -123,7 +123,11 @@ button.pill:hover{border-color:var(--ink)}
 
 .toolbar{display:flex;flex-wrap:wrap;gap:10px;align-items:center;justify-content:space-between}
 .search{flex:1;min-width:220px;max-width:520px;display:flex;align-items:center;gap:8px;border:1px solid var(--line);background:var(--surface-2);border-radius:9px;padding:0 11px;color:var(--muted)}
-.search input{border:0;outline:0;background:none;padding:9px 0;width:100%;color:var(--ink);font-weight:600}
+.search>svg{flex:none}
+.search input{flex:1;min-width:0;border:0;outline:0;background:none;padding:9px 0;color:var(--ink);font-weight:600}
+.search:focus-within{outline:2px solid var(--accent);outline-offset:1px}
+.search-clear{display:grid;place-items:center;flex:none;width:44px;height:44px;margin:-4px -10px -4px 0;padding:0;border:0;border-radius:8px;background:none;color:var(--muted);cursor:pointer}
+.search-clear[hidden]{display:none}
 .seg{display:inline-flex;border:1px solid var(--line);border-radius:9px;overflow:hidden;background:var(--surface);flex-wrap:wrap}
 .seg button{border:0;background:none;padding:7px 12px;font-size:12px;font-weight:700;color:var(--muted)}
 .seg button+button{border-left:1px solid var(--line)}
@@ -702,8 +706,10 @@ table.mx{border-collapse:collapse;width:100%;font-size:13px}
 .pdit .q{width:36px;height:36px;flex:none;border-radius:9px;background:var(--surface-2);display:grid;place-items:center;font-weight:800;font-size:15px}
 .pdit .d{flex:1;min-width:0;display:flex;flex-direction:column;line-height:1.25}
 .pdit .d b{font-size:15px;font-weight:700;white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
-.pdit .d small{font-size:12px;color:var(--muted)}
-.pdit .pr{flex:none;font-weight:800;font-size:14px}
+.pdit small{font-size:12px;color:var(--muted)}
+.pdit li.separador{border-top:1px solid color-mix(in srgb,var(--muted) 58%,var(--line));padding-top:12px}
+.pdit .pr{flex:none;max-width:48%;text-align:right;font-weight:800;font-size:14px;overflow-wrap:anywhere}
+.pdit .pr small{display:block;font-weight:400}
 .pdtl{font-size:15px;font-weight:700}
 .pdtot{font-size:22px;font-weight:800}
 .pdpay{display:grid;grid-template-columns:1fr 1fr;gap:10px}
@@ -1003,7 +1009,12 @@ html,body{overflow-x:clip}
 .agrow .oc2-due{flex:none;white-space:nowrap}
 /* v3.57 visor de imágenes deslizable */
 .lbx.gal{padding:0;display:block;touch-action:none;user-select:none;-webkit-user-select:none}
-.lbvp{position:absolute;inset:20px;overflow:hidden;container-type:size}
+.lbx.gal{--lb-arriba:20px;--lb-lado:20px;--lb-abajo:20px;--lb-editar:0px}
+.lbx.gal.editable{--lb-editar:46px}
+.lbvp{position:absolute;overflow:hidden;container-type:size;
+  inset:max(var(--lb-arriba),env(safe-area-inset-top)) max(var(--lb-lado),env(safe-area-inset-right))
+    calc(max(var(--lb-abajo),env(safe-area-inset-bottom) + 24px) + var(--lb-editar))
+    max(var(--lb-lado),env(safe-area-inset-left))}
 .lbtrack{display:flex;height:100%;will-change:transform}
 .lbs{flex:0 0 100%;height:100%;display:grid;place-items:center;padding:0;box-sizing:border-box}
 .lbs img{width:100%;height:100%;min-width:0;min-height:0;object-fit:contain;border-radius:8px;pointer-events:none}
@@ -1025,7 +1036,7 @@ html,body{overflow-x:clip}
 .dpg i.dd.ag{pointer-events:none}
 @media(min-width:761px){
   .lbx-next svg.i{transform:rotate(-90deg)}
-  .lbx.gal .lbvp{inset:clamp(54px,10dvh,68px) clamp(54px,9vw,94px) clamp(30px,7dvh,48px)}
+  .lbx.gal{--lb-arriba:clamp(54px,10dvh,68px);--lb-lado:clamp(54px,9vw,94px);--lb-abajo:clamp(30px,7dvh,48px)}
   .lbx.gal .lbs{padding:0;grid-template: minmax(0,1fr) / minmax(0,1fr)}
   .lbx.gal .lbs img{width:100%;height:100%;min-width:0;min-height:0;object-fit:contain;border-radius:0}
   .pdmd .imgbox{width:104px;height:104px}
@@ -1083,7 +1094,8 @@ html,body{overflow-x:clip}
 .ie-crop i[data-h=n]::after,.ie-crop i[data-h=s]::after{content:"";position:absolute;left:8px;right:8px;top:10px;height:4px;border-radius:2px;background:#fff}
 .ie-crop i[data-h=w]::after,.ie-crop i[data-h=e]::after{content:"";position:absolute;top:8px;bottom:8px;left:10px;width:4px;border-radius:2px;background:#fff}
 .ie-bar{display:flex;justify-content:center;align-items:center;gap:14px;padding:12px 12px max(14px,env(safe-area-inset-bottom))}
-.lbx-x.lbx-ed{top:auto;bottom:4px;right:4px;left:auto;background:#14233abf}
+.lbx-x.lbx-ed{right:auto;transform:translateX(-100%);background:#14233abf}
+.lbx-x.lbx-ed[hidden]{display:none}
 @media (max-width:1000px){.hello{padding-bottom:8px;margin-top:-6px}.hello h1{font-size:25px}}
 @media (max-width:1000px){.tiles.t5>:last-child{grid-column:1/-1}}
 @media (max-width:1000px){.pill.demo .m-pr{display:inline}}
@@ -1204,6 +1216,7 @@ import { montarPanelNotificaciones } from "./notificaciones-ui.mjs";
 import { conectarListasNota } from "./notas.mjs";
 import { consecutivoDe, documentosFoto, registrarPedido, necesitaValidacionPago, confirmarEdicionGrande, versionPedido, pedidoCabe } from "./pedidos-sync.mjs";
 import { guardarPendiente, leerPendientes, borrarPendiente, guardarFotoLocal, leerFotoLocal, borrarFotoLocal } from "./cola-local.mjs";
+import { ordenarPartidasPorTalla } from "./tallas-resumen.mjs";
 import { centavos, centavosHistoricos, cantidad, clavePrecio, precioHistorico, valorPrecioHistorico, validarPago, validarPagoEnCentavos, actualizarPagoPendiente } from "./pagos.mjs";
 import { initializeApp, deleteApp } from "https://www.gstatic.com/firebasejs/10.12.2/firebase-app.js";
 import { getAuth, onAuthStateChanged, signInWithEmailAndPassword, createUserWithEmailAndPassword, signOut, updatePassword, reauthenticateWithCredential, EmailAuthProvider } from "https://www.gstatic.com/firebasejs/10.12.2/firebase-auth.js";
@@ -1220,7 +1233,7 @@ const updateDoc = (...a) => sinEsperar(fsUpdateDoc(...a));
 const deleteDoc = (...a) => sinEsperar(fsDeleteDoc(...a));
 const writeBatch = db => { const b = fsWriteBatch(db), c = b.commit.bind(b); b.commit = () => sinEsperar(c()); return b; };
 
-const VERSION = "v3.70.5";
+const VERSION = "v3.70.6";
 /* ================= Utilidades ================= */
 const $ = (s, r = document) => r.querySelector(s);
 const esc = s => String(s ?? "").replace(/[&<>"']/g, c => ({"&":"&amp;","<":"&lt;",">":"&gt;",'"':"&quot;","'":"&#39;"}[c]));
@@ -2227,7 +2240,8 @@ function viewPedidos(a, pr){
   return `
     <div class="hello"><h1>Pedidos</h1><span class="date">${I("list")}${pedidosList().length} pedido${pedidosList().length === 1 ? "" : "s"} en total</span></div>
     <div class="toolbar">
-      <label class="search">${I("search")}<input id="q" placeholder="Buscar cliente, código o diseño" value="${esc(S.q)}" autocomplete="off"></label>
+      <div class="search">${I("search")}<input id="q" aria-label="Buscar pedidos" placeholder="Buscar cliente, código o diseño" value="${esc(S.q)}" autocomplete="off">
+        <button type="button" class="search-clear" aria-label="Limpiar búsqueda" ${S.q ? "" : "hidden"}>${I("x")}</button></div>
       <div class="seg">${fl.map(([k, t]) => `<button data-filtro="${k}" aria-pressed="${!S.q && S.filtro === k}">${t}</button>`).join("")}</div>
     </div>
     ${tipos.length > 1 ? `<div class="tipotabs">${tipos.map(t => `<button style="--c:${TIPOS[t].c}" data-tab="${t}" aria-pressed="${S.tab === t}">${(TIPOS[t].corto || TIPOS[t].label).toUpperCase()} · ${filtrar(t).length}</button>`).join("")}</div>` : ""}
@@ -2652,7 +2666,7 @@ function bindMain(){
       return;
     }
     if (d.tile) { if (d.tile === "avisos" || d.tile === "revisar") setView("avisos"); else if (d.tile.startsWith("tipo-")) { S.tab = d.tile.slice(5); S.filtro = "pendientes"; setView("pedidos"); } else { S.filtro = d.tile; autoTab(); setView("pedidos"); } return; }
-    if (d.tab) { S.tab = d.tab; render(); return; }
+    if (d.tab) { S.tab = d.tab; if (S.q) S.tabAntesBusqueda = d.tab; render(); return; }
     if (d.filtro) { S.filtro = d.filtro; autoTab(); render(); return; }
     if (d.act === "nuevo") return nuevoPedido(d.tipo);
     if (d.act === "cola") return abrirPendientes();
@@ -2681,7 +2695,31 @@ function bindMain(){
   };
   conectarNotificaciones(app.querySelector("[data-panel-notificaciones]"));
   const q = $("#q");
-  if (q) q.oninput = () => { S.q = q.value; clearTimeout(q._t); q._t = setTimeout(() => { if (S.q) autoTab(); render(); }, 160); };
+  if (q) {
+    const limpiar = $(".search-clear",app);
+    const limpiarBusqueda = () => {
+      clearTimeout(S.tBusqueda);
+      if (S.q && S.tabAntesBusqueda) S.tab = S.tabAntesBusqueda;
+      S.tabAntesBusqueda = null;
+      q.value = S.q = "";
+      limpiar.hidden = true;
+      q.focus({preventScroll:true});
+      render();
+    };
+    limpiar.onclick = limpiarBusqueda;
+    q.oninput = () => {
+      if (!q.value) return limpiarBusqueda();
+      if (!S.q) S.tabAntesBusqueda = S.tab;
+      S.q = q.value;
+      limpiar.hidden = false;
+      clearTimeout(S.tBusqueda);
+      S.tBusqueda = setTimeout(() => {
+        if (S.view !== "pedidos" || !S.q) return;
+        autoTab();
+        render();
+      }, 160);
+    };
+  }
   $("#themeBtn").onclick = () => { const t = document.documentElement.dataset.theme === "dark" ? "light" : "dark"; document.documentElement.dataset.theme = t; try { localStorage.setItem("cs-tema", t); } catch(e) {} };
   if ($("#demoBtn")) $("#demoBtn").onclick = toggleDemo;
   if ($("#instBtn")) $("#instBtn").onclick = async () => { S.installEvt.prompt(); await S.installEvt.userChoice; S.installEvt = null; render(); };
@@ -2975,10 +3013,10 @@ function lightbox(fotos, {inicio = 0, editar, descargar} = {}){
   let i = inicio;
   const origen = document.activeElement, n = fotos.length;
   const lb = document.createElement("div");
-  lb.className = "lbx gal";
+  lb.className = editar ? "lbx gal editable" : "lbx gal";
   lb.setAttribute("role","dialog"); lb.setAttribute("aria-modal","true"); lb.setAttribute("aria-label","Referencias");
   lb.innerHTML = `<button class="lbx-x lbx-close" type="button" aria-label="Cerrar">${I("x")}</button>
-    ${editar ? `<button class="lbx-x lbx-ed" type="button" aria-label="Editar imagen" title="Editar imagen">${I("edit")}</button>` : ""}
+    ${editar ? `<button class="lbx-x lbx-ed" type="button" hidden aria-label="Editar imagen" title="Editar imagen">${I("edit")}</button>` : ""}
     <div class="lbvp"><div class="lbtrack">${fotos.map(({src}, k) => `<div class="lbs"><div class="lb-foto"><img src="${esc(src)}" alt="Referencia ${k + 1}" draggable="false"></div></div>`).join("")}</div></div>
     ${n > 1 ? `<button class="lbx-x lbx-nav lbx-prev" type="button" aria-label="Foto anterior">${I("back")}</button><button class="lbx-x lbx-nav lbx-next" type="button" aria-label="Foto siguiente">${I("chev")}</button>
       <div class="lbdots" aria-hidden="true">${fotos.map(() => "<b></b>").join("")}</div>` : ""}
@@ -2989,16 +3027,6 @@ function lightbox(fotos, {inicio = 0, editar, descargar} = {}){
   const visor = $(".lbvp",lb), tr = $(".lbtrack",visor), previa = $(".lbx-prev",lb), siguiente = $(".lbx-next",lb);
   const slides = [...tr.querySelectorAll(".lbs")], marcos = slides.map(s => $(".lb-foto",s));
   const imagenes = marcos.map(m => $("img",m));
-  for (const [j, marco] of marcos.entries()) {
-    const foto = imagenes[j];
-    const ajustar = () => {
-      if (!foto.naturalWidth || !foto.naturalHeight) return;
-      marco.style.setProperty("--proporcion",foto.naturalWidth / foto.naturalHeight);
-      marco.setAttribute("data-lista","");
-    };
-    foto.addEventListener("load",ajustar,{once:true});
-    if (foto.complete) ajustar();
-  }
   const descarga = descargar ? document.createElement("button") : null;
   const botonEditar = $(".lbx-ed",lb);
   $(".lbx-close",lb).onclick = () => lb.close();
@@ -3017,6 +3045,26 @@ function lightbox(fotos, {inicio = 0, editar, descargar} = {}){
   };
   const puntos = new Map();
   let escala = 1, x = 0, y = 0, gesto = null, pinza = null;
+  const colocarEdicion = () => {
+    if (!botonEditar || !marcos[i].hasAttribute("data-lista")) return;
+    const foto = imagenes[i], area = visor.getBoundingClientRect(), dialogo = lb.getBoundingClientRect();
+    // La foto está centrada en su diapositiva. Limita su borde visible al área de zoom.
+    const borde = (lado,medida,desplazamiento) => Math.min(lado,(lado + medida * escala) / 2 + desplazamiento);
+    botonEditar.style.left = `${area.left - dialogo.left + borde(area.width,foto.offsetWidth,x)}px`;
+    botonEditar.style.top = `${area.top - dialogo.top + borde(area.height,foto.offsetHeight,y) + 6}px`;
+    botonEditar.hidden = false;
+  };
+  for (const [j, marco] of marcos.entries()) {
+    const foto = imagenes[j];
+    const ajustar = () => {
+      if (!foto.naturalWidth || !foto.naturalHeight) return;
+      marco.style.setProperty("--proporcion",foto.naturalWidth / foto.naturalHeight);
+      marco.setAttribute("data-lista","");
+      if (j === i) colocarEdicion();
+    };
+    foto.addEventListener("load",ajustar,{once:true});
+    if (foto.complete) ajustar();
+  }
   const aplicarZoom = (nivel,nx,ny) => {
     const foto = imagenes[i];
     const maxX = Math.max(0,(foto.offsetWidth * nivel - visor.clientWidth) / 2);
@@ -3025,6 +3073,7 @@ function lightbox(fotos, {inicio = 0, editar, descargar} = {}){
     x = nivel > 1 ? Math.max(-maxX,Math.min(maxX,nx)) : 0;
     y = nivel > 1 ? Math.max(-maxY,Math.min(maxY,ny)) : 0;
     foto.style.transform = nivel > 1 ? `translate3d(${x}px,${y}px,0) scale(${nivel})` : "";
+    colocarEdicion();
   };
   const reiniciarGestos = () => {
     aplicarZoom(1,0,0);
@@ -3032,7 +3081,7 @@ function lightbox(fotos, {inicio = 0, editar, descargar} = {}){
     gesto = pinza = null;
   };
   const ajuste = window.ResizeObserver ? new ResizeObserver(() => {
-    if (escala > 1) aplicarZoom(escala,x,y);
+    aplicarZoom(escala,x,y);
   }) : null;
   ajuste?.observe(visor);
 
@@ -3043,7 +3092,10 @@ function lightbox(fotos, {inicio = 0, editar, descargar} = {}){
     pos(0, t);
     lb.querySelectorAll(".lbdots b").forEach((b, j) => b.classList.toggle("on", j === i));
     slides.forEach((s, j) => s.setAttribute("aria-hidden", String(j !== i)));
-    if (botonEditar && botonEditar.parentElement !== marcos[i]) marcos[i].append(botonEditar);
+    if (botonEditar) {
+      botonEditar.hidden = !marcos[i].hasAttribute("data-lista");
+      colocarEdicion();
+    }
     if (descarga && descarga.parentElement !== marcos[i]) {
       const teniaFoco = document.activeElement === descarga;
       marcos[i].append(descarga);
@@ -4248,25 +4300,22 @@ function modeloExportable(p){
   const totalDisponible = items.length > 0 && items.every(i => tienePrecio(i) && cantidad(i.cant) !== null);
   const abonoDisponible = p.pagoVersion === 2 ? Number.isSafeInteger(p.abonoMenor)
     : typeof p.abono === "number" ? Number.isFinite(p.abono) : centavos(p.abono) !== null;
-  return {codigo:p.codigo,nota:p.nota,datos:[
+  const ultimaEdicion = fecha(p.editadoEn);
+  return {codigo:p.codigo,titulo:TIPOS[p.tipo].label.toUpperCase(),nota:p.nota,datos:[
     ["Creación",fecha(p.creadoEn)],["Entrega",p.fechaEntrega && Number.isFinite(Date.parse(p.fechaEntrega)) ? fmtDate(p.fechaEntrega) : p.fechaEntrega],["Cliente",p.cliente?.nombre],
-    ["Tema",p.tema],["Servicio",servsDe(p).join(", ")],["Etiqueta",p.etiqueta],
-    ["Prenda a cargo de",({cliente:"Cliente",tienda:"Tienda"})[p.prendaDe]]
-  ], prendas:items.map(i => [
+    ["Tema",p.tema],["Servicio",servsDe(p).join(", ")],
+    ...(p.tipo === "personalizado" ? [["Prenda a cargo de",({cliente:"Cliente",tienda:"Tienda"})[p.prendaDe]]] : [])
+  ], prendas:ordenarPartidasPorTalla(items,cfg().cat).map(({partida:i,separador}) => [
     i.prenda,i.horma,i.talla,i.color,cantidad(i.cant),i.nombre,i.numero,i.etiqueta,
-    tienePrecio(i) ? importe(precioUnitario(p,i) / 100) : "",
-    tienePrecio(i) && cantidad(i.cant) !== null ? importe(importeLinea(p,i)) : ""
+    unidadesDe(i,p) > 1 && tienePrecio(i) ? importe(precioUnitario(p,i) / 100) : "",
+    tienePrecio(i) && cantidad(i.cant) !== null ? importe(importeLinea(p,i)) : "",separador
   ]),pago:[
     ["Total",totalDisponible ? importe(calculado.total) : ""],
     ["Abono",abonoDisponible ? importe(calculado.abono) : ""],
     ["Saldo",totalDisponible && abonoDisponible ? importe(calculado.saldo) : ""],["Motivo sin abono",p.motivoSinAbono]
   ],seguimiento:[
-    ["Registrado por",persona(p.creadoPor)],["Última edición",fecha(p.editadoEn)],["Editado por",persona(p.editadoPor)],
-    ["Listo desde",fecha(p.listoEn)],["Marcado listo por",persona(p.listoPor)],["Cliente avisado",fecha(p.avisadoEn)],
-    ["Avisado por",persona(p.avisadoPor)],["Entregado",fecha(p.entregadoEn)],["Entregado por",persona(p.entregadoPor)],
-    ["Último recordatorio",fecha(p.recordadoEn)],["Recordar desde",p.posponerHasta],["Cambio por revisar",fecha(p.revisarEn)],
-    ["Revisión registrada por",persona(p.revisarPor)],["Cambios",p.revisarCambios?.join(", ")],
-    ["Asignados",p.asignados?.map(persona).join(", ")],["Acceso restringido para",p.denegados?.map(persona).join(", ")]
+    ["Registrado por",persona(p.creadoPor) || "—"],
+    ["Última edición por",ultimaEdicion ? [persona(p.editadoPor) || "—",ultimaEdicion].join("\n") : "—"]
   ]};
 }
 
@@ -4393,7 +4442,15 @@ function openDetail(id){
         ${extra.length ? `<div class="pdextra">${extra.map(x => `<span>${esc(x)}</span>`).join("")}</div>` : ""}
         <hr>
         <div class="pdrow"><span class="pdlbl">PRENDAS</span><span class="pdmut">${t.piezas} ${t.piezas === 1 ? "pieza" : "piezas"}</span></div>
-        <ul class="pdit">${(p.items || []).map(i => { const sub = [i.talla ? "Talla " + i.talla : "", i.horma, i.etiqueta, i.nombre, i.numero ? "N° " + i.numero : ""].filter(Boolean); return `<li><span class="q num">${esc(unidadesDe(i, p))}</span><span class="d"><b>${esc(i.prenda)} ${esc(String(i.color || "").toLowerCase())}</b>${sub.length ? `<small>${esc(sub.join(" · "))}</small>` : ""}</span><span class="pr num">${esc(money(importeLinea(p, i), p.moneda))}</span></li>`; }).join("")}</ul>
+        <ul class="pdit">${ordenarPartidasPorTalla(p.items || [],cfg().cat).map(({partida:i,separador}) => {
+          const unidades = unidadesDe(i,p);
+          const sub = [i.talla ? "Talla " + i.talla : "",i.horma,i.etiqueta,i.nombre,i.numero ? "N° " + i.numero : ""].filter(Boolean);
+          return `<li${separador ? ' class="separador"' : ""}>
+            <span class="q num">${esc(unidades)}</span>
+            <span class="d"><b>${esc(i.prenda)} ${esc(String(i.color || "").toLowerCase())}</b>${sub.length ? `<small>${esc(sub.join(" · "))}</small>` : ""}</span>
+            <span class="pr num">${esc(money(importeLinea(p,i),p.moneda))}${unidades > 1 ? `<small>Unidad: ${esc(money(precioUnitario(p,i) / 100,p.moneda))}</small>` : ""}</span>
+          </li>`;
+        }).join("")}</ul>
       </div>
       <div class="pdcard">
         <div class="pdrow"><span class="pdlbl ic">${I("cash")}PAGO</span></div>

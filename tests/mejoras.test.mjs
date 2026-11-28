@@ -81,3 +81,46 @@ test("listas de notas continúan el marcador y respetan texto y saltos", () => {
   assert.equal(continuarLista("• ABC",3),null);
   assert.deepEqual(iniciarLista("☐ AB",4,"•"),{inicio:0,fin:2,texto:"• ",cursor:4});
 });
+
+test("ordena partidas por grupos de catálogo y conserva los empates y tallas históricas", async () => {
+  const {ordenarPartidasPorTalla} = await import("../tallas-resumen.mjs");
+  const tallas = ["4XL","M","única","8","XS",6," m ","6XL",null];
+  const partidas = tallas.map((talla,id) => ({talla,id}));
+  const catalogo = {tallasNino:["6","8"],tallasAdulto:["XS","M"],tallasPlus:["4XL","6XL"]};
+  const orden = ordenarPartidasPorTalla(partidas,catalogo);
+  assert.deepEqual(orden.map(({partida}) => partida.id),[5,3,4,1,6,0,7,2,8]);
+  assert.deepEqual(orden.filter(({separador}) => separador).map(({partida}) => partida.id),[4,0,2]);
+  assert.deepEqual(partidas.map(({talla}) => talla),tallas);
+  assert.deepEqual(ordenarPartidasPorTalla([],catalogo),[]);
+});
+
+test("el PNG paginado omite el divisor si coincide con un corte de página", async () => {
+  const {archivosResumenPng} = await import("../pedido-export.mjs");
+  let pagina = 0;
+  const divisores = [];
+  const ctx = {
+    measureText: texto => ({width:String(texto).length * 8}),
+    fillText() {}, beginPath() {}, roundRect() {}, fill() {}, scale() {}, clip() {},
+    rect(x,y,w,h) { this.alto = h; },
+    translate(x,y) { pagina++; this.inicio = 24 - y; },
+    fillRect(x,y,w,h) {
+      const relativo = y - this.inicio;
+      if (h === 1 && pagina && relativo >= 0 && relativo < this.alto) divisores.push([pagina,relativo]);
+    }
+  };
+  const canvas = {getContext: () => ctx,toBlob: fn => fn(new Blob())};
+  const fila = (talla,separador = false) => ["Franela","",talla,"",1,"","","","","",separador];
+  const documentoOriginal = globalThis.document;
+  globalThis.document = {createElement: () => canvas};
+  try {
+    const prendas = [...Array.from({length:125},() => fila("6")),fila("M",true),fila("3XL",true)];
+    const paginas = await archivosResumenPng({codigo:"P-42",datos:[],prendas,pago:[],seguimiento:[]});
+    assert.deepEqual(paginas.map(({nombre}) => nombre),[
+      "resumen-pedido-P-42-parte-1.png","resumen-pedido-P-42-parte-2.png"
+    ]);
+    assert.deepEqual(divisores,[[2,103]]);
+  } finally {
+    if (documentoOriginal === undefined) delete globalThis.document;
+    else globalThis.document = documentoOriginal;
+  }
+});
