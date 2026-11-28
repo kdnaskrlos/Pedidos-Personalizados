@@ -4307,7 +4307,7 @@ function modeloExportable(p){
     ...(p.tipo === "personalizado" ? [["Prenda a cargo de",({cliente:"Cliente",tienda:"Tienda"})[p.prendaDe]]] : [])
   ], prendas:ordenarPartidasPorTalla(items,cfg().cat).map(({partida:i,separador}) => [
     i.prenda,i.horma,i.talla,i.color,cantidad(i.cant),i.nombre,i.numero,i.etiqueta,
-    tienePrecio(i) ? importe(precioUnitario(p,i) / 100) : "",
+    unidadesDe(i,p) > 1 && tienePrecio(i) ? importe(precioUnitario(p,i) / 100) : "",
     tienePrecio(i) && cantidad(i.cant) !== null ? importe(importeLinea(p,i)) : "",separador
   ]),pago:[
     ["Total",totalDisponible ? importe(calculado.total) : ""],
@@ -4443,11 +4443,12 @@ function openDetail(id){
         <hr>
         <div class="pdrow"><span class="pdlbl">PRENDAS</span><span class="pdmut">${t.piezas} ${t.piezas === 1 ? "pieza" : "piezas"}</span></div>
         <ul class="pdit">${ordenarPartidasPorTalla(p.items || [],cfg().cat).map(({partida:i,separador}) => {
+          const unidades = unidadesDe(i,p);
           const sub = [i.talla ? "Talla " + i.talla : "",i.horma,i.etiqueta,i.nombre,i.numero ? "N° " + i.numero : ""].filter(Boolean);
           return `<li${separador ? ' class="separador"' : ""}>
-            <span class="q num">${esc(unidadesDe(i,p))}</span>
+            <span class="q num">${esc(unidades)}</span>
             <span class="d"><b>${esc(i.prenda)} ${esc(String(i.color || "").toLowerCase())}</b>${sub.length ? `<small>${esc(sub.join(" · "))}</small>` : ""}</span>
-            <span class="pr num">${esc(money(importeLinea(p,i),p.moneda))}<small>Unidad: ${esc(money(precioUnitario(p,i) / 100,p.moneda))}</small></span>
+            <span class="pr num">${esc(money(importeLinea(p,i),p.moneda))}${unidades > 1 ? `<small>Unidad: ${esc(money(precioUnitario(p,i) / 100,p.moneda))}</small>` : ""}</span>
           </li>`;
         }).join("")}</ul>
       </div>

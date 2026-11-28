@@ -148,7 +148,7 @@ function comprobarCamposPNG(resumen, titulo = "SUBLIMACIÓN COMPLETA") {
     assert.ok(lineas.includes(campo),campo);
   for (const omitido of ["Datos del pedido","Prendas","Pago","Notas","Seguimiento"])
     if (omitido !== titulo) assert.ok(!lineas.includes(omitido),omitido);
-  assert.ok(lineas.includes(titulo === "Datos del pedido" ? "Precio unitario" : "Unidad"));
+  if (titulo === "Datos del pedido") assert.ok(lineas.includes("Precio unitario"));
   assert.match(resumen,/^\d+$/m);
   assert.match(resumen,/Talla /);
   assert.doesNotMatch(resumen,/RESUMEN DEL PEDIDO|\b[PS]-\d{4}\b|Teléfono|Estado|Urgente|Moneda|584120000000|12025550142/);
@@ -1409,7 +1409,8 @@ test("issue 13: búsqueda, detalle, visor y PNG con datos ficticios", {timeout:4
       assert.deepEqual(textos.map(t => nombres.find(n => t.includes(n))),nombres);
       assert.deepEqual(await filas.evaluateAll(fs => fs.flatMap((f,i) => f.classList.contains("separador") ? [i] : [])),[2,5,6]);
       assert.match(await filas.nth(3).innerText(),/144[.\s]000\s*\nUnidad:.*48[.\s]000/);
-      assert.match(await filas.first().innerText(),/48[.\s]000\s*\nUnidad:.*48[.\s]000/);
+      assert.match(await filas.first().locator(".pr").innerText(),/^COP 48[.\s]000$/);
+      assert.equal(await filas.locator(".pr small").count(),1);
       if (perfil === "movil") await page.evaluate(() => document.documentElement.dataset.theme = "dark");
       if (carpeta) {
         await detalle.locator(".pdrow").first().evaluate(fila => {
@@ -1455,6 +1456,8 @@ test("issue 13: búsqueda, detalle, visor y PNG con datos ficticios", {timeout:4
           const personalizado = tipo === "personalizado";
           comprobarCamposPNG(lineas.join("\n"),personalizado ? "PERSONALIZADO" : "SUBLIMACIÓN COMPLETA");
           assert.equal(lineas.includes("Prenda a cargo de"),personalizado);
+          assert.equal(lineas.filter(l => l === "Unidad").length,1);
+          assert.equal(lineas.filter(l => l === "Subtotal").length,nombres.length);
           assert.ok(lineas.some(l => l.includes("Serie Taller")));
           assert.deepEqual(lineas.slice(personalizado ? -5 : -4),["Registrado por","Ana Muestra","Última edición por",
             ...(personalizado ? ["Leo Ejemplo","28/11/2026 10:30 am"] : ["—"])]);

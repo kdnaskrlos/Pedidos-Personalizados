@@ -1,5 +1,10 @@
 # Bitácora de Pedidos Personalizados
 
+## 2026-11-28 · Entrega v3.70.6
+
+- Se aprobó el diseño y la publicación tras CI en verde. La última revisión oculta «Unidad» en las partidas de una pieza del detalle y del PNG, y conserva el subtotal.
+- Se renovaron las capturas y los dos PNG ficticios. La entrega usa la caché `pedidos-v183` y GitHub Pages desde `main`. [PR #14](https://github.com/kdnaskrlos/Pedidos-Personalizados/pull/14)
+
 ## 2026-11-28 · Candidata v3.70.6
 
 - Se retomó `main` en `f14b9fb` (v3.70.5) y se prepararon los ocho cambios visuales y la actualización de caché en `codex/issue-13-v3.70.6`. [Issue #13](https://github.com/kdnaskrlos/Pedidos-Personalizados/issues/13)
