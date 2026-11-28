@@ -157,14 +157,14 @@ test("el mismo service worker muestra un aviso FCM y abre una URL segura, aunque
     await espera;
   };
   runInNewContext(await readFile(new URL("../sw.js",import.meta.url),"utf8"),{self,location:url,URL,importScripts() {},
-    almacenAvisos:{leer:async () => intencion},caches:{open:async () => cache,keys:async () => ["pedidos-v185","pedidos-v186","pedidos-push-v1","libs-v1"],
+    almacenAvisos:{leer:async () => intencion},caches:{open:async () => cache,keys:async () => ["pedidos-v186","pedidos-v187","pedidos-push-v1","libs-v1"],
     delete:async clave => { borradas.push(clave); }}});
   const datos = {app:"pedidos",uid:"uid123",dispositivo:"id-1",evento:"e1",pedidoId:"p-1",titulo:"Actualizado",cuerpo:"Ana modificó un pedido."};
   await lanzar("push",{data:{json:() => ({data:datos})}});
   assert.equal(mostrados.length,0);
   vinculos.set(binding,{json:async () => ({uid:"uid123",id:"id-1"})});
   await lanzar("activate",{});
-  assert.deepEqual(borradas,["pedidos-v185"]);
+  assert.deepEqual(borradas,["pedidos-v186"]);
   await Promise.all([lanzar("push",{data:{json:() => ({data:datos})}}),lanzar("push",{data:{json:() => ({data:datos})}})]);
   assert.equal(mostrados.length,1);
   await lanzar("notificationclick",{notification:{data:mostrados[0].opciones.data,close() {}}});
